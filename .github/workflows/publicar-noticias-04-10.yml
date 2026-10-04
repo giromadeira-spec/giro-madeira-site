@@ -1,0 +1,105 @@
+name: Publicar noticias 04-10
+on:
+  push:
+    paths:
+      - '.github/workflows/publicar-noticias-04-10.yml'
+permissions:
+  contents: write
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inserir noticias preservando news.js
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('news.js')
+          s=p.read_text(encoding='utf-8')
+          marker='window.GIRO_NEWS = ['
+          entries=r'''
+  {
+    id: 'pm-apreende-dinheiro-listas-gasolina-porto-velho-eleicoes-2026',
+    category: 'POLÍCIA',
+    kicker: 'ELEIÇÕES 2026 • PORTO VELHO',
+    title: 'PM apreende R$ 2.292, listas e requisições de gasolina em Porto Velho',
+    summary: 'Ocorrência na Zona Leste terminou com dinheiro, celulares, material eleitoral e 25 requisições equivalentes a 175 litros de gasolina apreendidos; três homens foram encaminhados à PF.',
+    date: '04 de outubro de 2026',
+    time: '09:06',
+    image: 'assets/giro-pm-apreensao-eleicoes-porto-velho.svg',
+    imageCredit: 'Arte editorial Giro Madeira',
+    sourceName: 'Rondoniagora',
+    sourceUrl: 'https://www.rondoniagora.com/policia/vespera-da-eleicao-pm-apreende-r-2-2-mil-listas-e-requisicoes-de-gasolina-em-porto-velho',
+    body: [
+      'Uma ocorrência do BPTAR na Zona Leste de Porto Velho terminou com a apreensão de R$ 2.292 em espécie, listas com nomes e informações de veículos, celulares, material de campanha e requisições de combustível na noite de sábado (3), véspera da votação.',
+      'Segundo as informações registradas na ocorrência, foram encontradas 25 requisições de abastecimento que, somadas, correspondiam a 175 litros de gasolina. Também foram recolhidos dois celulares e materiais de propaganda eleitoral.',
+      'Três homens foram encaminhados à Delegacia da Polícia Federal com os materiais apreendidos. O caso foi apresentado para apuração de possível prática de crime eleitoral; o encaminhamento não significa condenação.'
+    ]
+  },
+  {
+    id: 'primeiro-balanco-eleicoes-rondonia-19-ocorrencias-3-prisoes',
+    category: 'RONDÔNIA',
+    kicker: 'ELEIÇÕES 2026',
+    title: 'Primeiro balanço registra 19 ocorrências policiais e três prisões em Rondônia',
+    summary: 'Boletim parcial contabilizado até as 10h também aponta cinco ocorrências com equipamentos de votação e dez demandas emergenciais.',
+    date: '04 de outubro de 2026',
+    time: '10:07',
+    image: 'assets/giro-balanco-eleicoes-ro.svg',
+    imageCredit: 'Arte editorial Giro Madeira',
+    sourceName: 'Rondoniagora / TRE-RO',
+    sourceUrl: 'https://www.rondoniagora.com/eleicoes/primeiro-balanco-das-eleicoes-registra-19-ocorrencias-policiais-e-tres-prisoes-em-rondonia',
+    body: [
+      'O primeiro balanço parcial das eleições em Rondônia registrou 19 ocorrências policiais até as 10h deste domingo (4). As três prisões em flagrante fazem parte desse total: duas foram registradas pela Polícia Militar e uma pela Polícia Federal.',
+      'Do total, 12 registros foram classificados como crimes sem flagrante e outros quatro resultaram em termos circunstanciados. O boletim também apontou cinco ocorrências relacionadas a equipamentos de votação.',
+      'As demandas emergenciais chegaram a dez, seis delas relacionadas à energia elétrica. Até o horário do balanço, também haviam sido contabilizados 326 atendimentos ao cidadão e 25 registros no Disque Denúncia.'
+    ]
+  },
+  {
+    id: 'rondonia-1267105-eleitores-porto-velho-368124-2026',
+    category: 'RONDÔNIA',
+    kicker: 'ELEIÇÕES 2026',
+    title: 'Rondônia tem 1,267 milhão de eleitores; Porto Velho concentra 368 mil',
+    summary: 'Capital reúne 368.124 pessoas aptas a votar, o equivalente a 29,05% do eleitorado estadual nas Eleições 2026.',
+    date: '04 de outubro de 2026',
+    time: '07:01',
+    image: 'assets/giro-eleitorado-rondonia-2026.svg',
+    imageCredit: 'Arte editorial Giro Madeira',
+    sourceName: 'Rondoniagora / TSE',
+    sourceUrl: 'https://www.rondoniagora.com/eleicoes/comeca-a-votacao-mais-de-1-2-milhao-de-eleitores-aptos-a-votar-em-rondonia',
+    body: [
+      'Rondônia chegou às Eleições 2026 com 1.267.105 pessoas aptas a votar nos 52 municípios do estado, segundo dados eleitorais divulgados neste domingo (4). O número representa crescimento de 2,93% em relação a 2024.',
+      'Porto Velho concentra o maior eleitorado, com 368.124 pessoas habilitadas, equivalentes a 29,05% do total estadual. Ji-Paraná aparece em seguida, com 98.186 eleitores.',
+      'As mulheres representam 52% do eleitorado rondoniense. Entre os municípios, os cinco maiores colégios eleitorais — Porto Velho, Ji-Paraná, Ariquemes, Vilhena e Cacoal — reúnem mais da metade dos eleitores do estado.'
+    ]
+  },
+  {
+    id: '2500-policiais-seguranca-eleicoes-rondonia-2026',
+    category: 'RONDÔNIA',
+    kicker: 'SEGURANÇA • ELEIÇÕES 2026',
+    title: 'Cerca de 2.500 policiais reforçam segurança das eleições em Rondônia',
+    summary: 'Operação integrada alcança municípios e localidades de difícil acesso e mantém proteção de eleitores, locais de votação e urnas.',
+    date: '04 de outubro de 2026',
+    time: '07:51',
+    image: 'assets/giro-seguranca-eleicoes-ro.svg',
+    imageCredit: 'Arte editorial Giro Madeira',
+    sourceName: 'Rondoniagora / Polícia Militar',
+    sourceUrl: 'https://www.rondoniagora.com/eleicoes/cerca-de-2-500-policiais-atuam-na-seguranca-de-eleitores-e-urnas-em-rondonia',
+    body: [
+      'Cerca de 2.500 policiais militares foram mobilizados para a segurança das Eleições 2026 em Rondônia, em uma operação integrada com a Justiça Eleitoral e outros órgãos de segurança.',
+      'O planejamento prevê presença policial em municípios e localidades de difícil acesso, com atuação na proteção dos eleitores e locais de votação, escolta e segurança das urnas e apoio às atividades da Justiça Eleitoral.',
+      'O policiamento cotidiano continua funcionando paralelamente à operação eleitoral. Polícia Civil, Polícia Federal, Polícia Rodoviária Federal e Justiça Eleitoral também integram a estrutura de segurança.'
+    ]
+  },
+'''
+          ids=['pm-apreende-dinheiro-listas-gasolina-porto-velho-eleicoes-2026','primeiro-balanco-eleicoes-rondonia-19-ocorrencias-3-prisoes','rondonia-1267105-eleitores-porto-velho-368124-2026','2500-policiais-seguranca-eleicoes-rondonia-2026']
+          if not any(f"id: '{x}'" in s for x in ids):
+              s=s.replace(marker, marker+entries, 1)
+              p.write_text(s,encoding='utf-8')
+      - name: Commit
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name "Giro Madeira Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add news.js
+          git commit -m "Publica cobertura eleitoral de 4 de outubro"
+          git push
