@@ -1,0 +1,12 @@
+const API='/.netlify/functions/football';
+const liveEl=document.getElementById('live-games');
+const gamesEl=document.getElementById('today-games');
+const newsEl=document.getElementById('football-news');
+const checkEl=document.getElementById('football-last-check');
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function clock(iso){try{return new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Porto_Velho',hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(new Date(iso))}catch{return '—'}}
+function gameCard(g){return `<a class="game-card" href="${esc(g.url)}" target="_blank" rel="noopener"><div class="competition">${esc(g.competition||'Futebol')}</div><div class="game-label">${esc(g.label)}</div><div class="game-status">${esc(g.status||'AO VIVO')}</div></a>`}
+function gameRow(g){return `<a class="game-row ${g.live?'is-live':''}" href="${esc(g.url)}" target="_blank" rel="noopener"><div><div class="competition">${esc(g.competition||'Futebol')}</div><div class="game-label">${esc(g.label)}</div></div><div class="game-status">${esc(g.status||'Detalhes')}</div></a>`}
+function newsCard(n,i){return `<a class="football-news-card" href="${esc(n.url)}" target="_blank" rel="noopener"><div class="source">ONEFOOTBALL • DESTAQUE ${i+1}</div><h3>${esc(n.title)}</h3><span>Ler notícia original ↗</span></a>`}
+async function loadFootball(){document.body.classList.add('football-refresh');try{const r=await fetch(`${API}?t=${Date.now()}`,{cache:'no-store'});const d=await r.json();if(!r.ok||!d.ok)throw new Error(d.error||'Falha na consulta');checkEl.textContent=clock(d.checkedAt);liveEl.innerHTML=d.live?.length?d.live.map(gameCard).join(''):'<div class="empty-live">Nenhuma partida identificada ao vivo neste instante. A página continua atualizando automaticamente.</div>';gamesEl.innerHTML=d.matches?.length?d.matches.map(gameRow).join(''):'<div class="empty-live">Nenhum jogo disponível agora.</div>';newsEl.innerHTML=d.news?.length?d.news.map(newsCard).join(''):'<div class="empty-live">Nenhuma manchete disponível agora.</div>'}catch(e){const msg='<div class="error-box">Não foi possível atualizar o OneFootball neste momento. Tente novamente em instantes ou use os links da página para consultar a fonte diretamente.</div>';liveEl.innerHTML=msg;gamesEl.innerHTML=msg;newsEl.innerHTML=msg;checkEl.textContent='fonte indisponível'}finally{document.body.classList.remove('football-refresh')}}
+loadFootball();setInterval(loadFootball,30000);
