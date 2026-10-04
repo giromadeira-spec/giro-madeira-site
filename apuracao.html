@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Apuração ao vivo das Eleições 2026 em Rondônia, com dados oficiais do TSE.">
+  <title>Apuração ao vivo | Eleições 2026 | Giro Madeira</title>
+  <link rel="icon" href="assets/logo-oficial.webp">
+  <link rel="stylesheet" href="apuracao.css">
+</head>
+<body>
+  <div class="topline"></div>
+  <header class="header">
+    <div class="header-inner">
+      <a class="brand" href="index.html" aria-label="Giro Madeira - início">
+        <img class="brand-logo" src="assets/logo-oficial.webp" alt="Logo oficial Giro Madeira">
+        <div>
+          <div class="brand-name">GIRO MADEIRA</div>
+          <div class="brand-sub">Porto Velho • Rondônia</div>
+        </div>
+      </a>
+      <nav class="nav">
+        <a href="index.html">Notícias</a>
+        <a class="active" href="apuracao.html">Eleições 2026</a>
+      </nav>
+    </div>
+  </header>
+
+  <div class="live-strip">
+    <div class="wrap live-strip-inner">
+      <span class="live-dot" aria-hidden="true"></span>
+      <strong>APURAÇÃO AO VIVO</strong>
+      <span>Dados oficiais do Tribunal Superior Eleitoral</span>
+    </div>
+  </div>
+
+  <main class="wrap">
+    <section class="election-head">
+      <div>
+        <div class="eyebrow">ELEIÇÕES 2026 • 1º TURNO</div>
+        <h1>Apuração em tempo real</h1>
+        <p>Rondônia e Brasil, com atualização automática a partir dos arquivos oficiais de resultados do TSE.</p>
+      </div>
+      <div class="update-box">
+        <span>Última consulta do Giro Madeira</span>
+        <strong id="last-check">—</strong>
+        <small id="auto-status">Atualização automática a cada 30 segundos</small>
+      </div>
+    </section>
+
+    <section class="overall" aria-live="polite">
+      <div class="overall-copy">
+        <span class="label">RONDÔNIA</span>
+        <strong id="overall-pct">0,00%</strong>
+        <span>das seções totalizadas</span>
+      </div>
+      <div class="progress"><span id="overall-bar"></span></div>
+      <div class="overall-meta" id="overall-meta">Aguardando início da totalização oficial.</div>
+    </section>
+
+    <div class="tabs" role="tablist" aria-label="Cargos">
+      <button class="tab active" data-cargo="governador">Governador</button>
+      <button class="tab" data-cargo="senador">Senador</button>
+      <button class="tab" data-cargo="deputado-federal">Dep. Federal</button>
+      <button class="tab" data-cargo="deputado-estadual">Dep. Estadual</button>
+      <button class="tab" data-cargo="presidente">Presidente</button>
+    </div>
+
+    <section class="result-card">
+      <div class="result-head">
+        <div>
+          <span class="label" id="scope-label">RONDÔNIA</span>
+          <h2 id="cargo-title">Governador</h2>
+        </div>
+        <div class="tse-time" id="tse-time">TSE: aguardando dados</div>
+      </div>
+      <div id="notice" class="notice">Carregando dados oficiais...</div>
+      <div id="candidates" class="candidates"></div>
+    </section>
+
+    <section class="stats" id="stats" hidden>
+      <div><span>Seções totalizadas</span><strong id="stat-sections">—</strong></div>
+      <div><span>Comparecimento</span><strong id="stat-turnout">—</strong></div>
+      <div><span>Abstenção</span><strong id="stat-abstention">—</strong></div>
+      <div><span>Votos válidos</span><strong id="stat-valid">—</strong></div>
+      <div><span>Brancos</span><strong id="stat-blank">—</strong></div>
+      <div><span>Nulos</span><strong id="stat-null">—</strong></div>
+    </section>
+
+    <section class="source-box">
+      <strong>Fonte oficial: Tribunal Superior Eleitoral (TSE).</strong>
+      <p>O Giro Madeira exibe os dados recebidos dos arquivos oficiais de divulgação. Durante a totalização, os números são parciais e podem mudar a cada atualização.</p>
+      <a href="https://resultados.tse.jus.br" target="_blank" rel="noopener">Conferir também no Resultados TSE ↗</a>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer-inner">
+      <div class="footer-brand"><img src="assets/logo-oficial.webp" alt="Giro Madeira"><div><strong>GIRO MADEIRA</strong><br>Notícias de Porto Velho, Rondônia e região.</div></div>
+      <div>Contato editorial: giromadeira@gmail.com<br>© 2026 Giro Madeira</div>
+    </div>
+  </footer>
+
+  <script src="apuracao.js"></script>
+</body>
+</html>
