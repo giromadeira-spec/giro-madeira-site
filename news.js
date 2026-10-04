@@ -1,5 +1,149 @@
 window.GIRO_NEWS = [
   {
+    id: 'santa-cruz-acesso-serie-b-2026',
+    category: 'FUTEBOL',
+    kicker: 'ACESSO',
+    title: 'Santa Cruz empata com Maringá e garante retorno à Série B',
+    summary: 'Empate por 1 a 1 na Arena de Pernambuco confirmou o acesso do clube pernambucano com uma rodada de antecedência.',
+    date: '03 de outubro de 2026',
+    time: '19:05',
+    image: 'https://commons.wikimedia.org/wiki/Special:FilePath/Arruda%20Stadium.jpg?width=1600',
+    imageCredit: 'Rafael Vieira/FPF — domínio público, via Wikimedia Commons — foto de contexto',
+    sourceName: 'UOL Esporte',
+    sourceUrl: 'https://www.uol.com.br/esporte/futebol/ultimas-noticias/2026/10/03/santa-cruz-empata-com-maringa-e-garante-acesso-a-serie-b.ghtm',
+    body: [
+      'O Santa Cruz garantiu neste sábado o retorno à Série B do Campeonato Brasileiro. A equipe empatou por 1 a 1 com o Maringá, na Arena de Pernambuco, pela penúltima rodada do quadrangular final da Série C.',
+      'Adeílson Maranhão abriu o placar para o Maringá logo no início da partida, e Pedro Favela marcou o gol de empate do Santa Cruz no segundo tempo. Com o resultado, o clube pernambucano chegou aos 11 pontos e não pode mais ser alcançado pelo terceiro colocado do grupo.',
+      'A partida também teve forte presença da torcida: 45.500 pessoas acompanharam o confronto. O Maringá segue na disputa pela outra vaga do grupo.'
+    ]
+  },
+  {
+    id: 'leapmotor-tres-carros-brasil-2027',
+    category: 'TECNOLOGIA',
+    kicker: 'CARROS ELÉTRICOS',
+    title: 'Leapmotor prepara três novos carros para o mercado brasileiro em 2027',
+    summary: 'Marca ligada ao grupo Stellantis planeja ampliar a oferta no país com hatch elétrico e SUVs em diferentes segmentos.',
+    date: '03 de outubro de 2026',
+    time: '19:05',
+    image: 'https://commons.wikimedia.org/wiki/Special:FilePath/Electric%20car%20charging%20at%20a%20station%20during%20the%20day%20with%20the%20charging%20cable%20connected%20to%20the%20vehicle.jpg?width=1600',
+    imageCredit: 'Shixart1985 / Wikimedia Commons — CC BY 2.0 — foto de contexto',
+    sourceName: 'Canaltech',
+    sourceUrl: 'https://canaltech.com.br/carros/rival-do-dolphin-e-mais-leapmotor-vai-lancar-3-novos-carros-no-brasil-em-2027/',
+    body: [
+      'A Leapmotor prepara três lançamentos para o mercado brasileiro em 2027, dentro da estratégia de expansão da marca chinesa ligada ao grupo Stellantis.',
+      'Entre os modelos citados estão o hatch elétrico B03, o SUV compacto A10 e o SUV de seis lugares C16. A proposta é disputar desde o segmento de carros urbanos até o de veículos familiares.',
+      'Os modelos terão diferentes propostas de eletrificação. O C16, por exemplo, é previsto em configurações elétrica e híbrida em série, enquanto o A10 deve apostar em conectividade e recursos de assistência à condução.'
+    ]
+  },
+  {
+    id: 'huawei-nova-loja-sao-paulo-2026',
+    category: 'TECNOLOGIA',
+    kicker: 'MERCADO BRASILEIRO',
+    title: 'Huawei amplia presença física no Brasil com nova loja em São Paulo',
+    summary: 'Unidade autorizada no Shopping Center Norte amplia os pontos de contato da fabricante com consumidores brasileiros.',
+    date: '03 de outubro de 2026',
+    time: '12:00',
+    image: 'https://commons.wikimedia.org/wiki/Special:FilePath/Huawei%20wordmark.svg?width=1600',
+    imageCredit: 'Huawei wordmark / Wikimedia Commons — imagem de contexto',
+    sourceName: 'Canaltech',
+    sourceUrl: 'https://canaltech.com.br/smartphone/huawei-amplia-presenca-no-brasil-com-nova-loja-em-sao-paulo/',
+    body: [
+      'A Huawei ampliou sua presença física no mercado brasileiro com uma nova loja autorizada no Shopping Center Norte, na zona norte de São Paulo. A inauguração estava marcada para este sábado, às 12h.',
+      'A unidade se soma à pop-up store da Avenida Paulista e oferece espaço para o público conhecer e experimentar produtos do ecossistema da fabricante, incluindo relógios inteligentes, fones, tablets e outros dispositivos.',
+      'A expansão ocorre após um ano de maior presença da marca no Brasil, com lançamentos, campanhas e ações ligadas a esporte, moda e tecnologia.'
+    ]
+  },
+  {
+    id: 'quem-ama-cuida-reencontro-heitor-pedro',
+    category: 'TV & NOVELAS',
+    kicker: 'SPOILER',
+    title: 'Quem Ama Cuida terá reencontro inesperado envolvendo Pedro e Heitor',
+    summary: 'Trama das 9 prepara uma virada com o retorno de personagem que era dado como morto na história.',
+    date: '03 de outubro de 2026',
+    time: '12:28',
+    image: 'https://commons.wikimedia.org/wiki/Special:FilePath/TV-Universit%C3%A1ria-UFRN.jpg?width=1600',
+    imageCredit: 'Wikimedia Commons — imagem de contexto sobre televisão',
+    sourceName: 'gshow',
+    sourceUrl: 'https://gshow.globo.com/novelas/quem-ama-cuida/vem-por-ai/noticia/quem-ama-cuida-pedro-fica-em-choque-ao-ver-heitor-vivo.ghtml',
+    body: [
+      'A novela Quem Ama Cuida prepara uma reviravolta nos próximos capítulos. Heitor, personagem interpretado por Renato Góes e considerado morto na história, retorna ao Brasil.',
+      'Segundo a prévia divulgada pelo gshow, o personagem procura Pedro, vivido por Chay Suede, provocando surpresa no advogado e abrindo uma nova frente na trama.',
+      'Esta matéria contém informação antecipada da novela. O Giro Madeira sinaliza spoilers para que o leitor possa escolher se deseja continuar a leitura.'
+    ]
+  },
+  {
+    id: 'boots-riley-50-mostra-sp-2026',
+    category: 'CULTURA',
+    kicker: 'CINEMA',
+    title: 'Boots Riley virá ao Brasil para a 50ª Mostra de Cinema de São Paulo',
+    summary: 'Cineasta apresentará o novo filme I Love Boosters e também fará parte do júri da competição Novos Diretores.',
+    date: '03 de outubro de 2026',
+    time: '10:51',
+    image: 'https://commons.wikimedia.org/wiki/Special:FilePath/Boots%20Riley%2020160118-1099.jpg?width=1600',
+    imageCredit: 'Pax Ahimsa Gethen / Wikimedia Commons — foto de contexto',
+    sourceName: 'Omelete',
+    sourceUrl: 'https://www.omelete.com.br/filmes/boots-riley-mostra-sp-i-love-boosters-juri',
+    body: [
+      'O cineasta norte-americano Boots Riley participará da 50ª Mostra Internacional de Cinema de São Paulo. Ele apresentará ao público brasileiro seu novo longa, I Love Boosters.',
+      'Riley, conhecido por Desculpe te Incomodar, também integrará o júri da competição Novos Diretores e participará de conversa com o público durante o evento.',
+      'O novo filme reúne nomes como Keke Palmer, Naomi Ackie, Don Cheadle, Demi Moore e Will Poulter e chega à Mostra dentro de uma programação dedicada a produções nacionais e internacionais.'
+    ]
+  },
+  {
+    id: 'tre-ro-muda-locais-votacao-17-municipios',
+    category: 'RONDÔNIA',
+    kicker: 'ELEIÇÕES 2026',
+    title: 'TRE alerta para mudanças em locais de votação de 17 municípios de Rondônia',
+    summary: 'Alterações atingem 34 locais de votação, incluindo pontos em Porto Velho e diferentes cidades do interior.',
+    date: '03 de outubro de 2026',
+    time: '09:54',
+    image: 'https://commons.wikimedia.org/wiki/Special:FilePath/Urna%20Eletr%C3%B4nica%20Brasileira.jpg?width=1600',
+    imageCredit: 'Vinicius Depizzol / Wikimedia Commons — fotografia de referência',
+    sourceName: 'Rondoniagora / TRE-RO',
+    sourceUrl: 'https://amp.rondoniagora.com/eleicoes/tre-alerta-eleitores-sobre-mudancas-em-locais-de-votacao-de-17-municipios-de-rondonia-confira-lista',
+    body: [
+      'Eleitores de 17 municípios de Rondônia precisam conferir o local de votação antes de sair de casa neste domingo. O TRE-RO informou mudanças em 34 locais para as Eleições 2026.',
+      'As alterações atingem Porto Velho, Itapuã do Oeste, Presidente Médici, Chupinguaia, Pimenta Bueno, Espigão do Oeste, Ouro Preto do Oeste, Alta Floresta do Oeste, Alvorada do Oeste, Urupá, Santa Luzia do Oeste, São Felipe do Oeste, Parecis, Candeias do Jamari, Cujubim, Rolim de Moura e Ji-Paraná.',
+      'A orientação é consultar antecipadamente a zona, a seção e o endereço atualizado nos canais oficiais da Justiça Eleitoral para evitar deslocamento ao local errado.'
+    ]
+  },
+  {
+    id: 'mudancas-climaticas-maior-ameaca-estudo-brasil',
+    category: 'MEIO AMBIENTE',
+    kicker: 'PESQUISA',
+    title: 'Mudanças climáticas aparecem como maior ameaça para o futuro em estudo com brasileiros',
+    summary: 'Levantamento ouviu 2 mil pessoas e colocou o clima à frente de temas como perda de emprego, saúde e escassez de alimentos.',
+    date: '03 de outubro de 2026',
+    time: '08:19',
+    image: 'https://commons.wikimedia.org/wiki/Special:FilePath/Amazon%20rainforest%2C%20Brazil%20-%202026.jpg?width=1600',
+    imageCredit: 'Flowcomm / Wikimedia Commons — foto de contexto da Amazônia',
+    sourceName: 'Agência Brasil',
+    sourceUrl: 'https://agenciabrasil.ebc.com.br/geral/noticia/2026-10/mudancas-climaticas-preocupam-mais-que-perda-de-emprego-diz-estudo',
+    body: [
+      'As mudanças climáticas foram apontadas por 41% dos entrevistados como a maior ameaça para o futuro em pesquisa do Instituto Oyá em parceria com a Ipsos.',
+      'O levantamento ouviu 2 mil brasileiros. Na lista de ameaças futuras, o tema ficou à frente de perda de emprego e retrocesso na democracia, ambos com 32%, além de deterioração da saúde, com 31%, e escassez de alimentos, com 30%.',
+      'Quando a pergunta muda para as principais preocupações do momento, porém, as mudanças climáticas aparecem em posição mais baixa, mostrando diferença entre a percepção de risco futuro e as urgências atuais.'
+    ]
+  },
+  {
+    id: 'temporada-gastronomica-costa-esmeralda-2026',
+    category: 'GASTRONOMIA',
+    kicker: 'VIAGEM & SABORES',
+    title: 'Temporada gastronômica reúne 12 restaurantes em Bombinhas e Porto Belo',
+    summary: 'Evento segue até 2 de novembro com menus especiais em restaurantes da Costa Esmeralda, em Santa Catarina.',
+    date: '03 de outubro de 2026',
+    time: '08:21',
+    image: 'https://commons.wikimedia.org/wiki/Special:FilePath/%E3%83%9F%E3%83%83%E3%82%AF%E3%82%B9%E3%82%B5%E3%83%B3%E3%83%89.jpg?width=1600',
+    imageCredit: 'Wikimedia Commons — fotografia gastronômica de contexto',
+    sourceName: 'Notícia Já',
+    sourceUrl: 'https://www.noticiaja.com/noticia/o-tempo-dos-sabores-temporada-gastronomica-reune-12-restaurantes-em-bombinhas-e-porto-belo',
+    body: [
+      'A 6ª Temporada Gastronômica da Costa Esmeralda reúne 12 restaurantes de Bombinhas e Porto Belo, em Santa Catarina, entre 1º de outubro e 2 de novembro.',
+      'Os estabelecimentos prepararam menus exclusivos com propostas que passam por frutos do mar, carnes, massas, culinária japonesa, hambúrgueres e ingredientes ligados à identidade catarinense.',
+      'Segundo a organização, os menus custam entre R$ 69 e R$ 99. A iniciativa busca estimular moradores e visitantes a conhecerem diferentes restaurantes da região durante o período do evento.'
+    ]
+  },
+  {
     id: 'vagao-volta-trilhos-madeira-mamore-29-anos',
     category: 'PORTO VELHO',
     kicker: 'PATRIMÔNIO',
