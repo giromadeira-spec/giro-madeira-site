@@ -1,5 +1,77 @@
 window.GIRO_NEWS = [
   {
+    id: 'banda-k7-encerra-112-anos-porto-velho',
+    category: 'CULTURA',
+    kicker: 'PORTO VELHO',
+    title: 'Banda K7 encerra programação dos 112 anos de Porto Velho com gravação audiovisual',
+    summary: 'Apresentação deste sábado fecha as comemorações da capital e registra em vídeo o show do grupo rondoniense.',
+    date: '03 de outubro de 2026',
+    time: '21:10',
+    image: 'https://commons.wikimedia.org/wiki/Special:FilePath/Parque%20Madeira%20Mamor%C3%A9%20Porto%20Velho%20RO%20sem%20filtro.jpg?width=1600',
+    imageCredit: 'Wikimedia Commons — imagem de contexto de Porto Velho',
+    sourceName: 'Prefeitura de Porto Velho',
+    sourceUrl: 'https://agencia.portovelho.ro.gov.br/noticias/58447',
+    body: [
+      'A Banda K7 encerra neste sábado a programação especial pelos 112 anos de Porto Velho. O show foi marcado para começar às 21h10 e seguir até as 22h.',
+      'Além da apresentação, o grupo rondoniense fará a gravação de um audiovisual durante o show, registrando a performance, o público e o ambiente das comemorações.',
+      'A atração fecha uma agenda de aniversário que reuniu atividades culturais, lazer e ações voltadas às famílias ao longo do dia.'
+    ]
+  },
+  {
+    id: 'acidente-br364-alto-paraiso-dois-mortos-seis-feridos',
+    category: 'RONDÔNIA',
+    kicker: 'BR-364',
+    title: 'Colisão entre caminhonetes deixa dois mortos e seis feridos em Alto Paraíso',
+    summary: 'Acidente ocorreu na noite de sexta-feira na BR-364; oito pessoas estavam nos dois veículos, entre elas uma criança.',
+    date: '03 de outubro de 2026',
+    time: '12:19',
+    image: 'https://commons.wikimedia.org/wiki/Special:FilePath/BR-364%20em%20Rond%C3%B4nia.jpg?width=1600',
+    imageCredit: 'Wikimedia Commons — imagem rodoviária de contexto',
+    sourceName: 'Rondoniagora',
+    sourceUrl: 'https://www.rondoniagora.com/policia/colisao-entre-caminhonetes-deixa-dois-mortos-e-6-feridos-em-rondonia',
+    body: [
+      'Uma colisão entre duas caminhonetes na BR-364, em Alto Paraíso, deixou duas pessoas mortas e outras seis feridas na noite de sexta-feira (2). Oito pessoas estavam nos veículos, incluindo uma criança.',
+      'Segundo as informações divulgadas, equipes do Corpo de Bombeiros atuaram no resgate e retiraram vítimas presas às ferragens. Os sobreviventes foram encaminhados para atendimento hospitalar.',
+      'A causa do acidente será apurada pelas autoridades. Informações iniciais apontam uma ultrapassagem indevida como possível fator relacionado à colisão.'
+    ]
+  },
+  {
+    id: 'petrobras-recorde-valor-mercado-descoberta-amapa',
+    category: 'ECONOMIA',
+    kicker: 'PETRÓLEO',
+    title: 'Petrobras alcança recorde de valor de mercado após nova descoberta no Amapá',
+    summary: 'Companhia encerrou o pregão de sexta-feira avaliada em R$ 700,08 bilhões após avanço das ações na B3.',
+    date: '03 de outubro de 2026',
+    time: '13:03',
+    image: 'https://commons.wikimedia.org/wiki/Special:FilePath/Petrobras%20headquarters.jpg?width=1600',
+    imageCredit: 'Wikimedia Commons — imagem de contexto',
+    sourceName: 'Agência Brasil',
+    sourceUrl: 'https://agenciabrasil.ebc.com.br/economia/noticia/2026-10/petrobras-atinge-recorde-de-valor-de-mercado-apos-descoberta-no-amapa',
+    body: [
+      'A Petrobras atingiu valor de mercado recorde de R$ 700,08 bilhões no encerramento do pregão de sexta-feira (2), segundo informação divulgada pela própria companhia.',
+      'O movimento ocorreu após o anúncio de uma nova descoberta de petróleo em águas ultraprofundas na Bacia da Foz do Amazonas, na Margem Equatorial brasileira. Em um único dia, a empresa acrescentou R$ 20,9 bilhões ao seu valor de mercado.',
+      'As ações preferenciais avançaram 2,81% e as ordinárias subiram 3,25%. A descoberta ampliou as expectativas da companhia sobre uma possível nova fronteira exploratória no país.'
+    ]
+  },
+  {
+    id: 'eleicoes-2026-prioridade-fila-votacao',
+    category: 'SERVIÇO',
+    kicker: 'ELEIÇÕES 2026',
+    title: 'Eleitores com mais de 80 anos têm prioridade absoluta na fila de votação',
+    summary: 'Outros grupos também têm atendimento prioritário neste domingo; regra inclui pessoas com deficiência, gestantes e idosos a partir de 60 anos.',
+    date: '03 de outubro de 2026',
+    time: '12:53',
+    image: 'https://commons.wikimedia.org/wiki/Special:FilePath/Urna%20Eletr%C3%B4nica%20Brasileira.jpg?width=1600',
+    imageCredit: 'Vinicius Depizzol / Wikimedia Commons — fotografia de referência',
+    sourceName: 'Agência Brasil',
+    sourceUrl: 'https://agenciabrasil.ebc.com.br/politica/noticia/2026-10/idosos-votam-primeiro-conheca-outros-eleitores-com-prioridade',
+    body: [
+      'Eleitores com mais de 80 anos terão prioridade absoluta nas filas das seções eleitorais neste domingo (4), inclusive sobre outros públicos prioritários. O acompanhante necessário também recebe a prioridade.',
+      'Também têm atendimento prioritário pessoas com 60 anos ou mais, pessoas com deficiência ou mobilidade reduzida, enfermos, autistas, obesos, gestantes, lactantes, pessoas com crianças de colo e doadores de sangue.',
+      'Profissionais diretamente envolvidos na organização e segurança do pleito também integram os grupos com prioridade previstos para o dia da votação.'
+    ]
+  },
+  {
     id: 'santa-cruz-acesso-serie-b-2026',
     category: 'FUTEBOL',
     kicker: 'ACESSO',
