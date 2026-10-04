@@ -11,6 +11,26 @@
   to = "/futebol.html"
   status = 200
 
+[[redirects]]
+  from = "/admin"
+  to = "/admin.html"
+  status = 200
+
+[[redirects]]
+  from = "/buscar"
+  to = "/buscar.html"
+  status = 200
+
+[[redirects]]
+  from = "/categoria"
+  to = "/categoria.html"
+  status = 200
+
+[[redirects]]
+  from = "/sitemap.xml"
+  to = "/.netlify/functions/sitemap"
+  status = 200
+
 [[headers]]
   for = "/*"
   [headers.values]
@@ -18,6 +38,16 @@
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Cache-Control = "public, max-age=300"
+
+[[headers]]
+  for = "/admin.html"
+  [headers.values]
+    Cache-Control = "no-store"
+
+[[headers]]
+  for = "/cms.js"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"
 
 [[headers]]
   for = "/apuracao.html"
