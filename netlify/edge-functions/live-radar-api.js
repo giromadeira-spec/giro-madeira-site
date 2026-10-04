@@ -4,17 +4,18 @@ const FEEDS = [
   { source: "BBC News Brasil", url: "https://feeds.bbci.co.uk/portuguese/rss.xml", priority: 1 },
 ];
 
-function clean(value = "") {
+function decode(value = "") {
   return value
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
-    .replace(/<[^>]+>/g, " ")
     .replace(/&amp;/g, "&")
     .replace(/&quot;/g, '"')
     .replace(/&#39;|&apos;/g, "'")
     .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/\s+/g, " ")
-    .trim();
+    .replace(/&gt;/g, ">");
+}
+
+function clean(value = "") {
+  return decode(value).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function field(block, name) {
@@ -22,25 +23,43 @@ function field(block, name) {
   return match ? clean(match[1]) : "";
 }
 
+function attrFromTag(block, tagPattern, attr = "url") {
+  const tag = block.match(new RegExp(`<${tagPattern}\\b[^>]*>`, "i"));
+  if (!tag) return "";
+  const value = tag[0].match(new RegExp(`${attr}=["']([^"']+)["']`, "i"));
+  return value ? decode(value[1]).trim() : "";
+}
+
+function imageFromBlock(block) {
+  const candidates = [
+    attrFromTag(block, "media:content", "url"),
+    attrFromTag(block, "media:thumbnail", "url"),
+    attrFromTag(block, "enclosure", "url"),
+  ];
+  const htmlImage = decode(block).match(/<img\b[^>]*\bsrc=["']([^"']+)["']/i);
+  if (htmlImage) candidates.push(htmlImage[1]);
+  return candidates.find((url) => /^https?:\/\//i.test(url || "")) || "";
+}
+
 function parseFeed(xml, source, priority) {
   const items = xml.match(/<item\b[\s\S]*?<\/item>/gi) || [];
-  return items.slice(0, 20).map((block) => {
+  return items.slice(0, 24).map((block) => {
     const title = field(block, "title");
     const link = field(block, "link") || field(block, "guid");
     const pubDate = field(block, "pubDate") || field(block, "dc:date");
     const timestamp = Date.parse(pubDate) || 0;
-    return { title, link, pubDate, timestamp, source, priority };
+    const image = imageFromBlock(block);
+    return { title, link, pubDate, image, timestamp, source, priority };
   }).filter((item) => item.title && /^https?:\/\//i.test(item.link));
 }
 
 async function loadFeed(feed) {
   try {
     const response = await fetch(feed.url, {
-      headers: { "user-agent": "GiroMadeiraRadar/1.0 (+https://giromadeira.netlify.app)" },
+      headers: { "user-agent": "GiroMadeiraRadar/1.1" },
     });
     if (!response.ok) return [];
-    const xml = await response.text();
-    return parseFeed(xml, feed.source, feed.priority);
+    return parseFeed(await response.text(), feed.source, feed.priority);
   } catch {
     return [];
   }
@@ -57,14 +76,10 @@ export default async () => {
       seen.add(key);
       return true;
     })
-    .slice(0, 12)
+    .slice(0, 16)
     .map(({ priority, timestamp, ...item }) => item);
 
-  return new Response(JSON.stringify({
-    updatedAt: new Date().toISOString(),
-    refreshSeconds: 60,
-    items,
-  }), {
+  return new Response(JSON.stringify({ updatedAt: new Date().toISOString(), refreshSeconds: 60, items }), {
     headers: {
       "content-type": "application/json; charset=utf-8",
       "cache-control": "public, max-age=30",
@@ -74,8 +89,4 @@ export default async () => {
   });
 };
 
-export const config = {
-  path: "/api/live-radar",
-  cache: "manual",
-  onError: "bypass",
-};
+export const config = { path: "/api/live-radar", cache: "manual", onError: "bypass" };
