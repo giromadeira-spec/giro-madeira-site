@@ -6,6 +6,11 @@
   to = "/apuracao.html"
   status = 200
 
+[[redirects]]
+  from = "/futebol"
+  to = "/futebol.html"
+  status = 200
+
 [[headers]]
   for = "/*"
   [headers.values]
@@ -16,5 +21,10 @@
 
 [[headers]]
   for = "/apuracao.html"
+  [headers.values]
+    Cache-Control = "public, max-age=60"
+
+[[headers]]
+  for = "/futebol.html"
   [headers.values]
     Cache-Control = "public, max-age=60"
