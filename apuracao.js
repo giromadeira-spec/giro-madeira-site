@@ -12,6 +12,9 @@ const $ = id => document.getElementById(id);
 const fmtInt = value => Number(value || 0).toLocaleString('pt-BR');
 const num = value => Number(String(value ?? 0).replace(',','.')) || 0;
 const fmtPct = value => `${num(value).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}%`;
+const LIVE_REFRESH=60000;
+const WAIT_REFRESH=120000;
+let updateTimer=null,atualizando=false,divulgacaoLiberada=false,lastUpdateAt=0;
 
 function candidatosDoArquivo(data){
   const out = [];
@@ -50,6 +53,7 @@ function escapeHtml(v){return String(v).replace(/[&<>'"]/g,ch=>({'&':'&amp;','<'
 
 function render(data){
   const cfg=cargos[cargoAtual];
+  divulgacaoLiberada=data.dv!=='n';
   $('cargo-title').textContent=cfg.title;
   $('scope-label').textContent=cfg.scope;
   $('tse-time').textContent=`TSE: ${data.dg||'—'} ${data.hg?'às '+data.hg:''}`;
@@ -74,7 +78,7 @@ function render(data){
 }
 
 async function buscar(cargo){
-  const res=await fetch(`/.netlify/functions/tse?cargo=${encodeURIComponent(cargo)}`);
+  const res=await fetch(`/.netlify/functions/tse?cargo=${encodeURIComponent(cargo)}`,{cache:'default'});
   const payload=await res.json();
   if(!res.ok||!payload.ok) throw new Error(payload.message||'Dados ainda indisponíveis');
   return payload.data;
@@ -89,26 +93,35 @@ async function carregar(cargo=cargoAtual,silencioso=false){
   if(!silencioso){$('notice').className='notice';$('notice').textContent='Buscando dados oficiais do TSE...';}
   try{
     const data=await buscar(cargo);
+    lastUpdateAt=Date.now();
     $('last-check').textContent=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
     cache.set(cargo,data);
     render(data);
     if(cargo!=='governador'&&cache.has('governador')) setProgressoRO(cache.get('governador'));
   }catch(err){
+    lastUpdateAt=Date.now();
+    divulgacaoLiberada=false;
     $('last-check').textContent=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
     $('notice').className='notice error';
-    $('notice').textContent=`${err.message}. A totalização oficial começa após o encerramento da votação; o painel continuará tentando automaticamente.`;
+    $('notice').textContent=`${err.message}. O painel tentará novamente automaticamente.`;
     if(cache.has(cargo)) render(cache.get(cargo));
   }
 }
 
+function scheduleRefresh(){clearTimeout(updateTimer);updateTimer=setTimeout(atualizarTudo,divulgacaoLiberada?LIVE_REFRESH:WAIT_REFRESH)}
+
 async function atualizarTudo(){
-  await carregar(cargoAtual,true);
-  if(cargoAtual!=='governador'){
-    try{const data=await buscar('governador');cache.set('governador',data);setProgressoRO(data);}catch(_){ }
-  }
+  if(atualizando)return;
+  if(document.hidden){clearTimeout(updateTimer);updateTimer=setTimeout(atualizarTudo,WAIT_REFRESH);return}
+  atualizando=true;
+  try{
+    await carregar(cargoAtual,true);
+    if(cargoAtual!=='governador'){
+      try{const data=await buscar('governador');cache.set('governador',data);setProgressoRO(data);}catch(_){ }
+    }
+  }finally{atualizando=false;scheduleRefresh()}
 }
 
 document.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>carregar(btn.dataset.cargo)));
-carregar('governador');
-setInterval(atualizarTudo,30000);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden) atualizarTudo();});
+carregar('governador').finally(scheduleRefresh);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&Date.now()-lastUpdateAt>45000){clearTimeout(updateTimer);atualizarTudo()}});

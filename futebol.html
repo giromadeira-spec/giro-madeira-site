@@ -1,1 +1,84 @@
-<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Futebol no Giro Madeira: principais notícias e placares em tempo real."><title>Futebol | Giro Madeira</title><link rel="icon" href="assets/logo-oficial.webp"><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="futebol.css"></head><body><div class="topline"></div><header class="header"><div class="header-inner"><a class="brand" href="index.html"><img class="brand-logo" src="assets/logo-oficial.webp" alt="Logo oficial Giro Madeira"><div><div class="brand-name">GIRO MADEIRA</div><div class="brand-sub">Porto Velho • Rondônia</div></div></a><nav class="nav"><a href="index.html#ultimas">Últimas</a><a href="index.html">Porto Velho</a><a href="index.html">Rondônia</a><a href="index.html">Economia</a><a href="index.html">Serviço</a><a class="active-foot" href="futebol.html">Futebol</a><a href="apuracao.html" style="color:#ffc400">Eleições 2026</a></nav></div></header><div class="football-strip"><div class="football-strip-inner"><span class="live-pill"><i></i> PLACARES AO VIVO</span><strong>Futebol Giro Madeira</strong><span>Notícias e jogos atualizados automaticamente</span></div></div><main class="football-wrap"><section class="football-hero"><div><div class="football-kicker">GIRO MADEIRA • FUTEBOL</div><h1>Futebol em tempo real</h1><p>Os assuntos mais importantes do futebol e os placares do dia em uma página rápida e direta.</p></div><div class="football-update"><span>Última atualização</span><strong id="football-last-check">—</strong><small>Atualização automática a cada 30 segundos</small></div></section><section class="football-section live-section"><div class="football-title"><div><span class="red-dot"></span><h2>Ao vivo agora</h2></div></div><div id="live-games" class="games-grid"><div class="loading-card">Consultando placares...</div></div></section><section class="football-section"><div class="football-title"><div><h2>Jogos de hoje</h2></div><a href="https://onefootball.com/pt-br/jogos" target="_blank" rel="noopener">Todos os jogos ↗</a></div><div id="today-games" class="games-list"><div class="loading-card">Carregando jogos...</div></div></section><section class="football-section"><div class="football-title"><div><h2>Notícias em destaque</h2></div><a href="https://onefootball.com/pt-br/inicio" target="_blank" rel="noopener">Mais notícias ↗</a></div><div id="football-news" class="football-news-grid"><div class="loading-card">Buscando as principais notícias...</div></div></section><section class="football-source"><strong>Fonte: OneFootball.</strong><p>O Giro Madeira organiza manchetes e placares disponibilizados pela fonte e direciona o leitor ao conteúdo original. Resultados ao vivo podem mudar a qualquer momento.</p></section></main><footer class="footer"><div class="footer-inner"><div class="footer-brand"><img src="assets/logo-oficial.webp" alt="Giro Madeira"><div><strong>GIRO MADEIRA</strong><br>Notícias de Porto Velho, Rondônia e região.</div></div><div>Contato editorial: giromadeira@gmail.com<br>© 2026 Giro Madeira</div></div></footer><script src="futebol.js"></script></body></html>
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Placares de futebol ao vivo no Giro Madeira, sem sair do site.">
+  <title>Futebol ao vivo | Giro Madeira</title>
+  <link rel="icon" href="assets/logo-oficial.webp">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="futebol.css">
+</head>
+<body>
+  <div class="topline"></div>
+  <header class="header">
+    <div class="header-inner">
+      <a class="brand" href="index.html">
+        <img class="brand-logo" src="assets/logo-oficial.webp" alt="Logo oficial Giro Madeira">
+        <div><div class="brand-name">GIRO MADEIRA</div><div class="brand-sub">Porto Velho • Rondônia</div></div>
+      </a>
+      <nav class="nav">
+        <a href="index.html#ultimas">Últimas</a>
+        <a href="index.html">Porto Velho</a>
+        <a href="index.html">Rondônia</a>
+        <a href="index.html">Economia</a>
+        <a href="index.html">Serviço</a>
+        <a class="active-foot" href="futebol.html">Futebol</a>
+        <a href="apuracao.html" style="color:#ffc400">Eleições 2026</a>
+      </nav>
+    </div>
+  </header>
+
+  <div class="football-strip">
+    <div class="football-strip-inner">
+      <span class="live-pill"><i></i> PLACARES AO VIVO</span>
+      <strong>Futebol Giro Madeira</strong>
+      <span>Atualização feita pelo provedor do placar, sem processamento do Giro Madeira.</span>
+    </div>
+  </div>
+
+  <main class="football-wrap">
+    <section class="football-hero">
+      <div>
+        <div class="football-kicker">GIRO MADEIRA • FUTEBOL</div>
+        <h1>Placares ao vivo</h1>
+        <p>Jogos, horários e resultados atualizados dentro do Giro Madeira.</p>
+      </div>
+      <div class="economy-badge">
+        <strong>Modo econômico</strong>
+        <span>Sem Function do Netlify</span>
+      </div>
+    </section>
+
+    <section class="score-section">
+      <div class="score-title">
+        <div><span class="red-dot"></span><h2>Jogos de hoje</h2></div>
+        <span class="score-note">Os dados podem ter alguns segundos de atraso.</span>
+      </div>
+      <div class="score-frame-wrap">
+        <iframe
+          class="score-frame"
+          src="https://www.scorebat.com/embed/livescore/"
+          title="Placares de futebol ao vivo"
+          loading="eager"
+          referrerpolicy="strict-origin-when-cross-origin"
+          sandbox="allow-scripts allow-same-origin allow-forms"
+          scrolling="yes">
+        </iframe>
+      </div>
+    </section>
+
+    <section class="football-info">
+      <strong>Como funciona:</strong>
+      <p>O Giro Madeira entrega apenas esta página estática. O placar é carregado e atualizado diretamente pelo provedor externo no navegador do leitor, evitando consultas periódicas às Functions do Netlify.</p>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <div class="footer-brand"><img src="assets/logo-oficial.webp" alt="Giro Madeira"><div><strong>GIRO MADEIRA</strong><br>Notícias de Porto Velho, Rondônia e região.</div></div>
+      <div>Contato editorial: giromadeira@gmail.com<br>© 2026 Giro Madeira</div>
+    </div>
+  </footer>
+</body>
+</html>
