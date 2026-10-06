@@ -65,9 +65,9 @@ async function save(status){
   const chosen=$('publish-at').value;
   const publishedAt=status==='published'?(chosen?isoFromLocal(chosen):new Date().toISOString()):null;
   const expiresAt=isoFromLocal($('expires-at').value);
-  const featured=$('featured-rank').value?Number($('featured-rank').value):null;
+  const scope=$('scope').value; let featured=$('featured-rank').value?Number($('featured-rank').value):null; if(!['porto_velho','rondonia'].includes(scope)) featured=null;
   const payload={
-    category:$('category').value,kicker:$('kicker').value.trim()||$('category').value,title,summary,body:paragraphs(),
+    scope,category:$('category').value,kicker:$('kicker').value.trim()||$('category').value,title,summary,body:paragraphs(),
     image_url:imageUrl,image_credit:$('image-credit').value.trim()||'Giro Madeira',source_name:sourceName,source_url:sourceUrl,
     status,published_at:publishedAt,featured_rank:featured,is_breaking:$('is-breaking').checked,is_service:$('is-service').checked,
     expires_at:expiresAt
@@ -95,20 +95,20 @@ function resetForm(){
 }
 function beginEdit(id){
   const n=recentRows.find(x=>x.id===id); if(!n)return;
-  editing=n;$('edit-id').value=n.id;$('title').value=n.title||'';$('category').value=n.category||'PORTO VELHO';$('kicker').value=n.kicker||'';$('summary').value=n.summary||'';$('body').value=(n.body||[]).join('\n\n');$('source-name').value=n.source_name||'';$('source-url').value=n.source_url||'';$('image-url').value=n.image_url||'';$('image-credit').value=n.image_credit||'';$('featured-rank').value=n.featured_rank??'';$('is-breaking').checked=!!n.is_breaking;$('is-service').checked=!!n.is_service;$('publish-at').value=localFromIso(n.published_at);$('expires-at').value=localFromIso(n.expires_at);
+  editing=n;$('edit-id').value=n.id;$('title').value=n.title||'';$('category').value=n.category||'PORTO VELHO';$('scope').value=n.scope||'rondonia';$('kicker').value=n.kicker||'';$('summary').value=n.summary||'';$('body').value=(n.body||[]).join('\n\n');$('source-name').value=n.source_name||'';$('source-url').value=n.source_url||'';$('image-url').value=n.image_url||'';$('image-credit').value=n.image_credit||'';$('featured-rank').value=n.featured_rank??'';$('is-breaking').checked=!!n.is_breaking;$('is-service').checked=!!n.is_service;$('publish-at').value=localFromIso(n.published_at);$('expires-at').value=localFromIso(n.expires_at);
   $('form-heading').textContent='Editar matéria';$('cancel-edit').classList.remove('hidden');$('publish').textContent='SALVAR E PUBLICAR';window.scrollTo({top:0,behavior:'smooth'});
 }
 
 async function loadRecent(){
   if(!currentUser)return;
-  const fields='id,slug,title,category,kicker,summary,body,image_url,image_credit,source_name,source_url,status,published_at,created_at,featured_rank,is_breaking,is_service,expires_at';
+  const fields='id,slug,title,scope,category,kicker,summary,body,image_url,image_credit,source_name,source_url,status,published_at,created_at,featured_rank,is_breaking,is_service,expires_at';
   const {data,error}=await supabase.from('news').select(fields).eq('created_by',currentUser.id).order('created_at',{ascending:false}).limit(50);
   const box=$('recent-list'); if(error){box.textContent='Não foi possível carregar as matérias.';return}
   recentRows=data||[];
   box.innerHTML=recentRows.map(n=>{
     const when=n.published_at||n.created_at, future=n.published_at&&new Date(n.published_at)>new Date();
     const label=n.status==='draft'?'RASCUNHO':future?'AGENDADA':'PUBLICADA';
-    return `<div class="news-row"><div class="news-row-main"><strong>${esc(n.title)}</strong><span>${new Date(when).toLocaleString('pt-BR',{timeZone:'America/Porto_Velho'})}</span><div class="row-flags">${n.featured_rank?`<b>DESTAQUE ${n.featured_rank}</b>`:''}${n.is_breaking?'<b>URGENTE</b>':''}${n.is_service?'<b>SERVIÇO</b>':''}</div></div><div class="row-actions"><span class="pill ${n.status}">${label}</span><button class="ghost edit-btn" type="button" data-id="${n.id}">Editar</button>${n.status==='published'&&!future?`<a class="open-link" href="materia.html?id=${encodeURIComponent(n.slug)}" target="_blank">Abrir</a>`:''}</div></div>`;
+    return `<div class="news-row"><div class="news-row-main"><strong>${esc(n.title)}</strong><span>${new Date(when).toLocaleString('pt-BR',{timeZone:'America/Porto_Velho'})}</span><div class="row-flags">${n.scope?`<b>${esc(n.scope.replace('_',' ').toUpperCase())}</b>`:''}${n.featured_rank?`<b>DESTAQUE ${n.featured_rank}</b>`:''}${n.is_breaking?'<b>URGENTE</b>':''}${n.is_service?'<b>SERVIÇO</b>':''}</div></div><div class="row-actions"><span class="pill ${n.status}">${label}</span><button class="ghost edit-btn" type="button" data-id="${n.id}">Editar</button>${n.status==='published'&&!future?`<a class="open-link" href="materia.html?id=${encodeURIComponent(n.slug)}" target="_blank">Abrir</a>`:''}</div></div>`;
   }).join('')||'<p>Nenhuma matéria cadastrada ainda.</p>';
   box.querySelectorAll('.edit-btn').forEach(b=>b.addEventListener('click',()=>beginEdit(b.dataset.id)));
 }
