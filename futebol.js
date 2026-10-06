@@ -1,4 +1,4 @@
-const API='/.netlify/functions/football';
+const API='https://dsihvbdhocbqscaypraw.supabase.co/functions/v1/placares-futebol';
 const liveEl=document.getElementById('live-games'),gamesEl=document.getElementById('today-games'),newsEl=document.getElementById('football-news'),checkEl=document.getElementById('football-last-check');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function clock(iso){try{return new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Porto_Velho',hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(new Date(iso))}catch{return '—'}}
