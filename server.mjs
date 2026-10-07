@@ -77,23 +77,18 @@ async function renderVideo(body) {
     if (ab.byteLength > MAX_IMAGE_BYTES) throw new Error("image_too_large");
     await fs.writeFile(input, Buffer.from(ab));
 
-    const frames = Math.round(secs * 30);
-    const vf = [
-      "scale=1200:2134:force_original_aspect_ratio=increase",
-      "crop=1200:2134",
-      "zoompan=z='min(zoom+0.00045,1.075)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=" + frames + ":s=1080x1920:fps=30",
-      "format=yuv420p"
-    ].join(",");
+    const vf = "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black,format=yuv420p";
 
     const args = [
       "-hide_banner", "-loglevel", "error", "-y",
-      "-loop", "1", "-i", input,
+      "-loop", "1", "-framerate", "15", "-i", input,
       "-f", "lavfi", "-i", "aevalsrc=" + audioExpr(style) + ":s=44100:d=" + secs,
       "-vf", vf,
+      "-r", "15",
       "-t", String(secs),
-      "-c:v", "libx264", "-preset", "veryfast", "-crf", "22",
-      "-profile:v", "high", "-level", "4.1", "-pix_fmt", "yuv420p",
-      "-c:a", "aac", "-b:a", "96k",
+      "-c:v", "libx264", "-preset", "ultrafast", "-crf", "25",
+      "-profile:v", "main", "-level", "4.0", "-pix_fmt", "yuv420p",
+      "-c:a", "aac", "-b:a", "80k",
       "-movflags", "+faststart", "-shortest",
       output
     ];
