@@ -43,7 +43,7 @@ def article_subject(title):
     mapping=[
      (r"mosquito|dengue|aedes|zika|sa[uú]de|vacina|hospital","mosquito aedes aegypti macro","SAÚDE"),
      (r"gasolina|combust[ií]vel|petr[oó]leo|petrobras|posto","gas station petrol pump","ECONOMIA"),
-     (r"clima|temporal|chuva|enchente|calor|seca|granizo","storm cloud dramatic sky","CLIMA"),
+     (r"clima|temporal|chuva|enchente|calor|seca|granizo","storm clouds","CLIMA"),
      (r"pol[ií]cia|pf |prendeu|pris[aã]o|feminic[ií]dio|investiga","police car emergency lights","SEGURANÇA"),
      (r"elei[cç][aã]o|voto|urna|tse|tre-|stf|supremo|congresso|senado|deputad|bolsonaro|lula","brazil electronic voting machine","POLÍTICA"),
      (r"futebol|sele[cç][aã]o|atleta|jogo|copa|fifa|gol ","soccer ball field","ESPORTES"),
@@ -93,7 +93,7 @@ def photo_matches_topic(topic, title):
       "brazil electronic voting machine":r"\b(voting machine|ballot box|electronic voting|urna eletr[oô]nica)\b",
       "gas station petrol pump":r"\b(gas station|petrol pump|fuel pump|gas pump|gasoline pump)\b",
       "mosquito aedes aegypti macro":r"\b(mosquito|aedes aegypti)\b",
-      "storm cloud dramatic sky":r"\b(storm|thunderstorm|lightning|storm clouds)\b",
+      "storm clouds":r"\b(storm clouds?|stormy sky|thunderstorm|lightning|rain clouds?|cumulonimbus)\b",
       "police car emergency lights":r"\b(police car|police vehicle|police lights|police cruiser)\b",
       "soccer ball field":r"\b(soccer ball|football ball|soccer field|football field)\b",
       "financial city skyscrapers":r"\b(skyscraper|financial district|financial center|financial centre)\b",
@@ -189,8 +189,13 @@ def make_frame(photo,river,logo,claim,scene,idx,credit,path):
     d=ImageDraw.Draw(img)
     # Trademark, high-contrast brand rather than a fake redraw.
     d.rounded_rectangle((34,31,1048,220),radius=20,fill=(3,17,43,230),outline=YELLOW,width=3)
-    lb=cover(logo,935,167)
-    img.paste(lb,(72,43))
+    lb=logo.convert("RGBA")
+    lb.thumbnail((173,169),Image.Resampling.LANCZOS)
+    img.alpha_composite(lb,(70+(173-lb.width)//2,39+(169-lb.height)//2))
+    d=ImageDraw.Draw(img)
+    heavy,regular=fonts()
+    d.text((267,41),"GIRO",font=ImageFont.truetype(heavy,89),fill=WHITE,stroke_width=2,stroke_fill=(0,0,0))
+    d.text((271,133),"MADEIRA",font=ImageFont.truetype(heavy,60),fill=YELLOW,stroke_width=2,stroke_fill=(0,0,0))
     heavy,regular=fonts()
     tagfont=ImageFont.truetype(heavy,40)
     d=ImageDraw.Draw(img)
@@ -311,6 +316,9 @@ def main():
             frames.append(file)
         soundtrack=folder/"sound.wav";make_music(soundtrack,27)
         video=folder/"giro_short.mp4";render_frames(frames,video,soundtrack)
+        preview_dir=ROOT/"shorts-test-preview"
+        preview_dir.mkdir(exist_ok=True)
+        frames[0].replace(preview_dir/("fila-"+str(qid)+".png"))
         with video.open("rb") as f:
             response=requests.put(result["upload_url"],data=f,headers={"Content-Type":"video/mp4","x-upsert":"false"},
               timeout=130)
