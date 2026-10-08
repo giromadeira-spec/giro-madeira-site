@@ -125,12 +125,12 @@ def licensed_openverse_photo(topic):
            or host=="cdn.stocksnap.io")
        if parsed.scheme!="https" or not allowed:continue
        if not re.search(r"\.(?:jpe?g|png|webp)$",parsed.path,re.I):continue
+       title=clean(obj.get("title") or "foto ilustrativa")[:60]
+       if not photo_matches_topic(topic,title):continue
        try:
           img=fetch_picture(img_url)
        except Exception:
           continue
-       title=clean(obj.get("title") or "foto ilustrativa")[:60]
-       if not photo_matches_topic(topic,title):continue
        landing=str(obj.get("foreign_landing_url") or "")
        if not landing.startswith("https://"):continue
        license_url=str(obj.get("license_url") or "")
