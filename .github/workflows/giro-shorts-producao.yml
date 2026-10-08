@@ -5,6 +5,10 @@ on:
     # Horarios em UTC; publica apenas filas vencidas, com controle de intervalo.
     - cron: '5,35 0,1,11,14,17,21,22 * * *'
   workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/giro-shorts-producao.yml'
+      - 'scripts/giro_shorts_auto.py'
 
 permissions:
   contents: read
@@ -37,4 +41,14 @@ jobs:
       - name: Gerar Short apenas quando o Supabase autorizar
         env:
           PYTHONUNBUFFERED: '1'
+          GIRO_PUSH_TEST_RENDER: '1'
         run: python scripts/giro_shorts_auto.py
+
+      - name: Guardar prévia visual para revisão
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: giro-short-previa
+          path: shorts-test-preview/*.png
+          if-no-files-found: ignore
+          retention-days: 1
