@@ -234,7 +234,8 @@ def main():
     if os.environ.get("GITHUB_EVENT_NAME")=="push":
         result=bridge(token,"status")
         print("Security handshake:",result.get("mode"),"Rendering enabled:",result.get("renderer_enabled"))
-        return
+        if os.environ.get("GIRO_PUSH_TEST_RENDER") != "1": return
+        print("One-time render-only validation; public uploads stay disabled")
     result=bridge(token,"claim")
     if not result.get("processed"):
         print("Nothing eligible:",result.get("reason","no candidate"))
