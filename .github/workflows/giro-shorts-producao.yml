@@ -41,4 +41,5 @@ jobs:
       - name: Gerar Short apenas quando o Supabase autorizar
         env:
           PYTHONUNBUFFERED: '1'
+          GIRO_PUSH_TEST_RENDER: '1'
         run: python scripts/giro_shorts_auto.py
