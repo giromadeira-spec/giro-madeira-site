@@ -103,7 +103,7 @@ async function renderVideo(body) {
 
 
 function wrapForShort(value, maxLine=28, maxLines=4) {
-  const words=String(value||"").replace(/[\\r\\n]+/g," ").replace(/\\s+/g," ").trim().split(" ");
+  const words=String(value||"").replace(/[\r\n]+/g," ").replace(/\s+/g," ").trim().split(" ");
   const lines=[];
   let line="";
   for(const word of words){
@@ -116,7 +116,7 @@ function wrapForShort(value, maxLine=28, maxLines=4) {
   }
   if(line) lines.push(line);
   if(lines.length>maxLines || lines.length===0) throw new Error("scene_text_too_long");
-  return lines.join("\\n");
+  return lines.join("\n");
 }
 
 async function renderShortVideo(body) {
