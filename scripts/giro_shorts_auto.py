@@ -85,6 +85,24 @@ def licensed_commons_photo(topic):
             return file_url, f"wikimedia_{title} — {creator} — {license_name}",title
     raise RuntimeError("No reliably licensed photograph; abort instead of using publisher media")
 
+def photo_matches_topic(topic, title):
+    """Fail closed: metadata must explicitly identify the *illustrative subject*."""
+    title=clean(title).lower()
+    groups={
+      "world globe earth":r"\b(globe|globes|planet earth|earth globe|world globe)\b",
+      "brazil electronic voting machine":r"\b(voting machine|ballot box|electronic voting|urna eletr[oô]nica)\b",
+      "gas station petrol pump":r"\b(gas station|petrol pump|fuel pump|gas pump|gasoline pump)\b",
+      "mosquito aedes aegypti macro":r"\b(mosquito|aedes aegypti)\b",
+      "storm cloud dramatic sky":r"\b(storm|thunderstorm|lightning|storm clouds)\b",
+      "police car emergency lights":r"\b(police car|police vehicle|police lights|police cruiser)\b",
+      "soccer ball field":r"\b(soccer ball|football ball|soccer field|football field)\b",
+      "financial city skyscrapers":r"\b(skyscraper|financial district|financial center|financial centre)\b",
+      "computer circuit board macro":r"\b(circuit board|printed circuit|motherboard)\b",
+      "newspaper printing press":r"\b(printing press|newspaper printing|newspaper press)\b"
+    }
+    pattern=groups.get(topic)
+    return bool(pattern and re.search(pattern,title,re.I))
+
 def licensed_openverse_photo(topic):
     """Search open-licensed photos, never scraping websites or selecting stock with unknown rights."""
     endpoint="https://api.openverse.org/v1/images/"
@@ -112,6 +130,7 @@ def licensed_openverse_photo(topic):
        except Exception:
           continue
        title=clean(obj.get("title") or "foto ilustrativa")[:60]
+       if not photo_matches_topic(topic,title):continue
        landing=str(obj.get("foreign_landing_url") or "")
        if not landing.startswith("https://"):continue
        license_url=str(obj.get("license_url") or "")
@@ -300,7 +319,7 @@ def main():
         confirmed=bridge(token,"complete",queue_id=qid,storage_path=result["storage_path"],
                  quality_passed=True,image_credit=credit)
         print("Rendered and stored approved video for queue",confirmed["queue_id"])
-        print("Photo credited to Wikimedia Commons:",file_title)
+        print("Openverse-licensed illustration:",file_title)
     except Exception as e:
         try: bridge(token,"fail",queue_id=qid)
         except Exception: print("Could not update queue error status.")
