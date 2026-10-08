@@ -49,7 +49,7 @@ def article_subject(title):
      (r"futebol|sele[cç][aã]o|atleta|jogo|copa|fifa|gol ","soccer ball field","ESPORTES"),
      (r"economia|infla[cç][aã]o|d[oó]lar|real|bolsa|banco|juros","financial city skyscrapers","ECONOMIA"),
      (r"tecnologia|intelig[eê]ncia artificial|internet|chip|rob[oô]","computer circuit board macro","TECNOLOGIA"),
-     (r"r[uú]ssia|ucr[aâ]nia|guerra|ataque|internacional|mundo|eua|trump|china","globe world map","MUNDO")
+     (r"bombardeio|r[uú]ssia|ucr[aâ]nia|guerra|ataque|internacional|mundo|eua|trump|china","world globe earth","MUNDO")
     ]
     for rx,query,category in mapping:
        if re.search(rx,t):return query,category
@@ -84,6 +84,43 @@ def licensed_commons_photo(topic):
             title=str(page.get("title","")).replace("File:","")
             return file_url, f"wikimedia_{title} — {creator} — {license_name}",title
     raise RuntimeError("No reliably licensed photograph; abort instead of using publisher media")
+
+def licensed_openverse_photo(topic):
+    """Search open-licensed photos, never scraping websites or selecting stock with unknown rights."""
+    endpoint="https://api.openverse.org/v1/images/"
+    qparams={"q":topic,"license":"cc0,by","category":"photograph",
+              "page_size":20}
+    r=requests.get(endpoint,params=qparams,headers=HEADERS,timeout=24)
+    r.raise_for_status()
+    for obj in r.json().get("results",[]):
+       license_name=str(obj.get("license") or "").lower().strip()
+       license_version=str(obj.get("license_version") or "").strip()
+       if license_name not in ("cc0","by") or obj.get("mature") is True:continue
+       if obj.get("width") and int(obj["width"])<1000:continue
+       if obj.get("height") and int(obj["height"])<700:continue
+       creator=clean(obj.get("creator") or "")
+       if license_name=="by" and not creator:continue
+       img_url=str(obj.get("url") or "")
+       parsed=urllib.parse.urlsplit(img_url)
+       host=(parsed.hostname or "").lower()
+       allowed=(host.endswith(".staticflickr.com") or host=="staticflickr.com"
+           or host=="cdn.stocksnap.io")
+       if parsed.scheme!="https" or not allowed:continue
+       if not re.search(r"\.(?:jpe?g|png|webp)$",parsed.path,re.I):continue
+       try:
+          img=fetch_picture(img_url)
+       except Exception:
+          continue
+       title=clean(obj.get("title") or "foto ilustrativa")[:60]
+       landing=str(obj.get("foreign_landing_url") or "")
+       if not landing.startswith("https://"):continue
+       license_url=str(obj.get("license_url") or "")
+       if not license_url.startswith("https://creativecommons.org/"):continue
+       credit=("openverse_"+title+" — "+creator[:45]+" — "+
+            license_name.upper()+" "+license_version+" — "+
+            landing)[:445]
+       return img,credit,title
+    raise RuntimeError("No downloadable, verified CC0/CC-BY illustration found in Openverse")
 
 def cover(im,w,h,x=.5,y=.5):
     ratio=max(w/im.width,h/im.height)
@@ -245,8 +282,7 @@ def main():
       with tempfile.TemporaryDirectory(prefix="giro-shorts-") as tmp:
         folder=Path(tmp)
         query,category=article_subject(result["title"])
-        image_url,credit,file_title=licensed_commons_photo(query)
-        picture=fetch_picture(image_url)
+        picture,credit,file_title=licensed_openverse_photo(query)
         logo=Image.open(ROOT/"assets/logo-oficial.webp").convert("RGB")
         river=river_from_archived_short(result["river_sample_video_url"],folder)
         frames=[]
