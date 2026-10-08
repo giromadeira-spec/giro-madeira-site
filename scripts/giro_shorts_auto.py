@@ -43,7 +43,7 @@ def article_subject(title):
     mapping=[
      (r"mosquito|dengue|aedes|zika|sa[uú]de|vacina|hospital","mosquito aedes aegypti macro","SAÚDE"),
      (r"gasolina|combust[ií]vel|petr[oó]leo|petrobras|posto","gas station petrol pump","ECONOMIA"),
-     (r"clima|temporal|chuva|enchente|calor|seca|granizo","storm clouds","CLIMA"),
+     (r"clima|temporal|chuva|enchente|calor|seca|granizo","lightning storm","CLIMA"),
      (r"pol[ií]cia|pf |prendeu|pris[aã]o|feminic[ií]dio|investiga","police car emergency lights","SEGURANÇA"),
      (r"elei[cç][aã]o|voto|urna|tse|tre-|stf|supremo|congresso|senado|deputad|bolsonaro|lula","brazil electronic voting machine","POLÍTICA"),
      (r"futebol|sele[cç][aã]o|atleta|jogo|copa|fifa|gol ","soccer ball field","ESPORTES"),
@@ -93,7 +93,7 @@ def photo_matches_topic(topic, title):
       "brazil electronic voting machine":r"\b(voting machine|ballot box|electronic voting|urna eletr[oô]nica)\b",
       "gas station petrol pump":r"\b(gas station|petrol pump|fuel pump|gas pump|gasoline pump)\b",
       "mosquito aedes aegypti macro":r"\b(mosquito|aedes aegypti)\b",
-      "storm clouds":r"\b(storm clouds?|stormy sky|thunderstorm|lightning|rain clouds?|cumulonimbus)\b",
+      "lightning storm":r"\b(lightning|thunderstorm|electric storm)\b",
       "police car emergency lights":r"\b(police car|police vehicle|police lights|police cruiser)\b",
       "soccer ball field":r"\b(soccer ball|football ball|soccer field|football field)\b",
       "financial city skyscrapers":r"\b(skyscraper|financial district|financial center|financial centre)\b",
@@ -127,6 +127,7 @@ def licensed_openverse_photo(topic):
        if not re.search(r"\.(?:jpe?g|png|webp)$",parsed.path,re.I):continue
        title=clean(obj.get("title") or "foto ilustrativa")[:60]
        if not photo_matches_topic(topic,title):continue
+       if re.search(r"\b(building|brick|house|church|chapel|school|roof|architecture|protest|demonstration|person|people)\b",title,re.I):continue
        try:
           img=fetch_picture(img_url)
        except Exception:
@@ -205,8 +206,8 @@ def make_frame(photo,river,logo,claim,scene,idx,credit,path):
     d.rectangle((75,739,95,826),fill=YELLOW)
     d.text((125,750),("DESTAQUE • "+article_subject(claim["title"])[1]),font=ImageFont.truetype(heavy,36),fill=YELLOW)
     # Single sensational but true title: use approved article title for first, facts for remaining.
-    head=claim["title"] if idx==0 else scene
-    rows,tf=lines_for(d,head,102,900,maxlines=5)
+    head=clean(claim["title"].split("|")[0]) if idx==0 else scene
+    rows,tf=lines_for(d,head,86,900,maxlines=5)
     top=868
     for k,line in enumerate(rows):
         d.text((83,top+k*(tf.size+11)),line,font=tf,fill=YELLOW if k==1 else WHITE,
@@ -232,11 +233,34 @@ def make_frame(photo,river,logo,claim,scene,idx,credit,path):
     d=ImageDraw.Draw(img)
     d.rectangle((0,1703,1080,1711),fill=YELLOW)
     d.rounded_rectangle((34,1730,500,1802),radius=10,fill=(2,18,43,230))
-    d.text((52,1744),"RIO MADEIRA • RONDÔNIA",font=ImageFont.truetype(heavy,35),fill=WHITE)
+    d.text((52,1744),"RIO MADEIRA • ARTE EDITORIAL",font=ImageFont.truetype(heavy,29),fill=WHITE)
     d.rectangle((0,1873,1080,1920),fill=(1,14,33,255))
     txt=("IMAGEM ILUSTRATIVA • "+str(claim.get("source_name") or "FONTE")+f" • {idx+1}/3").upper()
     d.text((28,1882),txt[:78],font=ImageFont.truetype(regular,25),fill=WHITE)
     img.convert("RGB").save(path,format="PNG",optimize=True)
+
+def render_clean_madeira_illustration():
+    """Branded editorial representation of the Rio Madeira; NO inherited words from earlier videos."""
+    strip=Image.new("RGB",(W,215),NAVY)
+    d=ImageDraw.Draw(strip)
+    sky_top=(23,38,70);sky_bottom=(231,144,51)
+    for y in range(215):
+        a=y/214
+        col=tuple(int(sky_top[i]*(1-a)+sky_bottom[i]*a) for i in range(3))
+        d.line((0,y,W,y),fill=col,width=1)
+    horizon=72
+    d.ellipse((800,15,912,121),fill=(255,201,94))
+    d.polygon([(0,93),(135,80),(235,91),(392,75),(531,91),(710,77),(850,89),(1080,71),(1080,115),(0,115)],fill=(5,27,44))
+    for y in range(104,215):
+        pct=(y-104)/111
+        d.line((0,y,W,y),fill=(3+int(20*pct),40+int(57*pct),72+int(35*pct)),width=1)
+    rng=random.Random(20261008)
+    for j in range(135):
+        yy=rng.randint(110,213);xc=rng.randint(0,W)
+        rw=rng.randint(8,80)
+        golden=(rng.random()<(0.65 if 720<xc<1040 else 0.10))
+        d.line((xc,yy,xc+rw,yy),fill=(191,132,55) if golden else (62,102,120),width=1)
+    return strip
 
 def river_from_archived_short(url,folder):
     local=folder/"river-reference.mp4"
@@ -308,7 +332,7 @@ def main():
         query,category=article_subject(result["title"])
         picture,credit,file_title=licensed_openverse_photo(query)
         logo=Image.open(ROOT/"assets/logo-oficial.webp").convert("RGB")
-        river=river_from_archived_short(result["river_sample_video_url"],folder)
+        river=render_clean_madeira_illustration()
         frames=[]
         for i,scene in enumerate(result["scenes"]):
             file=folder/("card%d.png"%i)
