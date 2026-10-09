@@ -1,0 +1,107 @@
+import { createClient } from "npm:@supabase/supabase-js@2.57.0";
+
+// Giro Madeira -> Buffer -> TikTok. Runs only after explicit admin activation.
+// NEVER mutates YouTube/Instagram queues. A failed/uncertain Buffer call is NOT retried.
+const SUPA=Deno.env.get("SUPABASE_URL")||"";
+const SVC=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"";
+const BUFFER_KEY=Deno.env.get("BUFFER_API_KEY")||"";
+const respond=(obj:unknown,status=200)=>new Response(JSON.stringify(obj),{status,headers:{"Content-Type":"application/json","Cache-Control":"no-store"}});
+const db=createClient(SUPA,SVC,{auth:{persistSession:false,autoRefreshToken:false}});
+async function bufferRequest(query:string,variables?:Record<string,unknown>){
+ const res=await fetch("https://api.buffer.com",{
+  method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+BUFFER_KEY},
+  body:JSON.stringify({query,variables}),signal:AbortSignal.timeout(24000)
+ });
+ const json=await res.json().catch(()=>({errors:[{message:"non_json_response"}]}));
+ if(!res.ok||json.errors?.length)throw new Error("buffer_api_error_"+String(res.status)+"_"+String(json.errors?.[0]?.extensions?.code||""));
+ return json.data;
+}
+async function reconcile(organizationId:string,channelId:string){
+ const {data:pending,error}=await db.from("giro_buffer_tiktok_jobs").select("id,buffer_post_id,created_at,updated_at")
+   .eq("status","queued").not("buffer_post_id","is",null)
+   .lt("updated_at",new Date(Date.now()-60*60000).toISOString()).limit(25);
+ if(error||!pending?.length)return {checked:0};
+ const escapedOrg=JSON.stringify(organizationId),escapedChannel=JSON.stringify(channelId);
+ const q="query { posts(first:100,input:{organizationId:"+escapedOrg+",filter:{status:[sent,error],channelIds:["+escapedChannel+"]},sort:[{field:createdAt,direction:desc}]}){edges{node{id,status,externalLink,sentAt,error{message}}}} }";
+ const result=await bufferRequest(q);
+ const map=new Map((result?.posts?.edges||[]).map((x:{node:{id:string}})=>[x.node.id,x.node]));
+ let changed=0;
+ for(const p of pending){
+  const remote=map.get(p.buffer_post_id) as {id:string,status:string,externalLink?:string,sentAt?:string,error?:{message?:string}}|undefined;
+  if(!remote)continue;
+  if(remote.status==="sent"){
+   const {error:e}=await db.from("giro_buffer_tiktok_jobs").update({
+    status:"sent",sent_at:remote.sentAt||new Date().toISOString(),
+    buffer_post_url:remote.externalLink||null,updated_at:new Date().toISOString()
+   }).eq("id",p.id).eq("status","queued");
+   if(!e)changed++;
+  }else if(remote.status==="error"){
+   await db.from("giro_buffer_tiktok_jobs").update({
+    status:"review_required",last_error:String(remote.error?.message||"buffer_publish_failed").slice(0,150),
+    updated_at:new Date().toISOString()
+   }).eq("id",p.id).eq("status","queued");
+   changed++;
+  }
+ }
+ return {checked:pending.length,changed};
+}
+Deno.serve(async req=>{
+ if(req.method!=="POST")return respond({ok:false,error:"method_not_allowed"},405);
+ if(!SUPA||!SVC)return respond({ok:false,error:"server_configuration_missing"},503);
+ const auth=req.headers.get("x-giro-db-key")||"";
+ if(auth.length<15||auth.length>512)return respond({ok:false,error:"unauthorized"},401);
+ const valid=await db.rpc("validar_giro_dispatch_key",{p_key:auth});
+ if(valid.error||valid.data!==true)return respond({ok:false,error:"unauthorized"},401);
+ const {data:cfg,error:e}=await db.from("giro_buffer_tiktok_settings").select("*").eq("id","giro_madeira").single();
+ if(e)return respond({ok:false,error:"settings_unavailable"},503);
+ if(!cfg.enabled||cfg.dry_run)return respond({ok:true,processed:0,reason:"buffer_auto_off"});
+ if(!BUFFER_KEY||!cfg.channel_id||!cfg.organization_id)return respond({ok:true,processed:0,reason:"buffer_not_configured"});
+ try{
+   let reconciliation={checked:0};
+   try{reconciliation=await reconcile(cfg.organization_id,cfg.channel_id)}catch(err){
+    return respond({ok:false,processed:0,error:"buffer_status_unavailable",detail:String(err).slice(0,160)},503);
+   }
+   const {data:claimed,error:claimError}=await db.rpc("giro_buffer_claim_tiktok_video");
+   if(claimError)return respond({ok:false,error:"claim_failed"},500);
+   if(!claimed?.length)return respond({ok:true,processed:0,reason:"no_due_verified_videos_or_spacing",reconciliation});
+   const job=claimed[0],jobId=Number(job.job_id),videoUrl=String(job.video_url||"");
+   const url=new URL(videoUrl);
+   if(url.origin!==SUPA||!url.pathname.startsWith("/storage/v1/object/public/news-videos/shorts/")||!url.pathname.endsWith(".mp4")){
+    await db.from("giro_buffer_tiktok_jobs").update({status:"review_required",last_error:"video_url_not_allowed",updated_at:new Date().toISOString()}).eq("id",jobId);
+    return respond({ok:false,processed:0,error:"video_url_not_allowed"},422);
+   }
+   let reachable=false;
+   try{
+     const head=await fetch(url,{method:"HEAD",redirect:"error",signal:AbortSignal.timeout(10000)});
+     reachable=head.ok && /video\/mp4|application\/octet-stream/i.test(head.headers.get("content-type")||"");
+   }catch{}
+   if(!reachable){
+    await db.from("giro_buffer_tiktok_jobs").update({status:"review_required",last_error:"public_video_not_reachable_or_wrong_type",updated_at:new Date().toISOString()}).eq("id",jobId);
+    return respond({ok:false,processed:0,error:"public_video_not_reachable_or_wrong_type"},422);
+   }
+   const gql="mutation CreatePost($input:CreatePostInput!){createPost(input:$input){... on PostActionSuccess{post{id,dueAt,status}} ... on MutationError{message}}}";
+   const variables={input:{
+      channelId:cfg.channel_id,text:String(job.caption),schedulingType:"automatic",mode:"addToQueue",
+      assets:[{video:{url:videoUrl}}]
+   }};
+   try{
+     const result=await bufferRequest(gql,variables);
+     const created=result?.createPost;
+     if(!created?.post?.id)throw new Error("buffer_returned_no_post_id_"+String(created?.message||""));
+     const {error:saveError}=await db.from("giro_buffer_tiktok_jobs").update({
+       status:"queued",buffer_post_id:String(created.post.id),
+       buffer_due_at:created.post.dueAt||null,queued_at:new Date().toISOString(),
+       updated_at:new Date().toISOString()
+     }).eq("id",jobId).eq("status","claimed");
+     if(saveError)return respond({ok:false,processed:0,error:"post_queued_but_local_save_failed_manual_reconciliation",job_id:jobId},500);
+     return respond({ok:true,processed:1,job_id:jobId,buffer_post_id:created.post.id,due_at:created.post.dueAt||null,reconciliation,note:"queued_in_buffer_not_yet_published"});
+   }catch(err){
+     await db.from("giro_buffer_tiktok_jobs").update({
+       status:"uncertain",last_error:String(err).slice(0,160),updated_at:new Date().toISOString()
+     }).eq("id",jobId).eq("status","claimed");
+     return respond({ok:false,processed:0,error:"buffer_response_uncertain_requires_review",job_id:jobId},502);
+   }
+ }catch{
+   return respond({ok:false,processed:0,error:"worker_unexpected_error"},500);
+ }
+});
