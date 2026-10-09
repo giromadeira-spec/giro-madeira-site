@@ -41,6 +41,7 @@ def clean(s):
 def article_subject(title):
     t=title.lower()
     mapping=[
+     (r"cadastro [uú]nico|cad[uú]nico|bolsa fam[ií]lia","cadastro unico editorial graphic","SERVIÇOS"),
      (r"mosquito|dengue|aedes|zika|sa[uú]de|vacina|hospital","mosquito aedes aegypti macro","SAÚDE"),
      (r"gasolina|combust[ií]vel|petr[oó]leo|petrobras|posto","gas station petrol pump","ECONOMIA"),
      (r"clima|temporal|chuva|enchente|calor|seca|granizo","lightning storm","CLIMA"),
@@ -406,7 +407,12 @@ def main():
         folder=Path(tmp)
         query,category=article_subject(result["title"])
         try:
-            picture,credit,file_title=licensed_openverse_photo(query)
+            if query=="cadastro unico editorial graphic":
+                picture=render_text_only_background(category)
+                credit="arte editorial original Giro Madeira — sem fotografia externa"
+                file_title="arte editorial tipográfica"
+            else:
+                picture,credit,file_title=licensed_openverse_photo(query)
         except Exception as primary_error:
             print("Openverse image unavailable, attempting verified Commons fallback:",type(primary_error).__name__)
             try:
