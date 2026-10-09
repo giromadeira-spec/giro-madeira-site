@@ -1,0 +1,41 @@
+name: Giro Madeira - validar fallback editorial (sem publicacao)
+on:
+  push:
+    paths:
+      - '.github/workflows/giro-shorts-validacao.yml'
+      - 'scripts/giro_shorts_auto.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validar-arte:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install "Pillow>=11,<13"
+      - name: Validar fallback original isolado, sem credenciais ou upload
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          from PIL import Image, ImageDraw
+          p=Path("scripts/giro_shorts_auto.py")
+          source=p.read_text(encoding="utf-8")
+          ast.parse(source)
+          tree=ast.parse(source)
+          fn=next((n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=="render_text_only_background"),None)
+          assert fn is not None, "Fallback missing"
+          scope={"Image":Image,"ImageDraw":ImageDraw,"W":1080,"H":1920,"NAVY":(4,17,40),"YELLOW":(255,212,0)}
+          exec(compile(ast.Module(body=[fn],type_ignores=[]),str(p),"exec"),scope)
+          picture=scope["render_text_only_background"]("POLÍTICA")
+          assert picture.size==(1080,1920) and picture.mode=="RGB"
+          assert len(set(picture.resize((54,96)).getdata()))>5, "Empty image"
+          main=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=="main")
+          assert any(isinstance(n,ast.Call) and isinstance(n.func,ast.Name) and n.func.id=="render_text_only_background" for n in ast.walk(main)), "Fallback not connected to renderer"
+          assert "picture,credit,file_title=licensed_commons_download(query)" in source
+          print("PASS: 1080x1920 original fallback; renderer integration present; no external image, credentials, bridge or upload invoked")
+          PY
