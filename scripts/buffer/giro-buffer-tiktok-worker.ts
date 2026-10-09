@@ -162,6 +162,112 @@ Deno.serve(async req=>{
        }))});
    }catch{return respond({ok:false,error:"draft_inspection_failed"},502);}
  }
+
+ // Exactly one public test on the previously reviewed editorial source.
+ // Stays disabled for scheduled automation until the public post is verified.
+ if(action==="publish_public_test"){
+   if(!BUFFER_KEY||!cfg.channel_id||!cfg.organization_id||cfg.channel_name!=="giro_madeira"||!cfg.test_draft_post_id)
+     return respond({ok:false,error:"tiktok_verified_draft_or_channel_missing"},409);
+   if(cfg.enabled||!cfg.dry_run)return respond({ok:false,error:"automated_publishing_must_remain_off_for_public_test"},409);
+   const sourceId=10;
+   const {data:previous,error:previousError}=await db.from("giro_buffer_tiktok_jobs")
+     .select("id,status,buffer_post_id").eq("source_queue_id",sourceId).maybeSingle();
+   if(previousError)return respond({ok:false,error:"duplicate_check_failed"},500);
+   if(previous)return respond({ok:true,already_attempted:true,job_id:previous.id,status:previous.status,buffer_post_id:previous.buffer_post_id||null});
+   const {data:source,error:sourceError}=await db.from("giro_social_video_queue")
+     .select("id,title,video_url,editor_approved,visual_review_status,status,platform,shorts_render_origin,storyboard_status,provider_privacy_status,provider_post_id,shorts_image_credit")
+     .eq("id",sourceId).single();
+   if(sourceError||!source||source.status!=="enviado"||source.platform!=="youtube_shorts"
+     ||source.editor_approved!==true||source.visual_review_status!=="approved"
+     ||source.provider_privacy_status!=="public"||!source.provider_post_id
+     ||source.shorts_render_origin!=="github_oidc_v1"||source.storyboard_status!=="preparado")
+     return respond({ok:false,error:"source_video_not_editor_approved"},409);
+   if(!String(source.title||"").startsWith("TSE aciona PF"))return respond({ok:false,error:"source_title_changed"},409);
+   const url=String(source.video_url||"");
+   if(!url.startsWith(SUPA+"/storage/v1/object/public/news-videos/shorts/")||!url.endsWith(".mp4"))
+     return respond({ok:false,error:"source_url_untrusted"},422);
+   let videoReachable=false;
+   try{
+     const h=await fetch(url,{method:"HEAD",redirect:"error",signal:AbortSignal.timeout(11000)});
+     videoReachable=h.ok&&/video\/mp4|application\/octet-stream/i.test(h.headers.get("content-type")||"");
+   }catch{}
+   if(!videoReachable)return respond({ok:false,error:"video_unavailable"},422);
+   const caption="TSE aciona a Polícia Federal para investigar ataques e ameaças a servidores da Justiça Eleitoral. Segundo o tribunal, os casos envolveram mensagens e exposição de dados. Fonte: G1 Brasil (08/10/2026). #GiroMadeira #Noticias #Brasil";
+   const {data:claimed,error:claimError}=await db.from("giro_buffer_tiktok_jobs")
+     .insert({source_queue_id:sourceId,video_url:url,caption,status:"claimed"})
+     .select("id").single();
+   if(claimError||!claimed)return respond({ok:false,error:"cannot_reserve_public_test_do_not_retry"},409);
+   const jobId=claimed.id;
+   try{
+     const mutation="mutation ($input:CreatePostInput!){createPost(input:$input){... on PostActionSuccess{post{id,status,channelId,schedulingType,externalLink,sharedNow}} ... on MutationError{message}}}";
+     const variables={input:{
+       channelId:cfg.channel_id,text:caption,schedulingType:"automatic",
+       mode:"shareNow",saveToDraft:false,aiAssisted:true,
+       metadata:{tiktok:{isAiGenerated:true}},
+       assets:[{video:{url}}]
+     }};
+     const resp=await bufferRequest(mutation,variables);
+     const remote=resp?.createPost?.post;
+     if(!remote?.id||String(remote.channelId)!==cfg.channel_id
+       ||String(remote.schedulingType).toLowerCase()!=="automatic"){
+       await db.from("giro_buffer_tiktok_jobs").update({
+         status:"uncertain",last_error:"buffer_did_not_return_confirmed_automatic_post",
+         updated_at:new Date().toISOString()
+       }).eq("id",jobId).eq("status","claimed");
+       return respond({ok:false,error:"public_test_uncertain_manual_review",job_id:jobId},502);
+     }
+     const finalStatus=String(remote.status||"").toLowerCase()==="error"?"review_required":"queued";
+     const {error:saveError}=await db.from("giro_buffer_tiktok_jobs").update({
+       status:finalStatus,buffer_post_id:String(remote.id),
+       last_error:finalStatus==="review_required"?"buffer_post_error":null,
+       queued_at:new Date().toISOString(),updated_at:new Date().toISOString(),
+       buffer_post_url:typeof remote.externalLink==="string"?remote.externalLink:null
+     }).eq("id",jobId).eq("status","claimed");
+     if(saveError)return respond({ok:false,error:"buffer_accepted_post_but_database_save_failed",job_id:jobId,post_id:String(remote.id)},500);
+     return respond({ok:true,job_id:jobId,source_queue_id:sourceId,
+       buffer_post_id:String(remote.id),status:remote.status,automatic:true,
+       shared_now:remote.sharedNow,link:remote.externalLink||null,public_confirmation_required:true});
+   }catch{
+     await db.from("giro_buffer_tiktok_jobs").update({
+       status:"uncertain",last_error:"buffer_network_or_mutation_response_uncertain",
+       updated_at:new Date().toISOString()
+     }).eq("id",jobId).eq("status","claimed");
+     return respond({ok:false,error:"buffer_public_test_response_uncertain_check_buffer_do_not_retry",job_id:jobId},502);
+   }
+ }
+ if(action==="check_public_test"){
+   const {data:job,error:findError}=await db.from("giro_buffer_tiktok_jobs")
+     .select("id,source_queue_id,status,buffer_post_id").eq("source_queue_id",10).maybeSingle();
+   if(findError||!job)return respond({ok:false,error:"public_test_not_found"},404);
+   if(!job.buffer_post_id)return respond({ok:true,job_id:job.id,status:job.status,warning:"post_identifier_missing_do_not_retry"});
+   try{
+     const query="query{post(input:{id:"+JSON.stringify(job.buffer_post_id)+"}){id,status,channelId,schedulingType,externalLink,sentAt,error{message}}}";
+     const resp=await bufferRequest(query);
+     const remote=resp?.post;
+     if(!remote||remote.id!==job.buffer_post_id||remote.channelId!==cfg.channel_id)
+       return respond({ok:false,error:"public_test_remote_identity_mismatch"},409);
+     const status=String(remote.status||"").toLowerCase();
+     if(status==="sent"&&String(remote.schedulingType).toLowerCase()==="automatic"
+        &&typeof remote.externalLink==="string"&&/^https:\/\/(www\.)?tiktok\.com\//i.test(remote.externalLink)){
+       await db.from("giro_buffer_tiktok_jobs").update({
+         status:"sent",buffer_post_url:remote.externalLink,
+         sent_at:remote.sentAt||new Date().toISOString(),updated_at:new Date().toISOString()
+       }).eq("id",job.id).in("status",["queued","claimed"]);
+     }else if(status==="error"||String(remote.schedulingType).toLowerCase()==="notification"){
+       await db.from("giro_buffer_tiktok_jobs").update({
+         status:"review_required",last_error:status==="error"?
+           String(remote.error?.message||"buffer_publish_error").slice(0,140):
+           "buffer_notification_mode_not_automatic",
+         updated_at:new Date().toISOString()
+       }).eq("id",job.id).in("status",["queued","claimed"]);
+     }
+     return respond({ok:true,source_queue_id:10,post_id:remote.id,
+       status:remote.status,automatic:remote.schedulingType==="automatic",
+       tiktok_url:remote.externalLink||null,
+       sent_at:remote.sentAt||null,error:remote.error?.message||null,
+       requires_public_profile_confirmation:true});
+   }catch{return respond({ok:false,error:"remote_post_status_unavailable"},502);}
+ }
  if(action!=="run")return respond({ok:false,error:"unsupported_action"},400);
  if(!cfg.enabled||cfg.dry_run)return respond({ok:true,processed:0,reason:"buffer_auto_off"});
  if(!BUFFER_KEY||!cfg.channel_id||!cfg.organization_id)return respond({ok:true,processed:0,reason:"buffer_not_configured"});
