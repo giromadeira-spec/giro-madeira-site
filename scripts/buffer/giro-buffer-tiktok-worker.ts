@@ -90,6 +90,61 @@ Deno.serve(async req=>{
      return respond({ok:true,channels:found});
    }catch{return respond({ok:false,error:"buffer_api_lookup_failed"},502)}
  }
+
+ // Isolated, non-public connection test. The Buffer API documents
+ // saveToDraft=true as a draft which is NOT scheduled or published.
+ if(action==="test_draft"){
+   if(!BUFFER_KEY||!cfg.channel_id||!cfg.organization_id)
+     return respond({ok:false,error:"configure_buffer_tiktok_channel_first"},409);
+   if(cfg.enabled||!cfg.dry_run)return respond({ok:false,error:"disable_auto_before_test"},409);
+   if(cfg.test_draft_post_id)
+     return respond({ok:true,already_tested:true,draft_post_id:cfg.test_draft_post_id});
+   const {data:verified,error:lookupError}=await db.from("giro_social_video_queue")
+     .select("id,title,video_url")
+     .eq("platform","youtube_shorts").eq("status","enviado")
+     .eq("editor_approved",true).eq("visual_review_status","approved")
+     .eq("provider_privacy_status","public").not("provider_post_id","is",null)
+     .eq("shorts_render_origin","github_oidc_v1")
+     .gte("shorts_rendered_at",new Date(Date.now()-24*3600000).toISOString())
+     .order("shorts_rendered_at",{ascending:false}).limit(1);
+   if(lookupError||!verified?.length)return respond({ok:false,error:"no_approved_recent_video_for_draft"},409);
+   const candidate=verified[0];
+   const url=String(candidate.video_url||"");
+   if(!url.startsWith(SUPA+"/storage/v1/object/public/news-videos/shorts/")||!url.endsWith(".mp4"))
+     return respond({ok:false,error:"invalid_video_source_for_draft"},422);
+   let reachable=false;
+   try{
+     const h=await fetch(url,{method:"HEAD",redirect:"error",signal:AbortSignal.timeout(12000)});
+     reachable=h.ok&&/video\/mp4|application\/octet-stream/i.test(h.headers.get("content-type")||"");
+   }catch{}
+   if(!reachable)return respond({ok:false,error:"public_video_inaccessible"},422);
+   // A post draft never counts as successful public delivery.
+   const mutation="mutation DraftTest($input:CreatePostInput!){createPost(input:$input){... on PostActionSuccess{post{id,status}} ... on MutationError{message}}}";
+   const variables={input:{
+     channelId:cfg.channel_id,
+     text:"TESTE DE INTEGRAÇÃO — "+String(candidate.title||"Giro Madeira").slice(0,135)+" #GiroMadeira",
+     schedulingType:"automatic",mode:"addToQueue",saveToDraft:true,
+     assets:[{video:{url}}]
+   }};
+   try{
+     const data=await bufferRequest(mutation,variables);
+     const reply=data?.createPost;
+     const post=reply?.post;
+     if(!post?.id)
+       return respond({ok:false,error:"buffer_rejected_draft",detail:String(reply?.message||"unknown").slice(0,180)},422);
+     // Any surprising status requires human investigation, never auto-enable.
+     if(String(post.status||"").toLowerCase()!=="draft")
+       return respond({ok:false,error:"unexpected_buffer_draft_status_manual_review",post_id:String(post.id),status:post.status},409);
+     const {error:saveError}=await db.from("giro_buffer_tiktok_settings").update({
+       test_draft_post_id:String(post.id),last_verified_at:new Date().toISOString(),updated_at:new Date().toISOString()
+     }).eq("id","giro_madeira").eq("enabled",false).eq("dry_run",true).is("test_draft_post_id",null);
+     if(saveError)return respond({ok:false,error:"draft_created_but_local_save_failed_manual_review",post_id:String(post.id)},500);
+     return respond({ok:true,draft_created:true,published:false,post_id:String(post.id),
+       status:"draft",source_queue_id:candidate.id});
+   }catch{
+     return respond({ok:false,error:"buffer_draft_response_unknown_check_buffer_before_retry"},502);
+   }
+ }
  if(action!=="run")return respond({ok:false,error:"unsupported_action"},400);
  if(!cfg.enabled||cfg.dry_run)return respond({ok:true,processed:0,reason:"buffer_auto_off"});
  if(!BUFFER_KEY||!cfg.channel_id||!cfg.organization_id)return respond({ok:true,processed:0,reason:"buffer_not_configured"});
