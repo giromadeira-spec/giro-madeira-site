@@ -201,6 +201,22 @@ def licensed_openverse_photo(topic):
        return img,credit,title
     raise RuntimeError("No downloadable, verified CC0/CC-BY illustration found in Openverse")
 
+def render_text_only_background(category):
+    """Original abstract editorial background; no third-party imagery or simulated real events."""
+    image=Image.new("RGB",(W,H),NAVY)
+    d=ImageDraw.Draw(image)
+    for y in range(H):
+        t=y/max(1,H-1)
+        d.line((0,y,W,y),fill=(4+int(12*t),17+int(19*t),40+int(26*t)))
+    # Geometric, intentionally non-photographic newsroom motifs.
+    for i in range(12):
+        x=80+i*100
+        d.line((x,260,x-210,1120),fill=(24,53,85),width=5)
+    d.ellipse((620,270,1030,680),outline=(74,105,128),width=12)
+    d.ellipse((700,350,950,600),outline=(74,105,128),width=6)
+    d.rectangle((70,1160,1010,1172),fill=YELLOW)
+    return image
+
 def cover(im,w,h,x=.5,y=.5):
     ratio=max(w/im.width,h/im.height)
     nw,nh=round(im.width*ratio),round(im.height*ratio)
@@ -393,7 +409,16 @@ def main():
             picture,credit,file_title=licensed_openverse_photo(query)
         except Exception as primary_error:
             print("Openverse image unavailable, attempting verified Commons fallback:",type(primary_error).__name__)
-            picture,credit,file_title=licensed_commons_download(query)
+            try:
+                picture,credit,file_title=licensed_commons_download(query)
+            except Exception as commons_error:
+                # Original editorial graphics: no external photo, unknown license, or implied eyewitness scene.
+                # The verified article title and approved scenes remain the only factual claims.
+                print("No verified licensed photo; using original text-first editorial graphic:",
+                      type(commons_error).__name__)
+                picture=render_text_only_background(category)
+                credit="arte editorial original Giro Madeira — sem fotografia externa"
+                file_title="arte editorial tipográfica"
         logo=Image.open(ROOT/"assets/logo-oficial.webp").convert("RGB")
         river=render_clean_madeira_illustration()
         frames=[]
