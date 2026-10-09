@@ -22,7 +22,7 @@ async function reconcile(organizationId:string,channelId:string){
    .lt("updated_at",new Date(Date.now()-60*60000).toISOString()).limit(25);
  if(error||!pending?.length)return {checked:0};
  const escapedOrg=JSON.stringify(organizationId),escapedChannel=JSON.stringify(channelId);
- const q="query { posts(first:100,input:{organizationId:"+escapedOrg+",filter:{status:[sent,error],channelIds:["+escapedChannel+"]},sort:[{field:createdAt,direction:desc}]}){edges{node{id,status,externalLink,sentAt,error{message}}}} }";
+ const q="query { posts(first:100,input:{organizationId:"+escapedOrg+",filter:{status:[sent,error],channelIds:["+escapedChannel+"]},sort:{field:dueAt,direction:desc}}){edges{node{id,status,externalLink,sentAt,error{message}}}} }";
  const result=await bufferRequest(q);
  const map=new Map((result?.posts?.edges||[]).map((x:{node:{id:string}})=>[x.node.id,x.node]));
  let changed=0;
