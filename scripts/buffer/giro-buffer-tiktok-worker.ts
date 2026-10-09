@@ -268,6 +268,82 @@ Deno.serve(async req=>{
        requires_public_profile_confirmation:true});
    }catch{return respond({ok:false,error:"remote_post_status_unavailable"},502);}
  }
+
+ // Precisely one retry of the original TikTok video rejected for 15fps,
+ // using only its distinct GitHub-verified 30fps copy. Never retries ambiguous sends.
+ if(action==="publish_repaired_test"){
+   if(!BUFFER_KEY||cfg.channel_name!=="giro_madeira"||!cfg.channel_id||!cfg.organization_id
+       ||cfg.enabled||!cfg.dry_run||!cfg.test_draft_post_id)
+     return respond({ok:false,error:"tiktok_manual_test_preconditions_not_met"},409);
+   const {data:prepared,error:pe}=await db.from("giro_tiktok_media_prepared")
+      .select("source_queue_id,status,converted_video_url,output_fps,output_width,output_height,completed_at")
+      .eq("source_queue_id",10).single();
+   if(pe||!prepared||prepared.status!=="ready"||Number(prepared.output_fps)<29.5||Number(prepared.output_fps)>30.5
+     ||prepared.output_width<480||prepared.output_height<720||!prepared.completed_at)
+     return respond({ok:false,error:"30fps_media_not_verified"},409);
+   const video=String(prepared.converted_video_url||"");
+   if(!video.startsWith(SUPA+"/storage/v1/object/public/news-videos/shorts/tiktok-30fps/10/")
+      ||!video.endsWith(".mp4"))
+     return respond({ok:false,error:"transcoded_video_untrusted"},422);
+   const {data:job,error:je}=await db.from("giro_buffer_tiktok_jobs").select("*")
+     .eq("source_queue_id",10).maybeSingle();
+   if(je||!job||job.public_test_retry_used||job.status!=="review_required"||
+       !/frame rate/i.test(job.last_error||"")||!job.buffer_post_id)
+     return respond({ok:false,error:"one_time_public_test_retry_not_permitted"},409);
+   const oldId=String(job.buffer_post_id);
+   let oldErrorVerified=false;
+   try{
+      const oldPost=await bufferRequest("query{post(input:{id:"+JSON.stringify(oldId)+"}){id,channelId,status,error{message}}}");
+      const old=oldPost?.post;
+      oldErrorVerified=old?.id===oldId&&old?.channelId===cfg.channel_id
+        &&String(old?.status||"").toLowerCase()==="error"
+        &&/frame rate/i.test(String(old?.error?.message||""));
+   }catch{}
+   if(!oldErrorVerified)return respond({ok:false,error:"original_buffer_failure_not_reconfirmed"},409);
+   let reachable=false;
+   try{
+     const h=await fetch(video,{method:"HEAD",redirect:"error",signal:AbortSignal.timeout(10000)});
+     reachable=h.ok&&/video\/mp4|application\/octet-stream/i.test(h.headers.get("content-type")||"");
+   }catch{}
+   if(!reachable)return respond({ok:false,error:"30fps_video_not_publicly_reachable"},422);
+   // Immutable reservation before calling the external publishing API.
+   const {data:reserved,error:reserveError}=await db.from("giro_buffer_tiktok_jobs").update({
+      status:"claimed",public_test_retry_used:true,previous_failed_buffer_post_id:oldId,
+      buffer_post_id:null,video_url:video,buffer_post_url:null,
+      last_error:"initial_15fps_post_failed_and_verified",updated_at:new Date().toISOString()
+   }).eq("id",job.id).eq("status","review_required").eq("public_test_retry_used",false)
+     .eq("buffer_post_id",oldId).select("id").maybeSingle();
+   if(reserveError||!reserved)return respond({ok:false,error:"retry_already_reserved_do_not_repeat"},409);
+   try{
+      const mutation="mutation ($input:CreatePostInput!){createPost(input:$input){... on PostActionSuccess{post{id,status,channelId,schedulingType,externalLink,sharedNow}} ... on MutationError{message}}}";
+      const vars={input:{
+        channelId:cfg.channel_id,text:String(job.caption),
+        schedulingType:"automatic",mode:"shareNow",saveToDraft:false,
+        aiAssisted:true,metadata:{tiktok:{isAiGenerated:true}},
+        assets:[{video:{url:video}}]
+      }};
+      const response=await bufferRequest(mutation,vars);
+      const post=response?.createPost?.post;
+      if(!post?.id||post.channelId!==cfg.channel_id
+        ||String(post.schedulingType).toLowerCase()!=="automatic")
+        throw Error("no_confirmed_automatic_tiktok_post_id");
+      const state=String(post.status||"").toLowerCase()==="error"?"review_required":"queued";
+      const {error:saveError}=await db.from("giro_buffer_tiktok_jobs").update({
+        status:state,buffer_post_id:String(post.id),
+        buffer_post_url:post.externalLink||null,last_error:state==="review_required"?"new_video_rejected":null,
+        queued_at:new Date().toISOString(),updated_at:new Date().toISOString()
+      }).eq("id",job.id).eq("status","claimed");
+      if(saveError)return respond({ok:false,error:"buffer_post_sent_but_local_save_failed_manual_reconcile",post_id:post.id},500);
+      return respond({ok:true,post_id:post.id,status:post.status,share_now:post.sharedNow,
+        retry_once_used:true,video_fps:30,public_link:post.externalLink||null});
+   }catch{
+      await db.from("giro_buffer_tiktok_jobs").update({
+        status:"uncertain",last_error:"30fps_buffer_retry_response_uncertain_no_auto_retry",
+        updated_at:new Date().toISOString()
+      }).eq("id",job.id).eq("status","claimed");
+      return respond({ok:false,error:"30fps_post_outcome_unknown_no_retry",job_id:job.id},502);
+   }
+ }
  if(action!=="run")return respond({ok:false,error:"unsupported_action"},400);
  if(!cfg.enabled||cfg.dry_run)return respond({ok:true,processed:0,reason:"buffer_auto_off"});
  if(!BUFFER_KEY||!cfg.channel_id||!cfg.organization_id)return respond({ok:true,processed:0,reason:"buffer_not_configured"});
@@ -296,7 +372,9 @@ Deno.serve(async req=>{
    }
    const gql="mutation CreatePost($input:CreatePostInput!){createPost(input:$input){... on PostActionSuccess{post{id,dueAt,status}} ... on MutationError{message}}}";
    const variables={input:{
-      channelId:cfg.channel_id,text:String(job.caption),schedulingType:"automatic",mode:"addToQueue",
+      channelId:cfg.channel_id,text:String(job.caption),schedulingType:"automatic",
+      mode:"shareNow",saveToDraft:false,aiAssisted:true,
+      metadata:{tiktok:{isAiGenerated:true}},
       assets:[{video:{url:videoUrl}}]
    }};
    try{
