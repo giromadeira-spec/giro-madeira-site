@@ -17,31 +17,45 @@ async function bufferRequest(query:string,variables?:Record<string,unknown>){
  return json.data;
 }
 async function reconcile(organizationId:string,channelId:string){
- const {data:pending,error}=await db.from("giro_buffer_tiktok_jobs").select("id,buffer_post_id,created_at,updated_at")
-   .eq("status","queued").not("buffer_post_id","is",null)
-   .lt("updated_at",new Date(Date.now()-60*60000).toISOString()).limit(25);
- if(error||!pending?.length)return {checked:0};
- const escapedOrg=JSON.stringify(organizationId),escapedChannel=JSON.stringify(channelId);
- const q="query { posts(first:100,input:{organizationId:"+escapedOrg+",filter:{status:[sent,error],channelIds:["+escapedChannel+"]},sort:{field:dueAt,direction:desc}}){edges{node{id,status,externalLink,sentAt,error{message}}}} }";
- const result=await bufferRequest(q);
- const map=new Map((result?.posts?.edges||[]).map((x:{node:{id:string}})=>[x.node.id,x.node]));
+ const threshold=new Date(Date.now()-45*60000).toISOString();
+ const {data:pending,error}=await db.from("giro_buffer_tiktok_jobs")
+   .select("id,buffer_post_id,created_at,updated_at").eq("status","queued")
+   .not("buffer_post_id","is",null).lt("updated_at",threshold).limit(8);
+ if(error)throw Error("pending_job_lookup_failed");
+ if(!pending?.length)return {checked:0,changed:0};
  let changed=0;
- for(const p of pending){
-  const remote=map.get(p.buffer_post_id) as {id:string,status:string,externalLink?:string,sentAt?:string,error?:{message?:string}}|undefined;
-  if(!remote)continue;
-  if(remote.status==="sent"){
-   const {error:e}=await db.from("giro_buffer_tiktok_jobs").update({
-    status:"sent",sent_at:remote.sentAt||new Date().toISOString(),
-    buffer_post_url:remote.externalLink||null,updated_at:new Date().toISOString()
-   }).eq("id",p.id).eq("status","queued");
-   if(!e)changed++;
-  }else if(remote.status==="error"){
-   await db.from("giro_buffer_tiktok_jobs").update({
-    status:"review_required",last_error:String(remote.error?.message||"buffer_publish_failed").slice(0,150),
-    updated_at:new Date().toISOString()
-   }).eq("id",p.id).eq("status","queued");
-   changed++;
-  }
+ for(const item of pending){
+   const query="query{post(input:{id:"+JSON.stringify(item.buffer_post_id)+
+     "}){id,status,channelId,schedulingType,externalLink,sentAt,error{message}}}";
+   const response=await bufferRequest(query);
+   const remote=response?.post;
+   if(!remote||remote.id!==item.buffer_post_id||remote.channelId!==channelId)
+     throw Error("buffer_post_identity_mismatch");
+   const status=String(remote.status||"").toLowerCase();
+   const automatic=String(remote.schedulingType||"").toLowerCase()==="automatic";
+   const link=typeof remote.externalLink==="string"?remote.externalLink:"";
+   const validLink=(()=>{try{
+       const u=new URL(link);
+       return u.protocol==="https:"&&(u.hostname==="tiktok.com"||u.hostname.endsWith(".tiktok.com"));
+     }catch{return false}})();
+   const at=new Date().toISOString();
+   if(status==="sent"&&automatic&&validLink){
+     const {error:ue}=await db.from("giro_buffer_tiktok_jobs").update({
+       status:"sent",buffer_post_url:link,sent_at:remote.sentAt||at,updated_at:at
+     }).eq("id",item.id).eq("status","queued");
+     if(ue)throw Error("remote_delivery_database_update_failed");
+     changed++;
+   }else if(status==="error"||!automatic||status==="sent"&&!validLink){
+     const message=status==="error"?String(remote.error?.message||"buffer_publication_failed"):
+       !automatic?"notification_publishing_not_allowed":"tiktok_link_missing_confirm_manually";
+     await db.from("giro_buffer_tiktok_jobs").update({
+       status:"review_required",last_error:message.slice(0,150),updated_at:at
+     }).eq("id",item.id).eq("status","queued");
+     changed++;
+   }else{
+     await db.from("giro_buffer_tiktok_jobs").update({updated_at:at})
+       .eq("id",item.id).eq("status","queued");
+   }
  }
  return {checked:pending.length,changed};
 }
