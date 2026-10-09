@@ -89,7 +89,7 @@ def photo_matches_topic(topic, title):
     """Fail closed: metadata must explicitly identify the *illustrative subject*."""
     title=clean(title).lower()
     groups={
-      "world globe earth":r"\b(globe|globes|planet earth|earth globe|world globe)\b",
+      "world globe earth":r"\b(globe|globes|planet earth|earth globe|world globe|the earth seen from apollo 17|earth from space|blue marble)\b",
       "brazil electronic voting machine":r"\b(voting machine|ballot box|electronic voting|urna eletr[oô]nica)\b",
       "gas station petrol pump":r"\b(gas station|petrol pump|fuel pump|gas pump|gasoline pump)\b",
       "mosquito aedes aegypti macro":r"\b(mosquito|aedes aegypti)\b",
@@ -107,7 +107,7 @@ def licensed_commons_download(topic):
     """Fallback: Wikimedia Commons photo with per-file licensing, subject and bytes verified."""
     endpoint="https://commons.wikimedia.org/w/api.php"
     fallback_terms={
-      "world globe earth":["EXACT:File:EarthGlobe.png", "earth globe", "world globe", "globe"],
+      "world globe earth":["EXACT:File:The Earth seen from Apollo 17.jpg", "earth globe", "world globe", "globe"],
       "brazil electronic voting machine":["urna eletrônica", "electronic voting machine"],
       "police car emergency lights":["police car", "police vehicle"],
       "lightning storm":["lightning storm", "lightning"],
