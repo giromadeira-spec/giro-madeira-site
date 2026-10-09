@@ -103,6 +103,61 @@ def photo_matches_topic(topic, title):
     pattern=groups.get(topic)
     return bool(pattern and re.search(pattern,title,re.I))
 
+def licensed_commons_download(topic):
+    """Fallback: Wikimedia Commons photo with per-file licensing, subject and bytes verified."""
+    endpoint="https://commons.wikimedia.org/w/api.php"
+    fallback_terms={
+      "world globe earth":["earth globe", "world globe", "globe"],
+      "brazil electronic voting machine":["urna eletrônica", "electronic voting machine"],
+      "police car emergency lights":["police car", "police vehicle"],
+      "lightning storm":["lightning storm", "lightning"],
+      "soccer ball field":["soccer ball", "football field"],
+    }
+    searches=fallback_terms.get(topic,[topic,topic.split()[0]])
+    for search in searches:
+        params={"action":"query","generator":"search","gsrsearch":search,
+          "gsrnamespace":"6","gsrlimit":"30","prop":"imageinfo",
+          "iiprop":"url|size|extmetadata","iiurlwidth":"1280",
+          "format":"json","formatversion":"2"}
+        try:
+            r=requests.get(endpoint,params=params,headers=HEADERS,timeout=20)
+            r.raise_for_status()
+            pages=r.json().get("query",{}).get("pages",[])
+        except Exception as e:
+            print("Wikimedia Commons search unavailable:",type(e).__name__)
+            continue
+        for page in pages:
+            info=(page.get("imageinfo") or [None])[0]
+            if not info:continue
+            title=str(page.get("title","")).removeprefix("File:")
+            if not photo_matches_topic(topic,title):continue
+            if re.search(r"\b(protest|demonstration|victim|execution|body|injured)\b",title,re.I):
+                continue
+            meta=info.get("extmetadata") or {}
+            license_name=html.unescape(str((meta.get("LicenseShortName") or {}).get("value",""))).strip()
+            license_url=html.unescape(str((meta.get("LicenseUrl") or {}).get("value",""))).strip()
+            label=license_name.upper()
+            is_pd=bool(re.search(r"\bCC0\b|PUBLIC DOMAIN|DOMÍNIO PÚBLICO",label))
+            is_by=bool(re.fullmatch(r"CC[ -]*BY[ -]*(2\.0|2\.5|3\.0|4\.0)",label))
+            if not (is_pd or is_by):continue
+            if is_by and not license_url.startswith("https://creativecommons.org/licenses/by/"):
+                continue
+            if int(info.get("width",0))<1000 or int(info.get("height",0))<700:continue
+            url=str(info.get("thumburl") or info.get("url") or "")
+            parsed=urllib.parse.urlparse(url)
+            if parsed.scheme!="https" or parsed.hostname not in ("upload.wikimedia.org","commons.wikimedia.org"):
+                continue
+            if not re.search(r"\.(?:jpe?g|png|webp)(?:$|[?])",parsed.path,re.I):
+                continue
+            artist=clean(html.unescape(re.sub("<[^>]*>"," ",str((meta.get("Artist") or {}).get("value","")))))
+            if is_by and not artist:continue
+            landing="https://commons.wikimedia.org/wiki/File:"+urllib.parse.quote(title.replace(" ","_"),safe="()-_")
+            try:photo=fetch_picture(url)
+            except Exception:continue
+            credit=("wikimedia_"+title[:70]+" — "+artist[:60]+" — "+license_name+" — "+landing)[:445]
+            return photo,credit,title
+    raise RuntimeError("No topical and licensable downloadable Wikimedia image found")
+
 def licensed_openverse_photo(topic):
     """Search open-licensed photos, never scraping websites or selecting stock with unknown rights."""
     endpoint="https://api.openverse.org/v1/images/"
@@ -330,7 +385,11 @@ def main():
       with tempfile.TemporaryDirectory(prefix="giro-shorts-") as tmp:
         folder=Path(tmp)
         query,category=article_subject(result["title"])
-        picture,credit,file_title=licensed_openverse_photo(query)
+        try:
+            picture,credit,file_title=licensed_openverse_photo(query)
+        except Exception as primary_error:
+            print("Openverse image unavailable, attempting verified Commons fallback:",type(primary_error).__name__)
+            picture,credit,file_title=licensed_commons_download(query)
         logo=Image.open(ROOT/"assets/logo-oficial.webp").convert("RGB")
         river=render_clean_madeira_illustration()
         frames=[]
