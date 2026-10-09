@@ -54,6 +54,43 @@ Deno.serve(async req=>{
  if(valid.error||valid.data!==true)return respond({ok:false,error:"unauthorized"},401);
  const {data:cfg,error:e}=await db.from("giro_buffer_tiktok_settings").select("*").eq("id","giro_madeira").single();
  if(e)return respond({ok:false,error:"settings_unavailable"},503);
+ // Safe Supabase-only configuration checks: authenticated with the existing
+ // database dispatch key. No Netlify browser or hosting is required.
+ const requestBody=await req.json().catch(()=>({}));
+ const action=String(requestBody?.action||"run");
+ if(action==="status")return respond({
+   ok:true,api_key_configured:!!BUFFER_KEY,
+   buffer_channel_selected:!!(cfg.channel_id&&cfg.organization_id),
+   buffer_channel_name:cfg.channel_name||null,
+   enabled:!!cfg.enabled,dry_run:!!cfg.dry_run,
+   daily_limit:cfg.daily_limit,min_interval_minutes:cfg.min_interval_minutes,
+   test_draft_completed:!!cfg.test_draft_post_id
+ });
+ if(action==="discover"){
+   if(!BUFFER_KEY)return respond({ok:false,error:"buffer_api_key_missing"},503);
+   try{
+     const query=async(q:string)=>{
+       const response=await fetch("https://api.buffer.com",{
+         method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+BUFFER_KEY},
+         body:JSON.stringify({query:q}),signal:AbortSignal.timeout(18000)
+       });
+       const body=await response.json().catch(()=>({}));
+       if(!response.ok||body.errors?.length)throw Error("buffer_api_query_error");
+       return body.data;
+     };
+     const account=await query("query{account{organizations{id,name}}}");
+     const found=[];
+     for(const org of (account?.account?.organizations||[]).slice(0,10)){
+       const channels=await query("query{channels(input:{organizationId:"+JSON.stringify(org.id)+"}){id,name,displayName,service,isQueuePaused}}");
+       for(const item of channels?.channels||[])if(String(item.service||"").toLowerCase()==="tiktok")
+         found.push({organization_id:String(org.id),organization_name:String(org.name||""),
+           channel_id:String(item.id),channel_name:String(item.displayName||item.name||""),
+           queue_paused:!!item.isQueuePaused});
+     }
+     return respond({ok:true,channels:found});
+   }catch{return respond({ok:false,error:"buffer_api_lookup_failed"},502)}
+ }
+ if(action!=="run")return respond({ok:false,error:"unsupported_action"},400);
  if(!cfg.enabled||cfg.dry_run)return respond({ok:true,processed:0,reason:"buffer_auto_off"});
  if(!BUFFER_KEY||!cfg.channel_id||!cfg.organization_id)return respond({ok:true,processed:0,reason:"buffer_not_configured"});
  try{
