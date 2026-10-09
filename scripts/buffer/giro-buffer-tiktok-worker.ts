@@ -145,6 +145,23 @@ Deno.serve(async req=>{
      return respond({ok:false,error:"buffer_draft_response_unknown_check_buffer_before_retry"},502);
    }
  }
+ if(action==="inspect_draft"){
+   if(!BUFFER_KEY||!cfg.test_draft_post_id)return respond({ok:false,error:"draft_not_configured"},409);
+   try{
+     const query="query{post(input:{id:"+JSON.stringify(cfg.test_draft_post_id)+"}){id,status,channelId,assets{mimeType,source,thumbnail}}}";
+     const payload=await bufferRequest(query);
+     const item=payload?.post;
+     if(!item||item.id!==cfg.test_draft_post_id||item.channelId!==cfg.channel_id)
+       return respond({ok:false,error:"draft_mismatch_or_missing"},409);
+     const assets=Array.isArray(item.assets)?item.assets:[];
+     return respond({ok:true,post_id:item.id,status:item.status,
+       assets:assets.map((a:{mimeType?:string,source?:string,thumbnail?:string})=>({
+         mime_type:a.mimeType||null, video_source_present:!!a.source,
+         video_source_is_supabase:typeof a.source==="string"&&a.source.startsWith(SUPA+"/storage/v1/object/public/news-videos/shorts/"),
+         has_thumbnail:!!a.thumbnail
+       }))});
+   }catch{return respond({ok:false,error:"draft_inspection_failed"},502);}
+ }
  if(action!=="run")return respond({ok:false,error:"unsupported_action"},400);
  if(!cfg.enabled||cfg.dry_run)return respond({ok:true,processed:0,reason:"buffer_auto_off"});
  if(!BUFFER_KEY||!cfg.channel_id||!cfg.organization_id)return respond({ok:true,processed:0,reason:"buffer_not_configured"});
