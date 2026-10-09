@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><meta name="description" content="Área de testes editoriais do TikTok no Giro Madeira.">
+<title>Integração TikTok | Giro Madeira</title><link rel="icon" href="/assets/logo-oficial.webp">
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#12253f;background:#f2f5f9}*{box-sizing:border-box}body{margin:0}.top{height:5px;background:#ffcb16}.header{background:#071f3b;color:#fff}.head-inner{max-width:930px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:15px;padding:16px 24px}.brand{display:flex;gap:12px;align-items:center;color:#fff;text-decoration:none;font-weight:900}.brand img{width:51px;height:51px;object-fit:contain}.head-inner>a:last-child{color:#ffce2d;font-size:14px;font-weight:700}main{max-width:930px;margin:30px auto;padding:0 20px 40px}h1{font-size:30px;margin:3px 0 6px}.lede{color:#53677f;margin-top:0;margin-bottom:22px}.panel{border-radius:12px;background:#fff;border:1px solid #dde5ee;box-shadow:0 5px 22px #081a2e0a;padding:22px;margin-bottom:16px}h2{font-size:20px;margin:0 0 14px}.steps{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px}.step{background:#ecf1f7;border-radius:50px;padding:7px 12px;font-size:13px;font-weight:800;color:#27415e}.muted{color:#60748b;font-size:14px}.hidden{display:none!important}.alert{padding:12px 14px;border-radius:7px;margin:10px 0;background:#eaf3fb;color:#123d66;font-size:14px}.alert.bad{background:#fff0ea;color:#8b3317}.alert.good{background:#e9f7ef;color:#12613c}button{padding:11px 16px;cursor:pointer;border:0;border-radius:7px;background:#0b4d84;color:#fff;font-weight:800}button.secondary{background:#eaf1f8;color:#133b5f}button.danger{background:#9b2e2e}button:disabled{opacity:.45;cursor:not-allowed}button+button{margin-left:8px}input[type=file]{display:block;width:100%;padding:12px;border:1px dashed #8ba7c1;border-radius:8px;margin:10px 0 14px;background:#f9fbfe}label{display:block;margin:12px 0;font-size:14px;line-height:1.5}.table{width:100%;border-collapse:collapse;font-size:14px}.table td,.table th{text-align:left;border-bottom:1px solid #edf0f5;padding:10px 7px;overflow-wrap:anywhere}.row{display:flex;gap:14px;align-items:center}.avatar{width:46px;height:46px;border-radius:50%;background:#eef4fa;object-fit:cover}.link{color:#0c528a;font-weight:700}footer{max-width:930px;margin:0 auto 30px;text-align:center;font-size:13px;color:#5b6b7f}footer a{color:#235a8a}ol{padding-left:20px;line-height:1.9}@media(max-width:600px){.head-inner{padding:13px}.brand img{width:40px;height:40px}main{padding:0 12px;margin:20px auto}.panel{padding:17px}h1{font-size:25px}button{margin:5px 0}button+button{margin-left:0}}
+</style>
+</head>
+<body><div class="top"></div><header class="header"><div class="head-inner"><a class="brand" href="/"><img src="/assets/logo-oficial.webp" alt="Giro Madeira">GIRO MADEIRA</a><a href="/admin.html">Voltar à redação</a></div></header>
+<main>
+<h1>Integração com TikTok</h1>
+<p class="lede">Área editorial de testes. Os vídeos não são publicados automaticamente no TikTok.</p>
+<div class="steps"><span class="step">1. Configurar aplicativo</span><span class="step">2. Conectar conta</span><span class="step">3. Enviar vídeo de teste</span><span class="step">4. Gravar demonstração</span></div>
+<div id="message" class="alert">Verificando sua sessão de editor...</div>
+<section id="login-box" class="panel hidden"><h2>Entre como editor</h2><p>Use a conta autorizada do painel de redação antes de conectar o TikTok.</p><a class="link" href="/admin.html">Abrir login da redação →</a></section>
+<div id="editor-zone" class="hidden">
+<section class="panel">
+<h2>1. Configuração e autorização</h2>
+<p class="muted">Este teste usa as credenciais configuradas com segurança no Supabase. Nunca cole o Client secret nesta página.</p>
+<div id="setup" class="alert">Verificando configuração...</div>
+<div id="connection" class="row hidden"><img id="avatar" class="avatar" alt="Foto do perfil TikTok"><div><strong id="nickname">Conta conectada</strong><div id="scope" class="muted"></div></div></div>
+<div style="margin-top:15px">
+<button id="connect" disabled>Conectar com TikTok</button>
+<button id="disconnect" class="danger hidden">Desconectar</button>
+<button id="refresh" class="secondary">Atualizar situação</button>
+</div>
+</section>
+<section class="panel" id="upload-panel">
+<h2>2. Enviar vídeo para teste</h2>
+<p>Selecione um vídeo MP4 original de até 15 MB. O arquivo é enviado para a <strong>caixa de entrada do TikTok</strong>; a publicação final exige sua confirmação no aplicativo TikTok.</p>
+<p class="muted">Não use aqui um Short com marca-d'água, logotipo ou texto promocional sobreposto. Isso pode contrariar as diretrizes de compartilhamento do TikTok. Não envie dados pessoais ou material sem licença.</p>
+<input id="file" type="file" accept="video/mp4,.mp4" aria-label="Selecionar MP4">
+<label><input type="checkbox" id="consent"> Sou responsável por este vídeo, tenho direitos para compartilhá-lo e autorizo expressamente seu envio ao TikTok.</label>
+<button id="send" disabled>Enviar vídeo de teste ao TikTok</button>
+<div id="upload-feedback" class="alert hidden"></div>
+</section>
+<section class="panel">
+<h2>3. Histórico dos testes</h2>
+<table class="table"><thead><tr><th>Arquivo</th><th>Situação</th><th>Verificar</th></tr></thead><tbody id="uploads"><tr><td colspan="3">Nenhum teste registrado.</td></tr></tbody></table>
+</section>
+<section class="panel">
+<h2>4. Demonstração para revisão</h2>
+<p>A gravação precisa mostrar a integração <strong>real</strong> funcionando. Quando as credenciais e permissões estiverem aprovadas para Sandbox:</p>
+<ol>
+<li>Grave a tela abrindo esta página e conectando sua conta pelo TikTok Login Kit.</li>
+<li>Mostre a conta TikTok conectada e o consentimento para enviar um vídeo original.</li>
+<li>Selecione o MP4 e envie o arquivo para a caixa de entrada.</li>
+<li>Mostre o resultado no painel e a notificação recebida no aplicativo TikTok.</li>
+</ol>
+<p class="muted">Vídeo para análise: MP4 ou MOV, até 50 MB. A aprovação pública não é garantida; o TikTok decide após a auditoria.</p>
+</section>
+</div>
+</main>
+<footer>Giro Madeira • <a href="/termos-de-uso.html">Termos de Uso</a> · <a href="/politica-de-privacidade.html">Política de Privacidade</a> · <a href="mailto:giromadeira@gmail.com">Contato</a></footer>
+<script type="module">
+import {createClient} from "https://esm.sh/@supabase/supabase-js@2.102.0";
+const URL="https://dsihvbdhocbqscaypraw.supabase.co";
+const PUBLISHABLE="sb_publishable_kPstEJdIxLedMPWhph3SyA_mhLmx9EK";
+const db=createClient(URL,PUBLISHABLE);
+const API=URL+"/functions/v1/giro-tiktok-panel";
+const el=id=>document.getElementById(id);
+let connected=false,configured=false,authenticated=false;
+function show(id,visible){el(id).classList.toggle("hidden",!visible)}
+function message(content,type=""){el("message").textContent=content;el("message").className="alert "+type}
+async function request(action,payload={}){
+ const {data:{session}}=await db.auth.getSession();
+ if(!session?.access_token)throw Error("Sua sessão de editor expirou. Entre novamente no painel de redação.");
+ const body=payload instanceof FormData?payload:JSON.stringify({action,...payload});
+ const options={method:"POST",headers:{authorization:"Bearer "+session.access_token,apikey:PUBLISHABLE},body};
+ if(!(body instanceof FormData))options.headers["content-type"]="application/json";
+ const res=await fetch(API,options);
+ const data=await res.json().catch(()=>({ok:false,error:"Resposta inesperada do servidor"}));
+ if(!res.ok||data.ok!==true)throw Error(data.error||"Não foi possível concluir a ação");
+ return data;
+}
+function setButtonStates(){el("connect").disabled=!authenticated||!configured||connected;el("send").disabled=!authenticated||!configured||!connected||!el("consent").checked||!el("file").files.length}
+async function load(){
+ try{
+  const {data:{user}}=await db.auth.getUser();
+  if(!user){message("Faça login no painel da redação antes de continuar.","bad");show("login-box",true);show("editor-zone",false);return}
+  const {data:profile}=await db.from("editor_profiles").select("role").eq("user_id",user.id).maybeSingle();
+  if(!["editor","admin"].includes(String(profile?.role||""))){message("Esta conta não possui permissão de editor.","bad");return}
+  authenticated=true;show("login-box",false);show("editor-zone",true);
+  const data=await request("status");configured=data.configured;connected=data.connected;
+  if(!configured){el("setup").textContent="Falta registrar TIKTOK_CLIENT_KEY e TIKTOK_CLIENT_SECRET em Supabase → Edge Functions → Secrets.";el("setup").className="alert bad"}
+  else {el("setup").textContent=connected?"Credenciais configuradas. Conta TikTok conectada.":"Credenciais do aplicativo configuradas. Clique em Conectar com TikTok.";el("setup").className="alert "+(connected?"good":"")}
+  show("connection",connected);show("disconnect",connected);el("nickname").textContent=data.account?.name||"Conta TikTok conectada";el("scope").textContent="Permissões: "+(data.account?.scopes||"não informadas");
+  const av=data.account?.avatar_url||"";el("avatar").src=av.startsWith("https://")?av:"/assets/logo-oficial.webp";
+  setButtonStates();message(connected?"Conta TikTok pronta para testes manuais.":"Integração carregada; complete as configurações restantes.",connected?"good":"");
+  const list=el("uploads");list.replaceChildren();
+  if(!data.uploads?.length){const tr=document.createElement("tr");const td=document.createElement("td");td.colSpan=3;td.textContent="Nenhum teste registrado.";tr.append(td);list.append(tr)}
+  for(const item of data.uploads||[]){
+   const tr=document.createElement("tr");
+   for(const value of [item.file_name,item.provider_status||item.status]){const td=document.createElement("td");td.textContent=value;tr.append(td)}
+   const td=document.createElement("td");
+   if(item.tiktok_publish_id){const b=document.createElement("button");b.className="secondary";b.textContent="Consultar";b.addEventListener("click",()=>check(item.id));td.append(b)}
+   tr.append(td);list.append(tr);
+  }
+ }catch(e){message("Verificação: "+e.message,"bad")}
+}
+async function check(id){try{const r=await request("poll",{upload_id:id});message("TikTok retornou: "+r.provider_status,"good");await load()}catch(e){message(e.message,"bad")}}
+el("refresh").onclick=load;
+el("consent").onchange=setButtonStates;el("file").onchange=setButtonStates;
+el("connect").onclick=async()=>{
+ el("connect").disabled=true;
+ try{const result=await request("connect");window.location.assign(result.authorization_url)}catch(e){message(e.message,"bad");setButtonStates()}
+};
+el("disconnect").onclick=async()=>{
+ if(!confirm("Desconectar esta conta TikTok da integração?"))return;
+ el("disconnect").disabled=true;
+ try{await request("disconnect");await load()}catch(e){message(e.message,"bad")}finally{el("disconnect").disabled=false}
+};
+el("send").onclick=async()=>{
+ const file=el("file").files[0];
+ if(!file||!el("consent").checked)return;
+ if(file.size>15*1024*1024){message("O MP4 deve ter no máximo 15 MB.","bad");return}
+ if(!confirm("Enviar este vídeo à caixa de entrada do TikTok para revisão manual?"))return;
+ el("send").disabled=true;show("upload-feedback",true);el("upload-feedback").textContent="Enviando... não repita este comando.";
+ const data=new FormData();data.append("action","upload");data.append("confirm_manual_upload","yes");data.append("file",file);
+ try{const result=await request("upload",data);el("upload-feedback").textContent=result.next_step||"Enviado para a caixa de entrada.";el("upload-feedback").className="alert good";await load()}
+ catch(e){el("upload-feedback").textContent=e.message+". Confira o histórico antes de qualquer nova tentativa.";el("upload-feedback").className="alert bad";await load()}
+ finally{setButtonStates()}
+};
+const q=new URLSearchParams(location.search);
+if(q.has("tiktok")){message("Retorno da autorização TikTok: "+q.get("tiktok"));history.replaceState(null,"","/tiktok-integracao.html")}
+load();
+</script>
+</body></html>
