@@ -1,0 +1,42 @@
+name: Giro Madeira - TikTok 30fps (isolado)
+
+on:
+  push:
+    paths:
+      - '.github/workflows/giro-tiktok-30fps.yml'
+  schedule:
+    - cron: '13 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: giro-tiktok-30fps-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  preparar-tiktok:
+    if: github.repository == 'giromadeira-spec/giro-madeira-site' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Obter codigo isolado do TikTok
+        uses: actions/checkout@v4
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Instalar FFmpeg e bibliotecas
+        run: |
+          python -m pip install --disable-pip-version-check "Pillow>=11,<13" "requests>=2.31,<3"
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ffmpeg
+          command -v ffmpeg
+          command -v ffprobe
+          python -m py_compile scripts/buffer/giro_tiktok_30fps.py
+      - name: Preparar uma copia TikTok em 30 fps
+        env:
+          PYTHONUNBUFFERED: '1'
+        run: python scripts/buffer/giro_tiktok_30fps.py
