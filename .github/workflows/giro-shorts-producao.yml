@@ -2,11 +2,10 @@ name: Giro Madeira - Shorts (sem API paga)
 
 on:
   schedule:
-    # Horarios em UTC; publica apenas filas vencidas, com controle de intervalo.
-    # Checagem a cada 15 min, das 06h às 23h59 de Porto Velho (UTC-4).
-    # Renderiza somente roteiros preparados e vencidos; YouTube respeita o intervalo mínimo.
-    - cron: '5,20,35,50 10-23 * * *'
-    - cron: '5,20,35,50 0-3 * * *'
+    # Porto Velho UTC-4: 08h e 20h (12h e 00h UTC).
+    # Janelas de producao, nao garantia de upload; publicador valida intervalo.
+    - cron: '0 12 * * *'
+    - cron: '0 0 * * *'
   workflow_dispatch:
 
 permissions:
