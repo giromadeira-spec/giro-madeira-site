@@ -107,7 +107,7 @@ def licensed_commons_download(topic):
     """Fallback: Wikimedia Commons photo with per-file licensing, subject and bytes verified."""
     endpoint="https://commons.wikimedia.org/w/api.php"
     fallback_terms={
-      "world globe earth":["earth globe", "world globe", "globe"],
+      "world globe earth":["EXACT:File:EarthGlobe.png", "earth globe", "world globe", "globe"],
       "brazil electronic voting machine":["urna eletrônica", "electronic voting machine"],
       "police car emergency lights":["police car", "police vehicle"],
       "lightning storm":["lightning storm", "lightning"],
@@ -119,6 +119,10 @@ def licensed_commons_download(topic):
           "gsrnamespace":"6","gsrlimit":"30","prop":"imageinfo",
           "iiprop":"url|size|extmetadata","iiurlwidth":"1280",
           "format":"json","formatversion":"2"}
+        if search.startswith("EXACT:"):
+            for opt in ("generator","gsrsearch","gsrnamespace","gsrlimit"):
+                params.pop(opt,None)
+            params["titles"]=search.removeprefix("EXACT:")
         try:
             r=requests.get(endpoint,params=params,headers=HEADERS,timeout=20)
             r.raise_for_status()
