@@ -117,7 +117,7 @@ def licensed_commons_download(topic):
     for search in searches:
         params={"action":"query","generator":"search","gsrsearch":search,
           "gsrnamespace":"6","gsrlimit":"30","prop":"imageinfo",
-          "iiprop":"url|size|extmetadata","iiurlwidth":"1280",
+          "iiprop":"url|size|extmetadata","iiurlwidth":"1600",
           "format":"json","formatversion":"2"}
         if search.startswith("EXACT:"):
             for opt in ("generator","gsrsearch","gsrnamespace","gsrlimit"):
