@@ -1,6 +1,11 @@
 name: Giro Madeira - Shorts (sem API paga)
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/giro_shorts_auto.py
+      - .github/workflows/giro-shorts-producao.yml
   schedule:
     # Porto Velho UTC-4: 08h e 20h (12h e 00h UTC).
     # Janelas de producao, nao garantia de upload; publicador valida intervalo.
@@ -17,8 +22,42 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  verificar-visual-sem-publicar:
+    if: github.event_name == 'push' && github.repository == 'giromadeira-spec/giro-madeira-site' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Obter repositório
+        uses: actions/checkout@v4
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Instalar dependências locais
+        run: |
+          python -m pip install --disable-pip-version-check "Pillow>=11,<13" "requests>=2.31,<3"
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ffmpeg fonts-dejavu-core
+          python -m py_compile scripts/giro_shorts_auto.py
+      - name: Gerar vídeo e capa sem conexão com contas sociais
+        env:
+          GITHUB_EVENT_NAME: push
+        run: |
+          python scripts/giro_shorts_auto.py --self-test
+      - name: Anexar resultado privado para inspeção
+        uses: actions/upload-artifact@v4
+        with:
+          name: giro-shorts-qa-sem-publicar
+          path: |
+            shorts-test-preview/auto-qa-cover.png
+            shorts-test-preview/auto-qa-video.mp4
+          if-no-files-found: error
+          retention-days: 2
+
   gerar-short:
-    if: github.repository == 'giromadeira-spec/giro-madeira-site' && github.ref == 'refs/heads/main'
+    if: github.event_name != 'push' && github.repository == 'giromadeira-spec/giro-madeira-site' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 18
     steps:
