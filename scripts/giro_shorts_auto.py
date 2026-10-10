@@ -431,14 +431,62 @@ def render_frames(frames,out,music):
     if stream.get("codec_name")!="h264" or stream["width"]!=1080 or stream["height"]!=1920:
         raise RuntimeError("Output video dimensions or codec invalid")
 
+def render_self_test():
+    """Offline QA: no OIDC, no Supabase, no YouTube and no network requests.
+
+    Produces a private 1080x1920 three-scene video to catch layout, encoding,
+    official logo and permanent Rio Madeira identity regressions.
+    """
+    with tempfile.TemporaryDirectory(prefix="giro-shorts-offline-qa-") as temporary:
+        folder=Path(temporary)
+        backdrop=render_text_only_background("POLÍCIA")
+        river=render_clean_madeira_illustration()
+        brand=Image.open(ROOT/"assets/logo-oficial.webp").convert("RGB")
+        claim={
+          "title":"TESTE VISUAL: GIRO MADEIRA VERIFICA AS CAPAS DOS SHORTS EM PORTO VELHO",
+          "topic_scope":"rondonia",
+          "source_name":"SIMULAÇÃO TÉCNICA — NÃO PUBLICAR",
+          "urgent":True,
+        }
+        scenes=[
+          "SIMULAÇÃO INTERNA DO NOVO PADRÃO VISUAL",
+          "VALIDAÇÃO DE MANCHETE, CRÉDITOS E LOGO",
+          "VALIDAÇÃO DO RIO MADEIRA E DO FORMATO VERTICAL",
+        ]
+        images=[]
+        for idx,scene in enumerate(scenes):
+            name=folder/("qa-frame-%d.png"%idx)
+            make_frame(backdrop,river,brand,claim,scene,idx,
+                       "arte original ilustrativa, sem foto externa",name)
+            check=Image.open(name)
+            if check.size!=(1080,1920):raise RuntimeError("QA frame dimensions incorrect")
+            images.append(name)
+        out=ROOT/"shorts-test-preview"
+        out.mkdir(parents=True,exist_ok=True)
+        from shutil import copyfile
+        copyfile(images[0],out/"auto-qa-cover.png")
+        audio=folder/"qa-music.wav"
+        make_music(audio,27)
+        video=out/"auto-qa-video.mp4"
+        render_frames(images,video,audio)
+        print(json.dumps({
+          "success":True,
+          "mode":"offline_self_test_no_upload",
+          "preview":str(out/"auto-qa-cover.png"),
+          "video":str(video),
+          "video_bytes":video.stat().st_size,
+          "expected_dimensions":"1080x1920",
+          "media_upload_attempted":False,
+        },ensure_ascii=False))
+
+
 def main():
-    token=github_token()
-    # Dry-run on push: never spend API upload quota or claim rows.
+    # Never claim or publish during a git push, even if old flags are present.
+    # The --self-test mode below renders locally, without credentials or uploads.
     if os.environ.get("GITHUB_EVENT_NAME")=="push":
-        result=bridge(token,"status")
-        print("Security handshake:",result.get("mode"),"Rendering enabled:",result.get("renderer_enabled"))
-        if os.environ.get("GIRO_PUSH_TEST_RENDER") != "1": return
-        print("One-time render-only validation; public uploads stay disabled")
+        print("Push event is QA-only; bridge claims and uploads are disabled.")
+        return
+    token=github_token()
     result=bridge(token,"claim")
     if not result.get("processed"):
         print("Nothing eligible:",result.get("reason","no candidate"))
@@ -494,4 +542,7 @@ def main():
         raise RuntimeError("Render failed safely without publishing: "+str(e)[:150]) from e
 
 if __name__=="__main__":
-    main()
+    if "--self-test" in sys.argv:
+        render_self_test()
+    else:
+        main()
