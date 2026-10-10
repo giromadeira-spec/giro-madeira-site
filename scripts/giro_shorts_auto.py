@@ -78,7 +78,7 @@ def licensed_commons_photo(topic):
             if not (int(info.get("width",0))>=1000 and int(info.get("height",0))>=700):continue
             file_url=str(info.get("thumburl") or info.get("url") or "")
             parsed=urllib.parse.urlparse(file_url)
-            if parsed.scheme!="https" or parsed.hostname not in ["upload.wikimedia.org","commons.wikimedia.org"]:continue
+            if parsed.scheme!="https" or parsed.hostname not in ["upload.wikimedia.org","thumb.wikimedia.org"]:continue
             if not re.search(r"\.(?:jpe?g|png|webp)(?:/|$|\?)",file_url,re.I):continue
             creator=html.unescape(re.sub("<[^>]+>"," ",str(info.get("extmetadata",{}).get("Artist",{}).get("value",""))))
             creator=clean(creator)[:70] or "autor informado na página do arquivo"
@@ -150,7 +150,7 @@ def licensed_commons_download(topic):
             if int(info.get("width",0))<1000 or int(info.get("height",0))<700:continue
             url=str(info.get("thumburl") or info.get("url") or "")
             parsed=urllib.parse.urlparse(url)
-            if parsed.scheme!="https" or parsed.hostname not in ("upload.wikimedia.org","commons.wikimedia.org"):
+            if parsed.scheme!="https" or parsed.hostname not in ("upload.wikimedia.org","thumb.wikimedia.org"):
                 continue
             if not re.search(r"\.(?:jpe?g|png|webp)(?:$|[?])",parsed.path,re.I):
                 continue
@@ -201,6 +201,38 @@ def licensed_openverse_photo(topic):
             landing)[:445]
        return img,credit,title
     raise RuntimeError("No downloadable, verified CC0/CC-BY illustration found in Openverse")
+
+def licensed_local_madeira_photo():
+    """Curated regional CC0 city/Rio Madeira photo for illustrated local news.
+
+    Only the original Wikimedia file whose individual CC0 license was checked
+    is used. The photo is illustrative, never claimed as the reported event.
+    """
+    filename="File:Porto Velho, Rondônia, Brasil.jpg"
+    endpoint="https://commons.wikimedia.org/w/api.php"
+    params={"action":"query","titles":filename,"prop":"imageinfo",
+            "iiprop":"url|size|extmetadata","iiurlwidth":"1500",
+            "format":"json","formatversion":"2"}
+    response=requests.get(endpoint,params=params,headers=HEADERS,timeout=22)
+    response.raise_for_status()
+    page=(response.json().get("query",{}).get("pages") or [None])[0]
+    if not page:raise RuntimeError("Rio Madeira photo missing from Wikimedia Commons")
+    info=(page.get("imageinfo") or [None])[0]
+    if not info:raise RuntimeError("Rio Madeira image metadata unavailable")
+    metadata=info.get("extmetadata") or {}
+    license_name=clean((metadata.get("LicenseShortName") or {}).get("value",""))
+    license_url=str((metadata.get("LicenseUrl") or {}).get("value",""))
+    if license_name.upper()!="CC0" or "creativecommons.org/publicdomain/zero/" not in license_url:
+        raise RuntimeError("Wikimedia regional photo license was not verified as CC0")
+    url=str(info.get("thumburl") or info.get("url") or "")
+    host=urllib.parse.urlsplit(url).hostname
+    if host not in ("upload.wikimedia.org","thumb.wikimedia.org"):
+        raise RuntimeError("Untrusted Commons image host")
+    image=fetch_picture(url)
+    creator="Silva Júnior / MTur"
+    landing="https://commons.wikimedia.org/wiki/File:Porto_Velho,_Rond%C3%B4nia,_Brasil.jpg"
+    return image,"wikimedia_"+creator+" — CC0 — "+landing,"Porto Velho / Rio Madeira (CC0)"
+
 
 def render_text_only_background(category):
     """Original abstract editorial background; no third-party imagery or simulated real events."""
@@ -508,13 +540,22 @@ def main():
             try:
                 picture,credit,file_title=licensed_commons_download(query)
             except Exception as commons_error:
-                # Original editorial graphics: no external photo, unknown license, or implied eyewitness scene.
-                # The verified article title and approved scenes remain the only factual claims.
-                print("No verified licensed photo; using original text-first editorial graphic:",
-                      type(commons_error).__name__)
-                picture=render_text_only_background(category)
-                credit="arte editorial original Giro Madeira — sem fotografia externa"
-                file_title="arte editorial tipográfica"
+                # Prefer regional identity photo for Rondônia when topical photography
+                # cannot be licensed. Never imply this shows the actual incident.
+                print("No verified topical Commons photo:",type(commons_error).__name__)
+                if result.get("topic_scope")=="rondonia":
+                    try:
+                        picture,credit,file_title=licensed_local_madeira_photo()
+                    except Exception as regional_error:
+                        print("No licensed regional photo; using original text-first graphic:",
+                              type(regional_error).__name__)
+                        picture=render_text_only_background(category)
+                        credit="arte editorial original Giro Madeira — sem fotografia externa"
+                        file_title="arte editorial tipográfica"
+                else:
+                    picture=render_text_only_background(category)
+                    credit="arte editorial original Giro Madeira — sem fotografia externa"
+                    file_title="arte editorial tipográfica"
         logo=Image.open(ROOT/"assets/logo-oficial.webp").convert("RGB")
         river=render_clean_madeira_illustration()
         frames=[]
