@@ -325,8 +325,8 @@ def make_frame(photo,river,logo,claim,scene,idx,credit,path):
     category=clean(subject).upper()[:16]
     if category=="SEGURANÇA":category="POLÍCIA"
     red=(222,31,45,255)
-    category_color=red if category in ("POLÍCIA","TRÂNSITO") else (255,212,0,255)
-    category_ink=WHITE if category_color==red else NAVY
+    category_color=(255,212,0,255)  # Padrão oficial 10/10/2026: TODAS as faixas amarelas
+    category_ink=NAVY
     tagfont=ImageFont.truetype(heavy,45)
     label_width=min(485,d.textbbox((0,0),category,font=tagfont)[2]+55)
     d.rounded_rectangle((54,252,54+label_width,329),radius=12,fill=category_color)
@@ -337,15 +337,14 @@ def make_frame(photo,river,logo,claim,scene,idx,credit,path):
     loc_width=d.textbbox((0,0),local,font=loc_font)[2]+55
     d.rounded_rectangle((54,348,54+loc_width,410),radius=9,fill=(5,20,43,230),outline=YELLOW,width=2)
     d.text((78,359),local,font=loc_font,fill=YELLOW)
-    # Rio Madeira is a permanent regional identity element, separate from
-    # the factual event photo. Its scenic graphic is never implied to be
-    # a police-operation photograph.
-    rio_card=river.convert("RGB").resize((278,108),Image.Resampling.LANCZOS).convert("RGBA")
-    d.rounded_rectangle((739,433,1048,573),radius=12,fill=(2,14,29,235),outline=YELLOW,width=2)
-    img.alpha_composite(rio_card,(753,443))
+    # Rodapé panorâmico permanente Rio Madeira — visual do Giro em todas as cenas.
+    # Imagem ilustrativa regional, nunca apresentada como fotografia do fato.
+    river_band=river.convert("RGB").resize((W,230),Image.Resampling.LANCZOS).convert("RGBA")
+    img.alpha_composite(river_band,(0,1690))
+    img.alpha_composite(Image.new("RGBA",(W,230),(1,12,28,108)),(0,1690))
     d=ImageDraw.Draw(img)
-    d.rectangle((753,525,1031,551),fill=(3,18,37,231))
-    d.text((770,528),"RIO MADEIRA",font=ImageFont.truetype(heavy,22),fill=WHITE)
+    d.rounded_rectangle((62,1698,346,1745),radius=6,fill=(4,20,41,225))
+    d.text((77,1709),"RIO MADEIRA",font=ImageFont.truetype(heavy,24),fill=YELLOW)
     if claim.get("urgent") is True:
         d.rounded_rectangle((769,240,1044,320),radius=7,fill=red)
         d.text((794,258),"URGENTE",font=ImageFont.truetype(heavy,49),fill=WHITE)
@@ -357,7 +356,7 @@ def make_frame(photo,river,logo,claim,scene,idx,credit,path):
     start=max(1035,1610-(len(rows)-1)*leading-tf.size)
     for k,line in enumerate(rows):
         # Accent a meaningful line, not artificial values or invented numbers.
-        color=YELLOW if k==0 else WHITE
+        color=YELLOW if k==1 or (len(rows)==1 and k==0) else WHITE
         d.text((62,start+k*leading),line,font=tf,fill=color,
                stroke_width=2,stroke_fill=(1,7,18))
     bottom=start+(len(rows)-1)*leading+tf.size
@@ -373,7 +372,7 @@ def make_frame(photo,river,logo,claim,scene,idx,credit,path):
         else:current=trial
     if current:pieces.append(current)
     fact_top=max(bottom+24,1634)
-    if len(pieces)<=2 and fact_top+len(pieces)*42<1770:
+    if len(pieces)<=2 and fact_top+len(pieces)*42<1685:
         for i,line in enumerate(pieces):
             d.text((65,fact_top+i*42),line,font=fact_font,fill=(237,245,255,255))
 
