@@ -256,64 +256,97 @@ def lines_for(draw,message,size,maxwidth,maxlines=4):
     raise RuntimeError("Headline cannot fit cinematic layout")
 
 def make_frame(photo,river,logo,claim,scene,idx,credit,path):
-    img=cover(photo,W,H, x=[.3,.5,.7][idx],y=.47).convert("RGBA")
-    # Topical PHOTO dominates upper half, dark editorial lower third.
-    overlay=Image.new("RGBA",(W,H),(0,0,0,0));o=overlay.load()
+    """Official cinematic vertical editorial art, with verified visual provenance.
+
+    Real photo: only individually licensed CC0/CC-BY and clearly marked illustrative.
+    Every title, category and source comes from the vetted news item.
+    No triangle, play icon, generic iconographic reconstruction or fake police scene.
+    """
+    img=cover(photo,W,H,x=[.42,.52,.62][idx],y=.45).convert("RGB")
+    img=ImageEnhance.Contrast(img).enhance(1.10)
+    img=ImageEnhance.Color(img).enhance(1.09).convert("RGBA")
+
+    # Dramatic but legible: photographic hero occupies upper 60 percent.
+    overlay=Image.new("RGBA",(W,H),(0,0,0,0))
+    d=ImageDraw.Draw(overlay)
     for y in range(H):
-        a=75 if y<500 else min(245,max(60,round((y-550)*.36)))
-        for x in range(W):o[x,y]=(2,12,33,a)
+        if y<170: alpha=125
+        elif y<825:alpha=28
+        elif y<1130:alpha=round(28+(y-825)/305*147)
+        elif y<1620:alpha=round(175+(y-1130)/490*71)
+        else:alpha=251
+        d.line((0,y,W,y),fill=(1,10,24,min(252,alpha)),width=1)
     img=Image.alpha_composite(img,overlay)
     d=ImageDraw.Draw(img)
-    # Trademark, high-contrast brand rather than a fake redraw.
-    d.rounded_rectangle((34,31,1048,220),radius=20,fill=(3,17,43,230),outline=YELLOW,width=3)
-    lb=logo.convert("RGBA")
-    lb.thumbnail((173,169),Image.Resampling.LANCZOS)
-    img.alpha_composite(lb,(70+(173-lb.width)//2,39+(169-lb.height)//2))
-    d=ImageDraw.Draw(img)
     heavy,regular=fonts()
-    d.text((267,41),"GIRO",font=ImageFont.truetype(heavy,89),fill=WHITE,stroke_width=2,stroke_fill=(0,0,0))
-    d.text((271,133),"MADEIRA",font=ImageFont.truetype(heavy,60),fill=YELLOW,stroke_width=2,stroke_fill=(0,0,0))
-    heavy,regular=fonts()
-    tagfont=ImageFont.truetype(heavy,40)
+
+    # Compact branding from the original official mark, not a competitor's logo.
+    d.rounded_rectangle((27,28,711,210),radius=14,fill=(2,14,35,212))
+    mark=logo.convert("RGBA")
+    mark.thumbnail((160,160),Image.Resampling.LANCZOS)
+    img.alpha_composite(mark,(45+(160-mark.width)//2,38+(160-mark.height)//2))
     d=ImageDraw.Draw(img)
-    d.rounded_rectangle((52,595,490,665),radius=8,fill=(255,212,0,255))
-    d.text((76,606),("BRASIL" if claim["topic_scope"]=="brasil" else "MUNDO" if claim["topic_scope"]=="mundo" else "RONDÔNIA")+"  |  "+str(idx+1)+"/3",font=tagfont,fill=NAVY)
-    d.rounded_rectangle((50,700,1030,1690),radius=18,fill=(4,21,47,235),outline=(255,212,0,255),width=3)
-    d.rectangle((75,739,95,826),fill=YELLOW)
-    d.text((125,750),("DESTAQUE • "+article_subject(claim["title"])[1]),font=ImageFont.truetype(heavy,36),fill=YELLOW)
-    # Single sensational but true title: use approved article title for first, facts for remaining.
-    head=clean(claim["title"].split("|")[0]) if idx==0 else scene
-    rows,tf=lines_for(d,head,86,900,maxlines=5)
-    top=868
+    d.text((218,42),"GIRO",font=ImageFont.truetype(heavy,93),fill=WHITE,stroke_width=1,stroke_fill=(0,7,17))
+    d.text((222,121),"MADEIRA",font=ImageFont.truetype(heavy,63),fill=YELLOW,stroke_width=1,stroke_fill=(0,7,17))
+
+    _,subject=article_subject(claim["title"])
+    category=clean(subject).upper()[:16]
+    if category=="SEGURANÇA":category="POLÍCIA"
+    red=(222,31,45,255)
+    category_color=red if category in ("POLÍCIA","TRÂNSITO") else (255,212,0,255)
+    category_ink=WHITE if category_color==red else NAVY
+    tagfont=ImageFont.truetype(heavy,45)
+    label_width=min(485,d.textbbox((0,0),category,font=tagfont)[2]+55)
+    d.rounded_rectangle((54,252,54+label_width,329),radius=12,fill=category_color)
+    d.text((80,268),category,font=tagfont,fill=category_ink)
+    local=("BRASIL" if claim.get("topic_scope")=="brasil" else
+           "MUNDO" if claim.get("topic_scope")=="mundo" else "RONDÔNIA")
+    loc_font=ImageFont.truetype(heavy,35)
+    loc_width=d.textbbox((0,0),local,font=loc_font)[2]+55
+    d.rounded_rectangle((54,348,54+loc_width,410),radius=9,fill=(5,20,43,230),outline=YELLOW,width=2)
+    d.text((78,359),local,font=loc_font,fill=YELLOW)
+    if claim.get("urgent") is True:
+        d.rounded_rectangle((769,240,1044,320),radius=7,fill=red)
+        d.text((794,258),"URGENTE",font=ImageFont.truetype(heavy,49),fill=WHITE)
+
+    # Open photo above, punchy typography below; adapt font before rendering.
+    head=clean(claim["title"].split("|")[0]) if idx==0 else clean(scene)
+    rows,tf=lines_for(d,head,91,942,maxlines=5)
+    leading=tf.size+9
+    start=max(1035,1610-(len(rows)-1)*leading-tf.size)
     for k,line in enumerate(rows):
-        d.text((83,top+k*(tf.size+11)),line,font=tf,fill=YELLOW if k==1 else WHITE,
-               stroke_width=2,stroke_fill=(0,8,25))
-    d.line((83,1422,999,1422),fill=YELLOW,width=5)
-    # Short factual slide: never invent or synthesize information.
-    fact=scene if idx==0 else "IMAGEM ILUSTRATIVA • FONTE IDENTIFICADA NA DESCRIÇÃO"
-    shortfont=ImageFont.truetype(regular,31)
-    shortlines=[];current=""
-    for word in clean(fact).split():
+        # Accent a meaningful line, not artificial values or invented numbers.
+        color=YELLOW if k==0 else WHITE
+        d.text((62,start+k*leading),line,font=tf,fill=color,
+               stroke_width=2,stroke_fill=(1,7,18))
+    bottom=start+(len(rows)-1)*leading+tf.size
+
+    # Small factual supporting text; never crop a verified sentence.
+    fact=clean(scene) if idx==0 else "IMAGEM ILUSTRATIVA • VEJA A FONTE NA DESCRIÇÃO"
+    fact_font=ImageFont.truetype(regular,31)
+    pieces=[];current=""
+    for word in fact.split():
         trial=(current+" "+word).strip()
-        if d.textbbox((0,0),trial,font=shortfont)[2]>892 and current:shortlines.append(current);current=word
+        if d.textbbox((0,0),trial,font=fact_font)[2]>940 and current:
+            pieces.append(current);current=word
         else:current=trial
-    if current:shortlines.append(current)
-    if len(shortlines)>4:raise RuntimeError("Verified fact text does not fit")
-    for j,line in enumerate(shortlines):d.text((83,1457+j*41),line,font=shortfont,fill=WHITE)
-    d.rounded_rectangle((73,1640,1009,1699),radius=9,fill=(255,212,0,255))
-    d.text((92,1650),"GIRO MADEIRA • NOTÍCIA VERIFICADA",font=ImageFont.truetype(heavy,30),fill=NAVY)
-    # Rio Madeira is always visible as regional brand, not the scene of the event.
-    rio=cover(river,W,215).convert("RGBA")
-    rio.putalpha(220)
-    img.alpha_composite(rio,(0,1704))
-    d=ImageDraw.Draw(img)
-    d.rectangle((0,1703,1080,1711),fill=YELLOW)
-    d.rounded_rectangle((34,1730,500,1802),radius=10,fill=(2,18,43,230))
-    d.text((52,1744),"RIO MADEIRA • ARTE EDITORIAL",font=ImageFont.truetype(heavy,29),fill=WHITE)
-    d.rectangle((0,1873,1080,1920),fill=(1,14,33,255))
-    txt=("IMAGEM ILUSTRATIVA • "+str(claim.get("source_name") or "FONTE")+f" • {idx+1}/3").upper()
-    d.text((28,1882),txt[:78],font=ImageFont.truetype(regular,25),fill=WHITE)
+    if current:pieces.append(current)
+    fact_top=max(bottom+24,1634)
+    if len(pieces)<=2 and fact_top+len(pieces)*42<1770:
+        for i,line in enumerate(pieces):
+            d.text((65,fact_top+i*42),line,font=fact_font,fill=(237,245,255,255))
+
+    d.line((62,1770,1017,1770),fill=YELLOW,width=7)
+    d.rounded_rectangle((54,1801,1023,1868),radius=10,fill=(6,23,50,240))
+    d.text((74,1814),"@GIRO_MADEIRA",font=ImageFont.truetype(heavy,41),fill=WHITE)
+    d.text((701,1824),f"CENA {idx+1}/3",font=ImageFont.truetype(heavy,29),fill=YELLOW)
+    d.rectangle((0,1882,1080,1920),fill=(1,10,25,255))
+    small=ImageFont.truetype(regular,21)
+    provenance=f"IMAGEM ILUSTRATIVA • {clean(claim.get('source_name') or 'FONTE')}"
+    d.text((31,1891),provenance[:91].upper(),font=small,fill=(225,230,239,255))
+    # Explicit credits are also preserved in the video description via image_credit.
     img.convert("RGB").save(path,format="PNG",optimize=True)
+
 
 def render_clean_madeira_illustration():
     """Branded editorial representation of the Rio Madeira; NO inherited words from earlier videos."""
