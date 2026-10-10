@@ -46,12 +46,39 @@ jobs:
           GITHUB_EVENT_NAME: push
         run: |
           python scripts/giro_shorts_auto.py --self-test
+      - name: Verificar fotografia CC0 do Rio Madeira em capa editorial
+        env:
+          GITHUB_EVENT_NAME: push
+        run: |
+          python - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          from PIL import Image
+          script=Path("scripts/giro_shorts_auto.py")
+          spec=importlib.util.spec_from_file_location("giro_shorts_qa",script)
+          module=importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          photo,credit,source=module.licensed_local_madeira_photo()
+          assert "CC0" in credit and photo.width>=900 and photo.height>=650
+          logo=Image.open("assets/logo-oficial.webp").convert("RGB")
+          claim={"title":"TESTE VISUAL: A IDENTIDADE DO GIRO MADEIRA EM PORTO VELHO",
+                 "topic_scope":"rondonia",
+                 "source_name":"SIMULAÇÃO INTERNA — NÃO PUBLICAR",
+                 "urgent":False}
+          folder=Path("shorts-test-preview");folder.mkdir(exist_ok=True)
+          module.make_frame(photo,module.render_clean_madeira_illustration(),logo,claim,
+                   "IMAGEM REGIONAL CC0 — TESTE SEM PUBLICAÇÃO",0,credit,folder/"auto-qa-photo-cover.png")
+          with Image.open(folder/"auto-qa-photo-cover.png") as im:
+              assert im.size==(1080,1920)
+          print("PASS: Foto CC0 licenciada de Porto Velho usada em capa 1080x1920; sem envio à plataforma")
+          PY
       - name: Anexar resultado privado para inspeção
         uses: actions/upload-artifact@v4
         with:
           name: giro-shorts-qa-sem-publicar
           path: |
             shorts-test-preview/auto-qa-cover.png
+            shorts-test-preview/auto-qa-photo-cover.png
             shorts-test-preview/auto-qa-video.mp4
           if-no-files-found: error
           retention-days: 2
