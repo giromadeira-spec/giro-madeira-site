@@ -305,6 +305,15 @@ def make_frame(photo,river,logo,claim,scene,idx,credit,path):
     loc_width=d.textbbox((0,0),local,font=loc_font)[2]+55
     d.rounded_rectangle((54,348,54+loc_width,410),radius=9,fill=(5,20,43,230),outline=YELLOW,width=2)
     d.text((78,359),local,font=loc_font,fill=YELLOW)
+    # Rio Madeira is a permanent regional identity element, separate from
+    # the factual event photo. Its scenic graphic is never implied to be
+    # a police-operation photograph.
+    rio_card=river.convert("RGB").resize((278,108),Image.Resampling.LANCZOS).convert("RGBA")
+    d.rounded_rectangle((739,433,1048,573),radius=12,fill=(2,14,29,235),outline=YELLOW,width=2)
+    img.alpha_composite(rio_card,(753,443))
+    d=ImageDraw.Draw(img)
+    d.rectangle((753,525,1031,551),fill=(3,18,37,231))
+    d.text((770,528),"RIO MADEIRA",font=ImageFont.truetype(heavy,22),fill=WHITE)
     if claim.get("urgent") is True:
         d.rounded_rectangle((769,240,1044,320),radius=7,fill=red)
         d.text((794,258),"URGENTE",font=ImageFont.truetype(heavy,49),fill=WHITE)
