@@ -46,7 +46,7 @@ def article_subject(title):
      (r"gasolina|combust[ií]vel|petr[oó]leo|petrobras|posto","gas station petrol pump","ECONOMIA"),
      (r"clima|temporal|chuva|enchente|calor|seca|granizo","lightning storm","CLIMA"),
      # Incidentes aéreos: evitar fotos genéricas de polícia ou gráficas de jornal.
-     (r"avi[aã]o|aeronave|helic[oó]ptero|aeroporto|acidente a[eé]reo|queda de avi[aã]o","incidente aereo editorial graphic","SEGURANÇA"),
+     (r"avi[aã]o|aeronave|helic[oó]ptero|aeroporto|acidente a[eé]reo|queda de avi[aã]o","aircraft airplane","SEGURANÇA"),
      (r"pol[ií]cia|pf |prendeu|pris[aã]o|feminic[ií]dio|investiga","police car emergency lights","SEGURANÇA"),
      (r"elei[cç][aã]o|voto|urna|tse|tre-|stf|supremo|congresso|senado|deputad|bolsonaro|lula","brazil electronic voting machine","POLÍTICA"),
      (r"futebol|sele[cç][aã]o|atleta|jogo|copa|fifa|gol ","soccer ball field","ESPORTES"),
@@ -101,9 +101,12 @@ def photo_matches_topic(topic, title):
       "soccer ball field":r"\b(soccer ball|football ball|soccer field|football field)\b",
       "financial city skyscrapers":r"\b(skyscraper|financial district|financial center|financial centre)\b",
       "computer circuit board macro":r"\b(circuit board|printed circuit|motherboard)\b",
-      "newspaper printing press":r"\b(printing press|newspaper printing|newspaper press)\b"
+      "newspaper printing press":r"\b(printing press|newspaper printing|newspaper press)\b",
+      "aircraft airplane":r"\b(aircraft|airplane|aeroplane|jetplane|avi[aã]o|aeronave|plane)\b"
     }
     pattern=groups.get(topic)
+    if topic=="aircraft airplane" and re.search(r"\b(toy|model|paper plane|simulator|diagram|poster|illustration|drawing|game|cartoon)\b",title,re.I):
+      return False
     return bool(pattern and re.search(pattern,title,re.I))
 
 def licensed_commons_download(topic):
@@ -115,6 +118,7 @@ def licensed_commons_download(topic):
       "police car emergency lights":["police car", "police vehicle"],
       "lightning storm":["lightning storm", "lightning"],
       "soccer ball field":["soccer ball", "football field"],
+      "aircraft airplane":["airplane on runway", "aircraft at airport", "airplane"],
     }
     searches=fallback_terms.get(topic,[topic,topic.split()[0]])
     for search in searches:
@@ -529,36 +533,24 @@ def main():
       with tempfile.TemporaryDirectory(prefix="giro-shorts-") as tmp:
         folder=Path(tmp)
         query,category=article_subject(result["title"])
+        # O padrão visual aprovado exige fotografia REAL, licenciada e pertinente.
+        # Se nenhuma foto válida existir, bloquear o Short em vez de publicar arte genérica.
         try:
-            if query in ("cadastro unico editorial graphic", "incidente aereo editorial graphic"):
-                picture=render_text_only_background(category)
-                credit="arte editorial original Giro Madeira — sem fotografia externa"
-                file_title="arte editorial tipográfica"
-            else:
-                picture,credit,file_title=licensed_openverse_photo(query)
+            picture,credit,file_title=licensed_openverse_photo(query)
         except Exception as primary_error:
-            print("Openverse image unavailable, attempting verified Commons fallback:",type(primary_error).__name__)
-            try:
-                picture,credit,file_title=licensed_commons_download(query)
-            except Exception as commons_error:
-                # Prefer regional identity photo for Rondônia when topical photography
-                # cannot be licensed. Never imply this shows the actual incident.
-                print("No verified topical Commons photo:",type(commons_error).__name__)
-                if result.get("topic_scope")=="rondonia":
-                    try:
-                        picture,credit,file_title=licensed_local_madeira_photo()
-                    except Exception as regional_error:
-                        print("No licensed regional photo; using original text-first graphic:",
-                              type(regional_error).__name__)
-                        picture=render_text_only_background(category)
-                        credit="arte editorial original Giro Madeira — sem fotografia externa"
-                        file_title="arte editorial tipográfica"
-                else:
-                    picture=render_text_only_background(category)
-                    credit="arte editorial original Giro Madeira — sem fotografia externa"
-                    file_title="arte editorial tipográfica"
+            print("Openverse without topical licensed photo:",type(primary_error).__name__)
+            picture,credit,file_title=licensed_commons_download(query)
+        if not credit.startswith(("openverse_","wikimedia_")):
+            raise RuntimeError("Visual standard failed: unlicensed or non-photographic hero")
         logo=Image.open(ROOT/"assets/logo-oficial.webp").convert("RGB")
-        river=render_clean_madeira_illustration()
+        # O Rio Madeira segue presente no rodapé. Priorizar fotografia CC0 regional.
+        try:
+            river_photo,_,_=licensed_local_madeira_photo()
+            river=cover(river_photo,W,230)
+        except Exception as regional_error:
+            print("Regional CC0 footer unavailable; keeping original Rio Madeira artwork:",
+                  type(regional_error).__name__)
+            river=render_clean_madeira_illustration()
         frames=[]
         for i,scene in enumerate(result["scenes"]):
             file=folder/("card%d.png"%i)
@@ -568,6 +560,14 @@ def main():
         video=folder/"giro_short.mp4";render_frames(frames,video,soundtrack)
         preview_dir=ROOT/"shorts-test-preview"
         preview_dir.mkdir(exist_ok=True)
+        # Checagem de qualidade estrutural: não confundir renderização concluída
+        # com conformidade visual. Fotografia ligada à pauta é condição obrigatória.
+        if len(frames)!=3 or not credit.startswith(("openverse_","wikimedia_")):
+            raise RuntimeError("Approved visual QA failed: photo/scene requirements")
+        for frame in frames:
+            with Image.open(frame) as review:
+                if review.size!=(1080,1920) or review.mode!="RGB":
+                    raise RuntimeError("Approved visual QA failed: vertical 1080x1920")
         frames[0].replace(preview_dir/("fila-"+str(qid)+".png"))
         with video.open("rb") as f:
             response=requests.put(result["upload_url"],data=f,headers={"Content-Type":"video/mp4","x-upsert":"false"},
@@ -575,7 +575,7 @@ def main():
         if response.status_code not in (200,201):
             raise RuntimeError("Supabase signed upload failed with HTTP "+str(response.status_code))
         confirmed=bridge(token,"complete",queue_id=qid,storage_path=result["storage_path"],
-                 quality_passed=True,image_credit=credit)
+                 quality_passed=(len(frames)==3 and credit.startswith(("openverse_","wikimedia_"))),image_credit=credit)
         print("Rendered and stored approved video for queue",confirmed["queue_id"])
         print("Openverse-licensed illustration:",file_title)
     except Exception as e:
