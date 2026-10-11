@@ -32,6 +32,18 @@ A RPC restrita `giro_plano_b_confirmar_publicacao(publicacao_id,formato,permalin
 ## Limitações a não mascarar
 - A conexão da API Meta para consultas respondeu HTTP 200 anteriormente, o que não prova autorização de publicação. `integrity_hold=true` continua.
 - **O agendamento nativo não é automatizado neste estágio**: exige acesso/ação da conta no app ou navegador Meta Business Suite. Não se pode confirmar uma postagem antes de permalink real.
-- A criação deste pacote foi feita para um Reel específico. Não há rotina que envie automaticamente *cada nova* mídia para a pasta Drive; futura automação de exportação terá que ser desenvolvida/validada separadamente.
+- **A automação v2 foi instalada**, mas os pacotes futuros são preparados no **Supabase Storage**, e não copiados automaticamente para o Google Drive. O Google Drive permanece apenas com o pacote nº 920, já carregado manualmente pelo conector. A conta de serviço do Supabase tem papel de leitura na pasta do Drive, portanto a escrita automática no Drive não está habilitada.
 - O sistema ainda precisa de confirmação de sessão/permissões dentro do Meta Business Suite para validar se está disponível para a conta.
 - Não usar Metricool neste fluxo, por escolha editorial do usuário.
+
+## Automação v2 — pacotes no Supabase Storage (11/10/2026)
+- Edge Function autenticada por `x-giro-db-key`: `giro-plano-b-empacotar` v1, ACTIVE. Ela apenas prepara arquivos e fila; **não executa requisições ao Instagram**.
+- Cron `giro-plano-b-empacotar-30min`: `*/30 * * * *` (UTC); executa preparação a cada 30 minutos, independente do horário das postagens.
+- Cada notícia recente com mídia produzida, legenda, fonte, `media_pipeline_version>=5`, sem `instagram_media_id` e em estado pendente/aprovada pode gerar entradas separadas para FEED, STORIES e REELS, conforme formatos previstos e recursos presentes.
+- Conteúdo gerado automaticamente: `news-images/plano-b/auto/<id>/<formato>/legenda.txt` e `manifesto.json`. Mídias originais permanecem em buckets Supabase, com URLs registradas na tabela `giro_plano_b_fila`.
+- Regras de estados: `aguardando_revisao_visual` quando visual_approved=false; `aguardando_video` quando Reel não possui vídeo; `pronto_para_agendar` **somente** com mídia disponível e visual_approved=true. Nenhuma aprovação visual automática é simulada.
+- Incluir expressamente `IMAGEM ILUSTRATIVA` em legendas quando ausente; não representar ilustração digital como fotografia real da operação.
+- Registros do Drive feitos manualmente (`origem_pacote=drive_manual`) não são sobrescritos pela automação. Id e formato são únicos, evitando múltiplos pacotes iguais.
+- Teste de conexão `dry_run=true` e teste de execução: ambos retornaram HTTP 200, `success=true`, `no_instagram_publish=true`, `processed=0`. Isto é esperado, pois naquele momento nenhuma nova mídia aprovada estava disponível; validação do caminho de geração positiva ficará pendente de uma próxima notícia com arte.
+- O Reel de teste 920 continua `pronto_para_agendar` na fila manual e não foi publicado. Semáforo da Meta permanece vermelho.
+- Confirmação de publicação nativa exige permalink oficial via `giro_plano_b_confirmar_publicacao` e evita reenvios pela API. O operador deve efetuar o clique no Instagram/Meta Business Suite — não há navegação autenticada do Instagram disponível nesta sessão.
