@@ -94,3 +94,20 @@ A migração `giro_media_status_corrigir_plano_b_e_reel_nativo_v1` atualiza o tr
 - Testes: `dry_run=true` HTTP 200 mostrou o id921 `aprovada` e `instagram_hold=true`. Execução protegida HTTP 200 à 00h40 local retornou `no_publish=true, stage=fora_janela_editorial`, sem tentativa na Meta.
 - Dependência real: `integrity_hold=true` em `giro_meta_rate_state`, último erro de escrita HTTP 403 da Meta, razão integridade/antispam (2207051). **Nunca remover o hold apenas porque GET /me ou quota retornou HTTP 200 ou a postagem nativa por navegador funcionou.** Requer revisão/regularização na Meta e verificação oficial da capacidade de escrita para habilitar a publicação automática. O usuário não precisa contratar nenhum provedor adicional.
 - O Plano B permanece sem uma API suportada de agendamento nativo no navegador; precisa de agendamento manual ou de uma ferramenta de navegador autenticada autorizada pelo usuário. Nenhuma implementação de automação por cliques na UI foi realizada.
+
+## Procedimento executável em navegador autenticado — Plano B (sem novas integrações pagas)
+
+**Pré-condição:** o usuário deve abrir um navegador autenticado no Meta Business Suite por um executor autorizado (por exemplo, ChatGPT Work) e aprovar os passos de acesso à conta. O backend Supabase NÃO controla nem agendará o Business Suite pela UI por si só. Agendar pela interface nativa não comprova liberação do endpoint Graph `media_publish`.
+
+1. Ler a fila `public.giro_plano_b_fila` apenas com formato relevante e status `pronto_para_agendar`, conferir em `giro_madeira_publicacoes` se `visual_approved=true`, fonte/data e prazo editorial ainda válidos. Excluir `agendado_nativo`, `publicado_nativo`, `cancelado` e `instagram_permalink` já preenchido.
+2. Acessar pela interface oficial **https://business.facebook.com/**, escolher o Instagram Giro Madeira e inspecionar primeiro o Planejador/Conteúdo para evitar uma duplicação de notícia/manchete. Se a Meta bloquear a ação ou solicitar verificação, parar e relatar: não insistir, não contornar políticas.
+3. Usar somente a arte final aprovada, não foto bruta do veículo de origem. Para o Feed #921: mídia https://drive.google.com/file/d/1FX7RKoXk-pGRSpt1wufUgy3RbPACTdg9/view ; legenda https://drive.google.com/file/d/1ErCb_iPyqNRCDt8y0CzXwnE64jpgQfqq/view . **A data 11/10/2026 e o limite de 23h30 Porto Velho são obrigatórios; NÃO agendar após o vencimento, nem se notícia tiver sido superada.** Agendamento interno no Supabase **não equivale** a agendamento na Meta.
+4. Na interface do Business Suite, criar e agendar um post Instagram nativo na janela 06h–23h30 America/Porto_Velho e respeitar intervalos. Somente declarar **agendado_nativo** após confirmar que o post efetivamente aparece no Planejador. Guardar confirmação e hora. Se houver confirmação de publicação, preferir ID/permalink retornados pela Meta para `publicado_nativo`, nunca marcar apenas porque a tarefa foi enviada.
+5. `giro-meta-nativo-conferir-30min` confere as publicações por GET e concilia correspondências inequívocas da fila automaticamente. **Stories sem legenda equivalente podem exigir verificação manual.**
+6. Não tentar publicar via Graph enquanto `giro_meta_rate_state.integrity_hold=true` (403, subcódigo 2207051). Não criar sessões ocultas/scrapers para evadir a restrição. Programar novos lotes no Business Suite via navegador só quando tecnicamente suportado e permitido.
+
+### Escopo e limitações
+
+- Radar, preparo de pacotes, fila e conciliação de Feed/Reels são automatizados no servidor, sem Metricool.
+- O **agendamento no Business Suite não foi conectado a qualquer ferramenta deste chat**. Para executar esse passo, é preciso um navegador autenticado (como o Work) aberto com permissão do usuário. Uma execução no Work pode agendar um lote, mas **não significa automação contínua 24h**.
+- Automação contínua de publicação no Instagram depende do restabelecimento legítimo da API oficial ou de alternativa oficial explicitamente autorizada pela Meta.
