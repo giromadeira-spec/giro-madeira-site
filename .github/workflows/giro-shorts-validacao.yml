@@ -28,14 +28,17 @@ jobs:
           ast.parse(source)
           tree=ast.parse(source)
           fn=next((n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=="render_text_only_background"),None)
-          assert fn is not None, "Fallback missing"
+          assert fn is not None, "QA-only fallback missing"
           scope={"Image":Image,"ImageDraw":ImageDraw,"W":1080,"H":1920,"NAVY":(4,17,40),"YELLOW":(255,212,0)}
           exec(compile(ast.Module(body=[fn],type_ignores=[]),str(p),"exec"),scope)
           picture=scope["render_text_only_background"]("POLÍTICA")
           assert picture.size==(1080,1920) and picture.mode=="RGB"
           assert len(set(picture.resize((54,96)).getdata()))>5, "Empty image"
           main=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=="main")
-          assert any(isinstance(n,ast.Call) and isinstance(n.func,ast.Name) and n.func.id=="render_text_only_background" for n in ast.walk(main)), "Fallback not connected to renderer"
+          assert not any(isinstance(n,ast.Call) and isinstance(n.func,ast.Name) and n.func.id=="render_text_only_background" for n in ast.walk(main)), "Generic fallback must NOT publish"
+          assert "aircraft airplane" in source, "Aircraft subject mapping missing"
+          assert "Visual standard failed: unlicensed or non-photographic hero" in source, "Photographic QA gate missing"
+          assert "len(frames)==3" in source, "Three-scene verification missing"
           assert "picture,credit,file_title=licensed_commons_download(query)" in source
-          print("PASS: 1080x1920 original fallback; renderer integration present; no external image, credentials, bridge or upload invoked")
+          print("PASS: production rejects generic background; QA-only test image remains isolated; no upload invoked")
           PY
