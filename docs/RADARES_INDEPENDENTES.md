@@ -71,3 +71,10 @@ O caminho de envio independente do Instagram não foi testado com publicação r
 - Parser TypeScript verificou os arquivos; os deployments confirmaram compilação. A resolução completa de dependências pelo Deno local foi impedida pela rede do executor.
 - Python compilado; `--self-test` produziu MP4 H.264 1080x1920 com `media_upload_attempted=false`.
 - Nenhum teste de postagem, remoção de hold Meta ou contratação de API paga foi executado.
+
+## Observações da verificação final
+
+- GitHub Actions: os checks `Giro Madeira - Shorts (sem API paga)` (QA sem envio) e `validar fallback editorial (sem publicacao)` passaram no commit da separação.
+- O workflow legado `publicar-noticias-04-10.yml`, já presente e sem alteração neste trabalho, continua falhando na validação. Não integra os novos radares e não foi executado para publicar notícias.
+- A primeira coleta registrou falha parcial da fonte O Observador em Shorts/TikTok; as demais fontes e os cinco radares concluíram. Essa falha é registrada por canal e não bloqueia o Instagram.
+- O primeiro rascunho novo de Reels ficou `aguardando_arte_tematica`, sem aprovação ou envio: falta uma imagem temática aprovada para essa pauta.
