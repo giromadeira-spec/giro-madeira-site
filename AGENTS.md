@@ -22,7 +22,7 @@ Qualquer automação, agente de código, gerador de imagem ou renderizador do re
 Conferir dimensão, logo original, foto licenciada/adequada, tarja de categoria, hierarquia branco/amarelo, Rio Madeira, manchete por inteiro, apoio e fonte verdadeiros, área segura da interface, ausência de play, e ausência de duplicidade. **Falhou 1 item => não publicar; encaminhar para revisão/refazer sem duplicar o item na fila.** Falha ou resultado remoto ambíguo nunca autoriza reenvio sem reconciliação.
 
 ### Implementação
-- O gerador automático de Shorts está em `scripts/giro_shorts_auto.py`; a cópia para TikTok em `scripts/buffer/giro_tiktok_30fps.py`. TikTok deve reutilizar o material **visual aprovado** dos Shorts, e não aplicar outro template.
+- Shorts e TikTok usam o renderizador visual comum `scripts/giro_shorts_auto.py`, mas com radares, pautas, filas, mídias e publicações totalmente independentes; `--tiktok` utiliza a ponte e a fila próprias e `scripts/buffer/giro_tiktok_30fps.py` converte somente os vídeos do TikTok. Compartilhar o padrão visual aprovado NÃO significa reaproveitar o vídeo ou depender de postagem no YouTube.
 - Antes de alterar o renderizador, executar `python scripts/giro_shorts_auto.py --self-test` em modo QA; esse teste **não publica**.
 - A documentação orienta a geração mas **não substitui** a validação de saída do renderizador nem a confirmação do provedor.
 
