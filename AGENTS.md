@@ -25,3 +25,8 @@ Conferir dimensão, logo original, foto licenciada/adequada, tarja de categoria,
 - O gerador automático de Shorts está em `scripts/giro_shorts_auto.py`; a cópia para TikTok em `scripts/buffer/giro_tiktok_30fps.py`. TikTok deve reutilizar o material **visual aprovado** dos Shorts, e não aplicar outro template.
 - Antes de alterar o renderizador, executar `python scripts/giro_shorts_auto.py --self-test` em modo QA; esse teste **não publica**.
 - A documentação orienta a geração mas **não substitui** a validação de saída do renderizador nem a confirmação do provedor.
+
+## Isolamento dos canais — 11/10/2026
+
+Fonte operacional: [docs/RADARES_INDEPENDENTES.md](docs/RADARES_INDEPENDENTES.md). Toda mudança de radar, intervalo, fila ou agendamento deve identificar explicitamente um dos canais `shorts`, `tiktok`, `feed`, `stories`, `reels`. Nunca propagar configuração de um canal aos demais. Usar a RPC `giro_configurar_radar_independente` para mudar frequência somente no canal solicitado. Compartilhar identidade visual e fontes não autoriza compartilhar estado de consumo, aprovação, tentativas ou publicação. TikTok não depende de sucesso, ID ou vídeo público no YouTube. Nenhuma publicação/teste de postagem está autorizado nesta implantação; `publication_enabled=false` até aprovação separada, e o hold Meta permanece.
+

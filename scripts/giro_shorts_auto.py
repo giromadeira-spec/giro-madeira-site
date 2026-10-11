@@ -9,7 +9,8 @@ import requests
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
 
 SUPABASE="https://dsihvbdhocbqscaypraw.supabase.co"
-BRIDGE=SUPABASE+"/functions/v1/giro-shorts-github-bridge"
+PLATFORM="tiktok" if "--tiktok" in sys.argv else "shorts"
+BRIDGE=SUPABASE+"/functions/v1/giro-"+PLATFORM+"-github-bridge"
 AUD=BRIDGE
 ROOT=Path(__file__).resolve().parents[1]
 HEADERS={"User-Agent":"GiroMadeiraShorts/1.0 (editorial illustration; github.com/giromadeira-spec/giro-madeira-site)"}
@@ -591,3 +592,4 @@ if __name__=="__main__":
         render_self_test()
     else:
         main()
+

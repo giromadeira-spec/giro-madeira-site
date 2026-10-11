@@ -1,0 +1,38 @@
+name: Giro Madeira - TikTok independente
+on:
+  schedule:
+    - cron: '4,19,34,49 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: giro-tiktok-production
+  cancel-in-progress: false
+jobs:
+  preparar-tiktok:
+    if: github.repository == 'giromadeira-spec/giro-madeira-site' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Instalar renderizador comum
+        run: |
+          python -m pip install --disable-pip-version-check "Pillow>=11,<13" "requests>=2.31,<3"
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ffmpeg fonts-dejavu-core
+      - name: Produzir vídeo da fila TikTok sem depender de Shorts
+        run: python scripts/giro_shorts_auto.py --tiktok
+      - name: Preparar cópia 30 fps da fila TikTok
+        run: python scripts/buffer/giro_tiktok_30fps.py
+      - name: Guardar prévia para revisão
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: giro-tiktok-previa
+          path: shorts-test-preview/*.png
+          if-no-files-found: ignore
+          retention-days: 2

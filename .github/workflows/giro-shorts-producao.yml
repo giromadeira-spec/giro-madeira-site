@@ -8,11 +8,16 @@ on:
       - .github/workflows/giro-shorts-producao.yml
   schedule:
     # Porto Velho UTC-4: 08h e 20h (12h e 00h UTC).
-    # Janelas de producao, nao garantia de upload; publicador valida intervalo.
+    # Preparacao antecipada 07h/19h locais e recuperacao 08h/20h.
+    # Horarios de upload continuam 08h/20h, sujeitos a aprovacao do canal.
+    - cron: '0 11 * * *'
     - cron: '0 12 * * *'
+    - cron: '0 23 * * *'
     - cron: '0 0 * * *'
     # Retentativas sem duplicacao para slots que ficaram aguardando renderizacao.
+    - cron: '30 11 * * *'
     - cron: '30 12 * * *'
+    - cron: '30 23 * * *'
     - cron: '30 0 * * *'
   workflow_dispatch:
 
@@ -118,3 +123,4 @@ jobs:
           path: shorts-test-preview/*.png
           if-no-files-found: ignore
           retention-days: 1
+
