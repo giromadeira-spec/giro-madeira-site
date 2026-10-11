@@ -45,6 +45,8 @@ def article_subject(title):
      (r"mosquito|dengue|aedes|zika|sa[uú]de|vacina|hospital","mosquito aedes aegypti macro","SAÚDE"),
      (r"gasolina|combust[ií]vel|petr[oó]leo|petrobras|posto","gas station petrol pump","ECONOMIA"),
      (r"clima|temporal|chuva|enchente|calor|seca|granizo","lightning storm","CLIMA"),
+     # Incidentes aéreos: evitar fotos genéricas de polícia ou gráficas de jornal.
+     (r"avi[aã]o|aeronave|helic[oó]ptero|aeroporto|acidente a[eé]reo|queda de avi[aã]o","incidente aereo editorial graphic","SEGURANÇA"),
      (r"pol[ií]cia|pf |prendeu|pris[aã]o|feminic[ií]dio|investiga","police car emergency lights","SEGURANÇA"),
      (r"elei[cç][aã]o|voto|urna|tse|tre-|stf|supremo|congresso|senado|deputad|bolsonaro|lula","brazil electronic voting machine","POLÍTICA"),
      (r"futebol|sele[cç][aã]o|atleta|jogo|copa|fifa|gol ","soccer ball field","ESPORTES"),
@@ -528,7 +530,7 @@ def main():
         folder=Path(tmp)
         query,category=article_subject(result["title"])
         try:
-            if query=="cadastro unico editorial graphic":
+            if query in ("cadastro unico editorial graphic", "incidente aereo editorial graphic"):
                 picture=render_text_only_background(category)
                 credit="arte editorial original Giro Madeira — sem fotografia externa"
                 file_title="arte editorial tipográfica"
