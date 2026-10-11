@@ -46,7 +46,7 @@ Os endpoints exigem a chave interna validada por RPC ou OIDC GitHub com reposit�
 
 ## Estado de publicação e autorização
 
-Radares e preparação estão ativos. `publication_enabled=false` em todos os novos canais, conforme a exigência de aprovação separada para postagem/testes de postagem. Shorts tem gate no uploader; TikTok tem gate na reserva de envio; Instagram tem gate no dispatcher e no publicador.
+Radares e preparação estão ativos. Na implantação inicial, `publication_enabled=false` em todos os novos canais, aguardando aprovação separada. Em 11/10/2026, o operador aprovou a publicação automática SOMENTE de `shorts`, e foi aplicado `giro_channel_settings.publication_enabled=true` para `channel='shorts'` no Supabase de produção. TikTok, Feed, Stories e Reels permanecem `false`. Shorts tem gate no uploader; TikTok tem gate na reserva de envio; Instagram tem gate no dispatcher e no publicador.
 
 Não habilitar publicação silenciosamente. Instagram ainda possui `integrity_hold=true` e `rollout_stage=feed_only`; aprovação do usuário não remove uma restrição da Meta. Feed/Reels/Stories passam também pelo semáforo central da conta.
 
@@ -78,3 +78,13 @@ O caminho de envio independente do Instagram não foi testado com publicação r
 - O workflow legado `publicar-noticias-04-10.yml`, já presente e sem alteração neste trabalho, continua falhando na validação. Não integra os novos radares e não foi executado para publicar notícias.
 - A primeira coleta registrou falha parcial da fonte O Observador em Shorts/TikTok; as demais fontes e os cinco radares concluíram. Essa falha é registrada por canal e não bloqueia o Instagram.
 - O primeiro rascunho novo de Reels ficou `aguardando_arte_tematica`, sem aprovação ou envio: falta uma imagem temática aprovada para essa pauta.
+
+## Liberação de produção de Shorts — 11/10/2026
+
+- Autorização explícita do operador nesta conversa para habilitar postagem automática no YouTube Shorts, sem alterar os demais canais.
+- Banco confirmado: `giro_channel_settings.channel='shorts'`, `radar_enabled=true`, `preparation_enabled=true`, `publication_enabled=true`; todos os demais canais permanecem com publicação desabilitada.
+- Supabase `giro_shorts_settings`: `public_auto_uploads_enabled=true`, `render_worker_reviewed=true`, `shorts_render_enabled=true`, `daily_goal=2`, `min_interval_minutes=720` e versão visual 6. Não baixar limites ou ignorar revisão visual apenas para forçar postagem.
+- Teste autenticado `giro-youtube-verify-channel` retornou HTTP 200 e `account_matches_target=true` para o canal `@giromadeira`, `UCvzAtpCtcIef5Tfw31RcknQ`, com `uploads_performed=0`.
+- O teste `giro-youtube-upload-auto` com `action=preview` retornou HTTP 200, `processed=0`, `reason=no_eligible_v5_shorts`: o vídeo de 20h ainda não estava renderizado/aprovado. Não equivale a publicação real validada.
+- A produção dos Shorts permanece no GitHub Actions (07h/19h locais, com checagem no horário dos slots de 08h/20h); o uploader público é agendado a cada 15 minutos. Slots são metas sujeitas a processamento, verificação, qualidade e intervalo mínimo — não horários garantidos.
+- Na fila em 11/10/2026 há pauta de 20h aguardando renderização. Só considerar a postagem concluída se houver `provider_post_id`, `status='enviado'` e `provider_privacy_status='public'`. Não aprovar artificialmente, nem ignorar erros ou reenvios incertos.
