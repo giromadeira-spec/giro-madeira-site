@@ -45,6 +45,29 @@ Deno.serve(async req=>{
    await db.from(table).update({erro:String(result.error||"media_preparation_failed").slice(0,500),media_status:"erro_midia"}).eq("id",item.id).eq("visual_approved",false);
    return response({success:false,channel,publication_id:item.id,no_publish:true,error:"media_preparation_failed"},502);
   }
+  // The renderer produces editorial PNGs; Meta IMAGE/STORIES requires verified JPEG.
+  // Conversion is a preparation step only and never counts as visual approval.
+  if(result.needs_approved_art!==true){
+   const supplied=String(result.feed_image_url||"");
+   const story=String(result.story_image_url||"");
+   if(!supplied.startsWith(url+"/storage/v1/object/public/news-images/")||
+      !story.startsWith(url+"/storage/v1/object/public/news-images/")){
+     await db.from(table).update({media_status:"erro_conversao_jpeg",erro:"rendered_media_missing_or_untrusted"}).eq("id",item.id).eq("visual_approved",false);
+     return response({success:false,channel,publication_id:item.id,no_publish:true,error:"rendered_media_missing_or_untrusted"},502);
+   }
+   const transcode=await fetch(url+"/functions/v1/preparar-jpeg-giro",{
+     method:"POST",headers:{"Content-Type":"application/json","x-giro-db-key":key},
+     body:JSON.stringify({publication_id:item.id,channel}),signal:AbortSignal.timeout(90000)
+   });
+   const converted=await transcode.json().catch(()=>({}));
+   if(!transcode.ok||converted.success!==true||converted.feed_jpeg!==true||converted.story_jpeg!==true){
+     await db.from(table).update({
+       media_status:"erro_conversao_jpeg",
+       erro:String(converted.error||"approved_size_jpeg_not_ready").slice(0,500)
+     }).eq("id",item.id).eq("visual_approved",false);
+     return response({success:false,channel,publication_id:item.id,no_publish:true,error:"jpeg_conversion_failed"},502);
+   }
+  }
   let videoReady=false;
   if(channel==="reels"&&result.reel_recommended===true&&!result.needs_approved_art){
    await db.from(table).update({publicar_reel:true,publicar_story:false}).eq("id",item.id);
