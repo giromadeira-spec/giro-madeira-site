@@ -451,8 +451,17 @@ async function licensedRioMadeiraPhoto():Promise<EditorialPhoto|null>{
 }
 
 function originalBackdrop(kind:"feed"|"story",_category:string){
-  // Ilustração autoral do Rio Madeira; sem ícones genéricos de prédio, polícia etc.
+  // Arte gráfica própria para pautas oficiais verificadas, sem simular fotografia da ocorrência.
   const W=1080,H=kind==="feed"?1080:1920;
+  const police=/POL[IÍ]CIA|SEGURAN[CÇ]A|HOMIC[IÍ]DIO/.test(_category.toUpperCase());
+  const categoryMotif=police?'<g opacity=".84">'+
+    '<ellipse cx="780" cy="295" rx="220" ry="125" fill="#0c3976" opacity=".42"/>'+
+    '<ellipse cx="780" cy="295" rx="145" ry="85" fill="#c34228" opacity=".19"/>'+
+    '<path d="M770 172 L869 212 V297 C869 364 814 403 770 425 C726 403 671 364 671 297 V212 Z" fill="#081f37" stroke="#f8c747" stroke-width="9"/>'+
+    '<path d="M770 234 L785 266 L821 270 L794 296 L801 333 L770 315 L739 333 L746 296 L719 270 L755 266 Z" fill="#ffd053"/>'+
+    '<path d="M642 410 H904" stroke="#dfca83" stroke-width="6" stroke-opacity=".54"/>'+
+    '</g>':'';
+
   const shift=kind==="feed"?0:380;
   return '<defs>'+
     '<linearGradient id="brandArt" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="#071724"/><stop offset=".46" stop-color="#174969"/><stop offset="1" stop-color="#031421"/></linearGradient>'+
@@ -475,7 +484,7 @@ function originalBackdrop(kind:"feed"|"story",_category:string){
     '<path d="M909 461 l17 -82 17 82 z M956 455 l15 -98 15 98 z M1010 460 l22 -90 22 90 z"/>'+
     '</g>'+
     '<text x="72" y="515" font-family="Inter" font-size="25" font-weight="800" letter-spacing="3" fill="#f9cb75" opacity=".92">RIO MADEIRA</text>'+
-    '</g>';
+    '</g>'+categoryMotif;
 }
 // Identidade oficial aprovada 10/10/2026; cenário Rio Madeira fixo no rodapé.
 function rioFooterSvg(W:number,H:number,portrait:boolean){
@@ -634,7 +643,9 @@ Deno.serve(async(req)=>{
           licensedEditorialPhoto(title,category),
           new Promise<null>(resolve=>setTimeout(()=>resolve(null),12500))
         ]);
-      if(!photo)throw new Error("Foto temática validada ausente. Prévia não aprovada: não usar fundo genérico.");
+      const isOfficial=new URL(String(item.fonte_url||"https://invalid.example")).hostname.endsWith(".gov.br");
+      if(!photo&&!(isOfficial&&String(item.legenda||"").length>=250&&category!=="GIRO AGORA"))
+        throw new Error("Foto temática validada ausente. Prévia não aprovada: não usar imagem desconexa.");
       const attribution=photo?(photo.creator+" • "+photo.license):"";
       const feedSvg=makeSvg("feed",title,clean(item.resumo),clean(item.fonte_nome)||"Giro Madeira",category,photo?.dataUri||"",item.urgente===true,attribution);
       const storySvg=makeSvg("story",title,clean(item.resumo),clean(item.fonte_nome)||"Giro Madeira",category,photo?.dataUri||"",item.urgente===true,attribution);
@@ -740,7 +751,9 @@ Deno.serve(async(req)=>{
       ]);
     // Preservar a pauta e a legenda mesmo quando não há imagem adequada/licenciada.
     // Nunca publicar fotografia genérica ou afirmar que a arte está aprovada.
-    if(!photo){
+    const officialSource=new URL(sourceLink).hostname.endsWith(".gov.br");
+    const ownVerifiedIllustration=!photo&&officialSource&&article.length>=280&&originalText.length>=250&&category!=="GIRO AGORA";
+    if(!photo&&!ownVerifiedIllustration){
       const draftCaption=`${originalText}\n\nFonte: ${source}\nMatéria original: ${sourceLink}\n\nARTE ILUSTRATIVA PENDENTE DE REVISÃO.\n\n#GiroMadeira #PortoVelho #Rondônia`;
       const pending=await sb.from(publicationTable).update({
         titulo:title,resumo:desc||item.resumo||null,categoria:category,
@@ -761,8 +774,8 @@ Deno.serve(async(req)=>{
         visual_mode:"no_verified_photo",reason:"Foto temática licenciada não encontrada; pauta e legenda preservadas."
       }),{headers:H});
     }
-    const attribution=photo.creator+" • "+photo.license;
-    const bg=photo.dataUri;
+    const attribution=photo?photo.creator+" • "+photo.license:"";
+    const bg=photo?.dataUri||"";
     await prepareBrandLogo();await ensureWasm(); const font=await getFont();
     const feed=await render(makeSvg("feed",title,desc,source,category,bg,item.urgente===true,attribution),font);
     const story=await render(makeSvg("story",title,desc,source,category,bg,item.urgente===true,attribution),font);
@@ -777,7 +790,7 @@ Deno.serve(async(req)=>{
     // A publisher's embedded video is not automatically licensed for republication.
     // Keep its source URL only; original Reel media is made by the approved worker.
     const vid={source:videoRaw,publicUrl:""};
-    const photoCredit=photo?"\nImagem ilustrativa: "+photo.creator+" ("+photo.license+") — "+photo.source:"";
+    const photoCredit=photo?"\nImagem ilustrativa: "+photo.creator+" ("+photo.license+") — "+photo.source:"\nArte editorial original ilustrativa do Giro Madeira; não é fotografia da ocorrência.";
     const legenda=`${originalText}\n\nFonte: ${source}\nMatéria original: ${sourceLink}${photoCredit}\n\n#GiroMadeira #PortoVelho #Rondônia`;
     const upd:any={
       titulo:title,resumo:desc||item.resumo||null,categoria:category,legenda,
