@@ -48,7 +48,7 @@ def article_subject(title):
      (r"clima|temporal|chuva|enchente|calor|seca|granizo","lightning storm","CLIMA"),
      # Incidentes aéreos: evitar fotos genéricas de polícia ou gráficas de jornal.
      (r"avi[aã]o|aeronave|helic[oó]ptero|aeroporto|acidente a[eé]reo|queda de avi[aã]o","aircraft airplane","SEGURANÇA"),
-     (r"pol[ií]cia|pf |prendeu|pris[aã]o|feminic[ií]dio|investiga","police car emergency lights","SEGURANÇA"),
+     (r"pol[ií]cia|\bpf\b|prendeu|pris[aã]o|feminic[ií]dio|investiga|\bpres[oa]s?\b|\bdetid[oa]s?\b|agred|agress|viol[eê]ncia dom[eé]stica|criminos[oa]|tr[aá]fico|boca de fumo|suspeit[oa]|homic[ií]dio|assassin|ex[eé]rcito","police car emergency lights","SEGURANÇA"),
      (r"elei[cç][aã]o|voto|urna|tse|tre-|stf|supremo|congresso|senado|deputad|bolsonaro|lula","brazil electronic voting machine","POLÍTICA"),
      (r"futebol|sele[cç][aã]o|atleta|jogo|copa|fifa|gol ","soccer ball field","ESPORTES"),
      (r"economia|infla[cç][aã]o|d[oó]lar|real|bolsa|banco|juros","financial city skyscrapers","ECONOMIA"),
@@ -478,7 +478,7 @@ def render_self_test():
     Produces a private 1080x1920 three-scene video to catch layout, encoding,
     official logo and permanent Rio Madeira identity regressions.
     """
-    with tempfile.TemporaryDirectory(prefix="giro-shorts-offline-qa-") as temporary:
+    # Regression: crime headlines must never fall back to a printing-press photo.\n    for headline in (\n        "Cabo do Exército é preso suspeito de agredir companheira em Porto Velho",\n        "Criminoso é preso acusado de gerenciar boca de fumo na zona Leste",\n        "Suspeito de matar mulher em RO é preso com a esposa em MT",\n    ):\n        query, category = article_subject(headline)\n        if category != "SEGURANÇA" or query == "newspaper printing press":\n            raise RuntimeError("Crime headline misclassified: " + headline)\n    with tempfile.TemporaryDirectory(prefix="giro-shorts-offline-qa-") as temporary:
         folder=Path(temporary)
         backdrop=render_text_only_background("POLÍCIA")
         river=render_clean_madeira_illustration()
