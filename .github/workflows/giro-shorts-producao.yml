@@ -11,6 +11,9 @@ on:
     # Janelas de producao, nao garantia de upload; publicador valida intervalo.
     - cron: '0 12 * * *'
     - cron: '0 0 * * *'
+    # Retentativas sem duplicacao para slots que ficaram aguardando renderizacao.
+    - cron: '30 12 * * *'
+    - cron: '30 0 * * *'
   workflow_dispatch:
 
 permissions:
