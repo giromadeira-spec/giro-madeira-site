@@ -348,7 +348,8 @@ async function licensedEditorialPhoto(title:string,category:string):Promise<Edit
       }
     }catch{/* license not verifiable: leave photo absent */}
   }
-  return null;
+  // Openverse is a secondary source; metadata, regionality, and license still must pass.
+  return await licensedOpenversePhoto(title,category);
 }
 
 
@@ -629,8 +630,7 @@ Deno.serve(async(req)=>{
         /opera[cç][aã]o|apreens[aã]o|pris[aã]o|investiga[cç][aã]o|homic/i.test(title+" "+category);
       // QA must obey the same bounded photo search as production; avoid timeout 546.
       const previewStarted=Date.now();
-      const photo=sensitiveRegionalOperation?null:
-        await Promise.race([
+      const photo=await Promise.race([
           licensedEditorialPhoto(title,category),
           new Promise<null>(resolve=>setTimeout(()=>resolve(null),12500))
         ]);
@@ -733,7 +733,7 @@ Deno.serve(async(req)=>{
     const sensitiveRegionalOperation=isRegional &&
       !isTimberVisualStory(title+" "+category) &&
       /opera[cç][aã]o|apreens[aã]o|pris[aã]o|investiga[cç][aã]o|homic/i.test(title+" "+category);
-    const photo=sensitiveRegionalOperation||!withinBudget()?null:
+    const photo=!withinBudget()?null:
       await Promise.race([
         licensedEditorialPhoto(title,category),
         new Promise<null>(resolve=>setTimeout(()=>resolve(null),Math.min(12500,remainingGenerationMs())))
