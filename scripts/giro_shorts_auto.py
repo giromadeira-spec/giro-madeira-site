@@ -57,7 +57,9 @@ def article_subject(title):
     ]
     for rx,query,category in mapping:
        if re.search(rx,t):return query,category
-    return "newspaper printing press", "NOTÍCIAS"
+    # Unknown subject: no generic newspaper/printing-press imagery is editorially acceptable.
+    # Hold the item until a topic-specific licensed photograph can be selected.
+    return "", "NOTÍCIAS"
 
 def licensed_commons_photo(topic):
     # Wikimedia Commons is not a blanket license: verify each file's metadata.
@@ -339,6 +341,10 @@ def make_frame(photo,river,logo,claim,scene,idx,credit,path):
     d.polygon([(55,tag_top),(tag_right+28,tag_top),(tag_right,tag_top+74),(55,tag_top+74)],fill=YELLOW)
     d.text((85,tag_top+9),category,font=tagfont,fill=NAVY)
     d.line((tag_right+29,tag_top+69,1015,tag_top+69),fill=YELLOW,width=5)
+    # Every retrieved license is for an illustrative photo, never evidence of this event.
+    # Explicit annotation prevents viewers from treating generic police visuals as real footage.
+    d.rounded_rectangle((58,790,401,838),radius=4,fill=(3,16,36,232))
+    d.text((74,802),"IMAGEM ILUSTRATIVA",font=ImageFont.truetype(regular,26),fill=WHITE)
     if claim.get("urgent") is True:
         d.rounded_rectangle((785,45,1034,117),radius=6,fill=(222,31,45,255))
         d.text((800,55),"URGENTE",font=ImageFont.truetype(heavy,43),fill=WHITE)
@@ -478,7 +484,22 @@ def render_self_test():
     Produces a private 1080x1920 three-scene video to catch layout, encoding,
     official logo and permanent Rio Madeira identity regressions.
     """
-    # Regression: crime headlines must never fall back to a printing-press photo.\n    for headline in (\n        "Cabo do Exército é preso suspeito de agredir companheira em Porto Velho",\n        "Criminoso é preso acusado de gerenciar boca de fumo na zona Leste",\n        "Suspeito de matar mulher em RO é preso com a esposa em MT",\n    ):\n        query, category = article_subject(headline)\n        if category != "SEGURANÇA" or query == "newspaper printing press":\n            raise RuntimeError("Crime headline misclassified: " + headline)\n    with tempfile.TemporaryDirectory(prefix="giro-shorts-offline-qa-") as temporary:
+    # Regression: all three actual TikTok rejected crime titles MUST use police imagery.
+    for headline in (
+        "Cabo do Exército é preso suspeito de agredir companheira em Porto Velho",
+        "Criminoso é preso acusado de gerenciar boca de fumo na zona Leste",
+        "Suspeito de matar mulher em RO é preso com a esposa em MT",
+    ):
+        query, category = article_subject(headline)
+        if (query,category) != ("police car emergency lights","SEGURANÇA"):
+            raise RuntimeError("Crime headline misclassified: " + headline)
+        if photo_matches_topic(query,"Cherokee Phoenix printing press"):
+            raise RuntimeError("Unrelated printing-press photo passed semantic check")
+        if not photo_matches_topic(query,"Police car emergency lights"):
+            raise RuntimeError("Valid illustrative police photo rejected")
+    if article_subject("Evento inédito em Porto Velho")[0]:
+        raise RuntimeError("Unknown editorial subject accepted unrelated default photo")
+    with tempfile.TemporaryDirectory(prefix="giro-shorts-offline-qa-") as temporary:
         folder=Path(temporary)
         backdrop=render_text_only_background("POLÍCIA")
         river=render_clean_madeira_illustration()
@@ -537,6 +558,8 @@ def main():
       with tempfile.TemporaryDirectory(prefix="giro-shorts-") as tmp:
         folder=Path(tmp)
         query,category=article_subject(result["title"])
+        if not query:
+            raise RuntimeError("No safe topic for photographic illustration; editorial review required")
         # O padrão visual aprovado exige fotografia REAL, licenciada e pertinente.
         # Se nenhuma foto válida existir, bloquear o Short em vez de publicar arte genérica.
         try:
@@ -546,6 +569,10 @@ def main():
             picture,credit,file_title=licensed_commons_download(query)
         if not credit.startswith(("openverse_","wikimedia_")):
             raise RuntimeError("Visual standard failed: unlicensed or non-photographic hero")
+        if not photo_matches_topic(query,file_title):
+            raise RuntimeError("Visual standard failed: photo mismatches headline topic")
+        if category=="SEGURANÇA" and re.search(r"press|newspaper|cherokee|printing",file_title,re.I):
+            raise RuntimeError("Crime headline cannot use unrelated newspaper imagery")
         logo=Image.open(ROOT/"assets/logo-oficial.webp").convert("RGB")
         # O Rio Madeira segue presente no rodapé. Priorizar fotografia CC0 regional.
         try:
