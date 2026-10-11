@@ -88,3 +88,10 @@ O caminho de envio independente do Instagram não foi testado com publicação r
 - O teste `giro-youtube-upload-auto` com `action=preview` retornou HTTP 200, `processed=0`, `reason=no_eligible_v5_shorts`: o vídeo de 20h ainda não estava renderizado/aprovado. Não equivale a publicação real validada.
 - A produção dos Shorts permanece no GitHub Actions (07h/19h locais, com checagem no horário dos slots de 08h/20h); o uploader público é agendado a cada 15 minutos. Slots são metas sujeitas a processamento, verificação, qualidade e intervalo mínimo — não horários garantidos.
 - Na fila em 11/10/2026 há pauta de 20h aguardando renderização. Só considerar a postagem concluída se houver `provider_post_id`, `status='enviado'` e `provider_privacy_status='public'`. Não aprovar artificialmente, nem ignorar erros ou reenvios incertos.
+
+## Correção editorial TikTok — 11/10/2026
+
+- Causa verificada na fila: TikTok #49 e #52 tinham crédito de imagem `openverse_Cherokee Phoenix printing press`, alheio às manchetes de crimes. Os dois itens já estavam `visual_review_status='rejected'`, `editor_approved=false`. Suas conversões em `giro_tiktok_media_prepared` foram marcadas `failed`, sem excluir os MP4 originais, para impedir reutilização.
+- Corrigido `scripts/giro_shorts_auto.py`: assunto desconhecido não gera foto de prensa; licenças/fontes não substituem verificação temática; foto incompatível impede renderização; etiqueta “IMAGEM ILUSTRATIVA”; regressão de três títulos policiais restaurada no QA (linha que havia `\\n` literal).
+- O agendador TikTok permanece separado do YouTube Shorts; formatos de 1080x1920, identificação visual oficial e Rio Madeira preservados. Nunca aprovar/reaproveitar diretamente o vídeo #49/#52 rejeitado. Quando for conveniente reprocessar essas notícias, produzir nova mídia somente sob revisão e sem criar segundo item publicado.
+- Publicação via Buffer/worker depende do gate `giro_channel_settings.publication_enabled`, do formato TikTok aprovado e da conversão `giro_tiktok_media_prepared.status='ready'`. Prazos/slots locais 06h30, 10h, 13h30, 17h, 20h30; máximo 5/dia e 90 minutos mínimos.
