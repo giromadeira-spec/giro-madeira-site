@@ -294,103 +294,106 @@ def lines_for(draw,message,size,maxwidth,maxlines=4):
     raise RuntimeError("Headline cannot fit cinematic layout")
 
 def make_frame(photo,river,logo,claim,scene,idx,credit,path):
-    """Official cinematic vertical editorial art, with verified visual provenance.
+    """GIRO_EDITORIAL_FOTO_MANCHETE_RIO_V1 — approved photo/headline/Rio layout.
 
-    Real photo: only individually licensed CC0/CC-BY and clearly marked illustrative.
-    Every title, category and source comes from the vetted news item.
-    No triangle, play icon, generic iconographic reconstruction or fake police scene.
+    Visual contract: docs/REFERENCIA_CAPA_OFICIAL.md.
+    The licensed event photo is illustrative unless authenticated as the real event.
+    Logo is the original brand asset: do not redraw it or print a duplicate wordmark.
+    Text/category/location/figures come only from vetted news data.
     """
     img=cover(photo,W,H,x=[.42,.52,.62][idx],y=.45).convert("RGB")
-    img=ImageEnhance.Contrast(img).enhance(1.10)
+    img=ImageEnhance.Contrast(img).enhance(1.13)
     img=ImageEnhance.Color(img).enhance(1.09).convert("RGBA")
 
-    # Dramatic but legible: photographic hero occupies upper 60 percent.
+    # Full-bleed photographic news backdrop with a readable navy gradient.
     overlay=Image.new("RGBA",(W,H),(0,0,0,0))
     d=ImageDraw.Draw(overlay)
     for y in range(H):
-        if y<170: alpha=125
-        elif y<825:alpha=28
-        elif y<1130:alpha=round(28+(y-825)/305*147)
-        elif y<1620:alpha=round(175+(y-1130)/490*71)
-        else:alpha=251
-        d.line((0,y,W,y),fill=(1,10,24,min(252,alpha)),width=1)
+        if y<330: alpha=90
+        elif y<735: alpha=18
+        elif y<995: alpha=round(18+(y-735)/260*115)
+        elif y<1600: alpha=round(133+(y-995)/605*115)
+        else: alpha=248
+        d.line((0,y,W,y),fill=(1,10,24,min(248,alpha)),width=1)
     img=Image.alpha_composite(img,overlay)
-    d=ImageDraw.Draw(img)
     heavy,regular=fonts()
+    d=ImageDraw.Draw(img)
 
-    # Compact branding from the original official mark, not a competitor's logo.
-    d.rounded_rectangle((27,28,711,210),radius=14,fill=(2,14,35,212))
+    # Big original round logo, upper-left, over the photo. NO extra GIRO/MADEIRA.
     mark=logo.convert("RGBA")
-    mark.thumbnail((160,160),Image.Resampling.LANCZOS)
-    img.alpha_composite(mark,(45+(160-mark.width)//2,38+(160-mark.height)//2))
+    mark.thumbnail((295,295),Image.Resampling.LANCZOS)
+    logo_x,logo_y=58,62
+    img.alpha_composite(mark,(logo_x+(295-mark.width)//2,logo_y+(295-mark.height)//2))
     d=ImageDraw.Draw(img)
-    d.text((218,42),"GIRO",font=ImageFont.truetype(heavy,93),fill=WHITE,stroke_width=1,stroke_fill=(0,7,17))
-    d.text((222,121),"MADEIRA",font=ImageFont.truetype(heavy,63),fill=YELLOW,stroke_width=1,stroke_fill=(0,7,17))
 
+    # Yellow editorial topic flag with clean horizontal rule (screenshot style).
     _,subject=article_subject(claim["title"])
-    category=clean(subject).upper()[:16]
+    category=clean(subject).upper()[:22]
     if category=="SEGURANÇA":category="POLÍCIA"
-    red=(222,31,45,255)
-    category_color=(255,212,0,255)  # Padrão oficial 10/10/2026: TODAS as faixas amarelas
-    category_ink=NAVY
-    tagfont=ImageFont.truetype(heavy,45)
-    label_width=min(485,d.textbbox((0,0),category,font=tagfont)[2]+55)
-    d.rounded_rectangle((54,252,54+label_width,329),radius=12,fill=category_color)
-    d.text((80,268),category,font=tagfont,fill=category_ink)
-    local=("BRASIL" if claim.get("topic_scope")=="brasil" else
-           "MUNDO" if claim.get("topic_scope")=="mundo" else "RONDÔNIA")
-    loc_font=ImageFont.truetype(heavy,35)
-    loc_width=d.textbbox((0,0),local,font=loc_font)[2]+55
-    d.rounded_rectangle((54,348,54+loc_width,410),radius=9,fill=(5,20,43,230),outline=YELLOW,width=2)
-    d.text((78,359),local,font=loc_font,fill=YELLOW)
-    # Rodapé panorâmico permanente Rio Madeira — visual do Giro em todas as cenas.
-    # Imagem ilustrativa regional, nunca apresentada como fotografia do fato.
-    river_band=river.convert("RGB").resize((W,230),Image.Resampling.LANCZOS).convert("RGBA")
-    img.alpha_composite(river_band,(0,1690))
-    img.alpha_composite(Image.new("RGBA",(W,230),(1,12,28,108)),(0,1690))
-    d=ImageDraw.Draw(img)
-    d.rounded_rectangle((62,1698,346,1745),radius=6,fill=(4,20,41,225))
-    d.text((77,1709),"RIO MADEIRA",font=ImageFont.truetype(heavy,24),fill=YELLOW)
+    tagfont=ImageFont.truetype(heavy,48)
+    while d.textbbox((0,0),category,font=tagfont)[2]>620 and tagfont.size>30:
+        tagfont=ImageFont.truetype(heavy,tagfont.size-2)
+    tag_right=min(760,98+d.textbbox((0,0),category,font=tagfont)[2]+58)
+    tag_top=864
+    d.polygon([(55,tag_top),(tag_right+28,tag_top),(tag_right,tag_top+74),(55,tag_top+74)],fill=YELLOW)
+    d.text((85,tag_top+9),category,font=tagfont,fill=NAVY)
+    d.line((tag_right+29,tag_top+69,1015,tag_top+69),fill=YELLOW,width=5)
     if claim.get("urgent") is True:
-        d.rounded_rectangle((769,240,1044,320),radius=7,fill=red)
-        d.text((794,258),"URGENTE",font=ImageFont.truetype(heavy,49),fill=WHITE)
+        d.rounded_rectangle((785,45,1034,117),radius=6,fill=(222,31,45,255))
+        d.text((800,55),"URGENTE",font=ImageFont.truetype(heavy,43),fill=WHITE)
 
-    # Open photo above, punchy typography below; adapt font before rendering.
+    # Strong center-lower headline. Fit the whole verified text or fail closed.
     head=clean(claim["title"].split("|")[0]) if idx==0 else clean(scene)
-    rows,tf=lines_for(d,head,91,942,maxlines=5)
-    leading=tf.size+9
-    start=max(1035,1610-(len(rows)-1)*leading-tf.size)
+    start=974
+    for requested_size in (124,112,101,90,80,70,60):
+        rows,tf=lines_for(d,head,requested_size,944,maxlines=5)
+        leading=int(tf.size*1.13)
+        bottom=start+(len(rows)-1)*leading+tf.size
+        if bottom<=1518:break
+    else:
+        raise RuntimeError("Headline does not fit approved reference safe area")
     for k,line in enumerate(rows):
-        # Accent a meaningful line, not artificial values or invented numbers.
         color=YELLOW if k==1 or (len(rows)==1 and k==0) else WHITE
-        d.text((62,start+k*leading),line,font=tf,fill=color,
-               stroke_width=2,stroke_fill=(1,7,18))
-    bottom=start+(len(rows)-1)*leading+tf.size
+        d.text((63,start+k*leading),line,font=tf,fill=color,
+               stroke_width=3,stroke_fill=(1,7,18))
 
-    # Small factual supporting text; never crop a verified sentence.
-    fact=clean(scene) if idx==0 else "IMAGEM ILUSTRATIVA • VEJA A FONTE NA DESCRIÇÃO"
-    fact_font=ImageFont.truetype(regular,31)
-    pieces=[];current=""
-    for word in fact.split():
-        trial=(current+" "+word).strip()
-        if d.textbbox((0,0),trial,font=fact_font)[2]>940 and current:
-            pieces.append(current);current=word
-        else:current=trial
-    if current:pieces.append(current)
-    fact_top=max(bottom+24,1634)
-    if len(pieces)<=2 and fact_top+len(pieces)*42<1685:
-        for i,line in enumerate(pieces):
-            d.text((65,fact_top+i*42),line,font=fact_font,fill=(237,245,255,255))
+    # Brief verified support, no cut-off sentence. Crediting remains in video description.
+    if idx==0:
+        support=clean(scene)
+        support_font=ImageFont.truetype(regular,31)
+        if support and d.textbbox((0,0),support,font=support_font)[2]<=950:
+            sy=max(bottom+26,1540)
+            if sy+42<1632:
+                d.line((62,sy-19,1017,sy-19),fill=YELLOW,width=5)
+                d.text((63,sy),support,font=support_font,fill=WHITE)
 
-    d.line((62,1770,1017,1770),fill=YELLOW,width=7)
-    d.rounded_rectangle((54,1801,1023,1868),radius=10,fill=(6,23,50,240))
-    d.text((74,1814),"@GIRO_MADEIRA",font=ImageFont.truetype(heavy,41),fill=WHITE)
-    d.text((701,1824),f"CENA {idx+1}/3",font=ImageFont.truetype(heavy,29),fill=YELLOW)
-    d.rectangle((0,1882,1080,1920),fill=(1,10,25,255))
-    small=ImageFont.truetype(regular,21)
-    provenance=f"IMAGEM ILUSTRATIVA • {clean(claim.get('source_name') or 'FONTE')}"
-    d.text((31,1891),provenance[:91].upper(),font=small,fill=(225,230,239,255))
-    # Explicit credits are also preserved in the video description via image_credit.
+    # Permanent Porto Velho/Rio Madeira visual signature in panoramic bottom strip.
+    river_top=1644
+    river_band=river.convert("RGB").resize((W,H-river_top),Image.Resampling.LANCZOS).convert("RGBA")
+    img.alpha_composite(river_band,(0,river_top))
+    river_shade=Image.new("RGBA",(W,H-river_top),(1,11,25,91))
+    img.alpha_composite(river_shade,(0,river_top))
+    d=ImageDraw.Draw(img)
+    d.line((56,river_top,1022,river_top),fill=YELLOW,width=7)
+    d.rounded_rectangle((57,river_top+22,299,river_top+70),radius=5,fill=(3,16,36,229))
+    d.text((74,river_top+32),"RIO MADEIRA",font=ImageFont.truetype(heavy,25),fill=YELLOW)
+    d.text((63,H-80),"@GIRO_MADEIRA",font=ImageFont.truetype(heavy,35),
+           fill=WHITE,stroke_width=1,stroke_fill=(0,5,14))
+
+    source=clean(claim.get("source_name") or "FONTE")
+    source_label="FONTE: "+source.upper()
+    source_font=ImageFont.truetype(regular,25)
+    for size in (25,22,19,17):
+        source_font=ImageFont.truetype(regular,size)
+        if d.textbbox((0,0),source_label,font=source_font)[2]<=495:break
+    if d.textbbox((0,0),source_label,font=source_font)[2]>495:
+        raise RuntimeError("Source label does not fit approved layout")
+    source_width=d.textbbox((0,0),source_label,font=source_font)[2]
+    d.text((1010-source_width,H-74),source_label,font=source_font,fill=WHITE,
+           stroke_width=1,stroke_fill=(0,5,14))
+
+    # The footer is branding and is never presented as the event's physical location.
+    # There is intentionally no play triangle, 'scene x/3', invented arrow or logo wordmark.
     img.convert("RGB").save(path,format="PNG",optimize=True)
 
 
