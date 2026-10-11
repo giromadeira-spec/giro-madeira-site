@@ -103,3 +103,16 @@ O caminho de envio independente do Instagram não foi testado com publicação r
 - Vídeos #49 e #52 com foto de prensa inadequada seguem explicitamente rejeitados na fila, e suas conversões foram invalidada(s) (`giro_tiktok_media_prepared.status='failed'`). Material original preservado; **não reaprovar** esses vídeos antigos.
 - Nenhuma publicação independente posterior à liberação foi validada. A fila nova #50 para 20h30 de Porto Velho ainda não tinha MP4 renderizado/aprovação visual na checagem. O horário é previsto, não garantido. Confirmar primeiro envio somente com ID/link remoto e resultado reconciliado no Buffer/TikTok.
 - O GitHub passou a incluir validação temática e regressões em `scripts/giro_shorts_auto.py`; ainda é necessário confirmar uma execução real pós-correção e o resultado do primeiro post. Falha em qualidade => bloquear, não substituir imagem por foto desconexa. 
+
+## Recuperação segura do Instagram — 11/10/2026
+
+Diagnóstico diretamente no Supabase de produção: `giro_meta_rate_state.integrity_hold=true` e erro anterior da Meta HTTP 403 / subcódigo `2207051`, registrado em 10/10/2026. O semáforo operacional `giro_instagram_semaforo_gate` retornou `allowed=false` para os três formatos. `giro_channel_settings.publication_enabled=false` em Feed, Stories e Reels. **Não reabilitar nem remover o hold sem verificar o estado da conta na Meta e validar retomada gradual.**
+
+Correções feitas:
+- `gerar-arte-noticia-vault` v54/v55: extração mais abrangente de conteúdo factual (incluindo JSON-LD de artigo), tentativa de endereços canônicos no mesmo portal, e segunda fonte para fotografia com licença/assunto verificados. Conteúdo pago ou fotografia de terceiros sem licença não é autorizado.
+- Teste `preview_only`: matéria da Polícia Civil de Rondônia retornou 200 com 1774 caracteres de texto jornalístico; notícia do Rondônia ao Vivo apresentou HTTP 403 também na URL canônica (fonte impede leitura pelo servidor). Não burlar bloqueio com proxies nem inventar legenda. 
+- Teste `preview_art` sem publicar: imagem temática da pauta policial não foi validada; não aprovar arte genérica ou ilustrativa como foto da ocorrência. Pauta preservada.
+- Linhas novas de Feed/Stories/Reels com falha de leitura foram classificadas `aguardando_fonte_acessivel` e mantidas `visual_approved=false`. Preparador ainda pode reagendar tentativa segundo o limite de duas tentativas, sem liberar publicação.
+- Três dry runs autenticados dos publicadores independentes retornaram HTTP 200 com `no_publish=true`, `integrity_hold=true` e `publication_enabled=false`.
+
+Próximos passos: responsável verificar `Instagram → Perfil → ☰ → Status da conta` no aplicativo e informar se há restrição/contestar quando disponibilizado. Confirmar acesso e saúde da conta antes de liberar inicialmente somente Feed com limite de três posts/dia, intervalo mínimo de 120 minutos, arte temática aprovada; Stories e Reels depois, por canal. Registrar o ID de mídia e verificar publicação de verdade, sem duplicações. Fontes HTTP 403 exigem meio autorizado de acesso ou fontes oficiais alternativas.
