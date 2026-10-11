@@ -24,18 +24,42 @@ function b64(bytes:Uint8Array){let out="";const step=0x8000;for(let i=0;i<bytes.
 
 function articleText($:any){
   const root=load($.html());
+  // Prefer source-native NewsArticle.articleBody when it is factual body text.
+  // Social widgets and unrelated page recommendations are not article content.
+  let structured="";
+  root('script[type="application/ld+json"]').each((_:any,el:any)=>{
+    try{
+      const data=JSON.parse(root(el).html()||"null");
+      const nodes:Array<any>=Array.isArray(data)?data:[data];
+      for(let j=0;j<nodes.length;j++){
+        const node=nodes[j];
+        if(node?.["@graph"]&&Array.isArray(node["@graph"]))nodes.push(...node["@graph"]);
+        const kinds=Array.isArray(node?.["@type"])?node["@type"]:[node?.["@type"]];
+        if(!kinds.some((k:any)=>/^(?:NewsArticle|Article|ReportageNewsArticle)$/i.test(String(k))))continue;
+        const body=clean(node.articleBody);
+        if(body.length>=280&&body.length<=16000&&body.length>structured.length)structured=body;
+      }
+    }catch{/* malformed JSON-LD cannot be trusted */}
+  });
   root("script,style,noscript,nav,header,footer,aside,form,iframe,.advertisement,.ads,.related,.recommended,.share-buttons,.social-media,.newsletter,.comments").remove();
-  const sel=["article .entry-content p","article .post-content p","article .article-body p",
-    ".post-content p",".entry-content p",".td-post-content p",".article-body p","article p","main p"];
+  const sel=[
+    "article .entry-content p","article .post-content p","article .article-body p",
+    ".post-content p",".entry-content p",".td-post-content p",".article-body p",
+    ".texto-noticia p",".texto-da-noticia p",".conteudo-noticia p",".conteudo-da-noticia p",
+    ".noticia-corpo p",".materia-corpo p",".article-content p",".news-content p",
+    ".news-body p",".post-body p","#texto-noticia p","#corpo-noticia p",
+    ".texto-materia p","#conteudo-materia p","#conteudo-noticia p",
+    "article p","main p"
+  ];
   let best:string[]=[];
   for(const selector of sel){
     const items=root(selector).toArray().map((e:any)=>clean(root(e).text()))
-      .filter((t:string)=>t.length>=65&&t.length<=1800
+      .filter((t:string)=>t.length>=35&&t.length<=1800
         &&!/^(publicidade|compartilhe|leia tamb[eé]m|veja tamb[eé]m|siga nossas redes|receba not[ií]cias|todos os direitos|clique aqui|saiba mais|assine|newsletter)/i.test(t))
-      .slice(0,12);
+      .slice(0,16);
     if(items.join(" ").length>best.join(" ").length)best=items;
   }
-  return best.join("\n").slice(0,6500);
+  return (structured.length>best.join(" ").length?structured:best.join("\n")).slice(0,6500);
 }
 function editorialAllowed(title:string,source:string,sourceUrl:string){
  const t=clean(title).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
@@ -115,12 +139,37 @@ function textBlock(lines:string[],x:number,y:number,fs:number,lh:number,color:st
   return `<text x="${x}" y="${y}" font-family="Inter" font-size="${fs}" font-weight="850" fill="${color}">${lines.map((l,i)=>`<tspan x="${x}" dy="${i===0?0:lh}">${esc(l)}</tspan>`).join("")}</text>`;
 }
 async function fetchPage(url:string){
-  const ctl=new AbortController();const to=setTimeout(()=>ctl.abort(),15000);
-  try{
-    const r=await fetch(url,{signal:ctl.signal,headers:{"User-Agent":"Mozilla/5.0 (compatible; GiroMadeiraBot/3.0)","Accept":"text/html,application/xhtml+xml","Accept-Language":"pt-BR,pt;q=0.9"}});
-    if(!r.ok) throw new Error("HTTP "+r.status);
-    return await r.text();
-  } finally {clearTimeout(to);}
+  const original=new URL(url);
+  if(original.protocol!=="https:")throw new Error("HTTPS obrigatório para fonte de notícia");
+  const urls=[original.toString()];
+  // These are the same news publisher, not an unrelated article or search result.
+  if(["www.rondoniaovivo.com","rondoniaovivo.com"].includes(original.hostname)){
+    const alternate=new URL(original.toString());
+    alternate.hostname=original.hostname.startsWith("www.")?"rondoniaovivo.com":"www.rondoniaovivo.com";
+    urls.unshift(alternate.toString());
+  }
+  let best="",bestScore=-1,lastError="source_page_unavailable";
+  for(const candidate of [...new Set(urls)]){
+    const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),12500);
+    try{
+      const r=await fetch(candidate,{signal:ctl.signal,headers:{
+        "User-Agent":"Mozilla/5.0 (compatible; GiroMadeiraBot/3.1)",
+        "Accept":"text/html,application/xhtml+xml","Accept-Language":"pt-BR,pt;q=0.9"
+      }});
+      if(!r.ok){lastError="HTTP "+r.status;continue;}
+      const ct=String(r.headers.get("content-type")||"").toLowerCase();
+      if(ct&&!ct.includes("text/html")){lastError="unexpected_content_type";continue;}
+      const html=await r.text();
+      if(html.length>1_000_000){lastError="html_too_large";continue;}
+      const $=load(html);
+      const score=articleText($).length;
+      if(score>bestScore){best=html;bestScore=score;}
+      if(score>=340)return html;
+    }catch(e){lastError=e instanceof Error?e.name:"fetch_error"}
+    finally{clearTimeout(to)}
+  }
+  if(best)return best;
+  throw new Error("Fonte temporariamente inacessível: "+lastError);
 }
 async function imageDataUri(imageUrl:string){
   if(!imageUrl) return "";
@@ -578,9 +627,13 @@ Deno.serve(async(req)=>{
       const sensitiveRegionalOperation=isRegional &&
         !isTimberVisualStory(title+" "+category) &&
         /opera[cç][aã]o|apreens[aã]o|pris[aã]o|investiga[cç][aã]o|homic/i.test(title+" "+category);
+      // QA must obey the same bounded photo search as production; avoid timeout 546.
+      const previewStarted=Date.now();
       const photo=sensitiveRegionalOperation?null:
-        (await licensedEditorialPhoto(title,category))
-        ||(await licensedOpenversePhoto(title,category));
+        await Promise.race([
+          licensedEditorialPhoto(title,category),
+          new Promise<null>(resolve=>setTimeout(()=>resolve(null),12500))
+        ]);
       if(!photo)throw new Error("Foto temática validada ausente. Prévia não aprovada: não usar fundo genérico.");
       const attribution=photo?(photo.creator+" • "+photo.license):"";
       const feedSvg=makeSvg("feed",title,clean(item.resumo),clean(item.fonte_nome)||"Giro Madeira",category,photo?.dataUri||"",item.urgente===true,attribution);
@@ -631,6 +684,10 @@ Deno.serve(async(req)=>{
         legenda:draft+"\n\nFonte: "+source+"\nMatéria original: "+link+"\n\n#GiroMadeira #PortoVelho #Rondônia",
         art_photo_source:"original_illustration_no_external_publisher_logo"}),{status:200,headers:H});
     }
+    const generationStarted=Date.now();
+    const generationBudgetMs=38000;
+    const remainingGenerationMs=()=>Math.max(0,generationBudgetMs-(Date.now()-generationStarted));
+    const withinBudget=()=>remainingGenerationMs()>9000;
     let pageTitle=clean(item.titulo),desc=clean(item.resumo),imageUrl="",videoRaw="",article="";
     if(item.fonte_url){
       try{
@@ -676,9 +733,11 @@ Deno.serve(async(req)=>{
     const sensitiveRegionalOperation=isRegional &&
       !isTimberVisualStory(title+" "+category) &&
       /opera[cç][aã]o|apreens[aã]o|pris[aã]o|investiga[cç][aã]o|homic/i.test(title+" "+category);
-    const photo=sensitiveRegionalOperation?null:
-      (await licensedEditorialPhoto(title,category))
-      ||(await licensedOpenversePhoto(title,category));
+    const photo=sensitiveRegionalOperation||!withinBudget()?null:
+      await Promise.race([
+        licensedEditorialPhoto(title,category),
+        new Promise<null>(resolve=>setTimeout(()=>resolve(null),Math.min(12500,remainingGenerationMs())))
+      ]);
     // Preservar a pauta e a legenda mesmo quando não há imagem adequada/licenciada.
     // Nunca publicar fotografia genérica ou afirmar que a arte está aprovada.
     if(!photo){
