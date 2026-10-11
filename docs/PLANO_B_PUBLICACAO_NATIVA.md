@@ -61,3 +61,7 @@ Implantado e conferido:
 - Diagnóstico autenticado, sem cobrança, comprovou `OPENAI_API_KEY` presente no ambiente, mas `OPENAI_API_HAS_CREDITS=false` no gerador e `can_generate_images_automatically=false`. **Não afirmar que imagens de IA são geradas automaticamente.** Para habilitar geração por API, verificar faturamento/créditos, aprovar orçamento e implementar integração de imagem em roteiro validado, com limites de despesa; **não habilitar automaticamente**.
 - Publicação automática Instagram Graph API continua com `integrity_hold=true`, erro anterior 403 subcódigo 2207051 e `rollout_stage=feed_only`. Testes nativos pelo Business Suite não comprovam desbloqueio da API. **Não forçar `media_publish` para testar**, nem liberar fila sem revisão específica.
 - O botão final no Meta Business Suite continua sendo operado por uma pessoa (ou Work autenticado). Nenhuma rotina presente agenda nativamente por si só. Sem permissões/bloqueio resolvidos, não há publicação automática ponta a ponta.
+
+### Correção complementar de estado da mídia
+
+A migração `giro_media_status_corrigir_plano_b_e_reel_nativo_v1` atualiza o trigger `giro_atualizar_media_status()` para evitar que um Reel nativo confirmado seja rotulado como `aguardando_feed`. Mantém `reel_publicado` para publicações sem Feed e preserva estados explícitos de revisão/pauta sem arte. Testes de leitura confirmaram o Reel 920 com `media_status=reel_publicado` e o Feed 921 `media_status=plano_b_revisado_para_publicacao_nativa`. Não libera a Meta nem converte rascunho em publicação.
