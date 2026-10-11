@@ -1,6 +1,11 @@
 name: Giro Madeira - Teste visual seguro (sem publicar)
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/giro-teste-visual-seguro.yml
+      - scripts/giro_shorts_auto.py
   workflow_dispatch:
 
 permissions:
