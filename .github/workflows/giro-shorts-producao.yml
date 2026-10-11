@@ -21,7 +21,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: giro-shorts-production
+  group: ${{ github.event_name == 'push' && 'giro-shorts-qa' || 'giro-shorts-production' }}
   cancel-in-progress: false
 
 jobs:
