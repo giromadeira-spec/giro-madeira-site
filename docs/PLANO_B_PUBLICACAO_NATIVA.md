@@ -65,3 +65,11 @@ Implantado e conferido:
 ### Correção complementar de estado da mídia
 
 A migração `giro_media_status_corrigir_plano_b_e_reel_nativo_v1` atualiza o trigger `giro_atualizar_media_status()` para evitar que um Reel nativo confirmado seja rotulado como `aguardando_feed`. Mantém `reel_publicado` para publicações sem Feed e preserva estados explícitos de revisão/pauta sem arte. Testes de leitura confirmaram o Reel 920 com `media_status=reel_publicado` e o Feed 921 `media_status=plano_b_revisado_para_publicacao_nativa`. Não libera a Meta nem converte rascunho em publicação.
+
+## Diretriz confirmada pelo usuário — sem custos adicionais (11/10/2026)
+- Proibido habilitar serviços pagos de geração de imagens ou texto por API sem uma nova autorização explícita do usuário. Não pressupor que a assinatura ChatGPT Plus inclua créditos da API.
+- A Edge Function de geração `gerar-arte-noticia-vault` **v50** removeu completamente chamadas para a API OpenAI (`/v1/images/generations` e `/v1/chat/completions`). A reescrita factual usa rotina local determinística; artes são geradas com templates próprios e fotografias com licença CC validada, mais créditos da imagem.
+- Sem foto apropriada ou licença verificável, a notícia fica em rascunho `aguardando_arte_tematica`; nunca publicar uma capa errada ou inventar um registro fotográfico. Ilustrações próprias devem ser identificadas.
+- Diagnóstico autenticado sem custos adicionais de API: HTTP 200, `extra_paid_ai_costs_forbidden=true`, `image_api_enabled=false`, `can_generate_images_automatically=false`, `can_compose_free_licensed_photo_templates=true`.
+- **Limite importante**: esta diretriz bloqueia custos adicionais de IA, não garante isenção de mensalidades/cotas/custos de armazenamento e serviços existentes (Supabase, Netlify, Drive, terceiros); monitorar planos e consumo antes de ampliar carga.
+- O semáforo de Instagram Graph API continua com hold preventivo. A postagem sem clique do operador continua dependente da recuperação/verificação de permissão de publicação da Meta. Nunca afirmar automação ponta a ponta antes de validação real.
