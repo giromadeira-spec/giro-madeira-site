@@ -33,3 +33,12 @@ Versão editorial: 10/10/2026. Referências aprovadas pelo responsável: artes c
 5. Publicar sem spam, respeitando as restrições da Meta. Se `integrity_hold=true`, nenhuma tentativa automática à Meta.
 6. Considerar Feed/Reel/Story publicado **somente** depois do ID oficial do provedor; em resposta de erro ambígua, reconciliar pela consulta de leitura antes de qualquer reenvio.
 7. Não republicar pautas concluídas, não recriar linhas para contornar erro e não substituir mídia de post histórico publicado.
+
+
+## Referência visual específica aprovada (10/10/2026) — prioridade máxima
+
+O layout de **foto realista de abastecimento, logo grande circular, categoria amarela ECONOMIA, manchete em branco/amarelo e panorama do Rio Madeira no rodapé** compartilhado pelo responsável é a referência dominante sobre templates antigos. [Veja o guia de composição e o prompt mestre](REFERENCIA_CAPA_OFICIAL.md).
+
+**Regra executável:** gerador principal \`scripts/giro_shorts_auto.py\`, contrato visual \`GIRO_EDITORIAL_FOTO_MANCHETE_RIO_V1\`, entrada comum para Shorts e cópia TikTok 30fps. Para Feed/Stories/Reels, adaptar a MESMA composição, não importar templates genéricos nem colar capa quadrada em vídeo vertical. O layout atual deve incluir: logo original sem palavra GIRO/MADEIRA redundante, tarja amarela editorial, manchete central-baixa de grande escala (cores branca/amarela), e faixa panorâmica permanente do Rio Madeira na base.
+
+**Antes de permitir postagem**, efetuar QA visual do arquivo renderizado e não apenas confiar que os arquivos de prompt existem. Bloquear no caso de logo cortada/duplicada, manchete truncada, arquivo fora de dimensão, play/triângulo, ausência do Rio Madeira, crédito impossível de ler, arte sem ligação com a pauta ou uso não licenciado de imagens. Sem aprovação visual válida, reter o trabalho; não recriar/duplicar registros de postagem anteriores.
