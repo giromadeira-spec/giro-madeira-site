@@ -2,6 +2,7 @@
 import io
 import json
 import os
+import subprocess
 from pathlib import Path
 import tempfile
 import unittest
@@ -149,14 +150,45 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(workflow["on"]["workflow_dispatch"]["inputs"]["use_ai"]["default"], "false")
         steps = workflow["jobs"]["auditoria"]["steps"]
         secret_steps = [s for s in steps if "OPENAI_API_KEY" in s.get("env", {})]
-        self.assertEqual(len(secret_steps), 1)
+        self.assertEqual(len(secret_steps), 2)
         condition = secret_steps[0]["if"]
         self.assertIn("refs/heads/main", condition)
         self.assertIn("workflow_dispatch", condition)
         self.assertIn("GIRO_AGENT_AI_ENABLED == 'true'", condition)
+        self.assertIn("GIRO_AGENT_AI_ENABLED == ''", condition)
+        self.assertIn("[test-ai]", condition)
         self.assertNotIn("pull_request", condition)
+        self.assertIn("refs/heads/main", secret_steps[1]["if"])
+        self.assertIn("steps.ai_preflight.outputs.ready == 'true'", secret_steps[1]["if"])
         checkout = next(s for s in steps if "actions/checkout" in s.get("uses", ""))
         self.assertEqual(checkout["with"]["persist-credentials"], "false")
+
+    def run_preflight(self, key):
+        workflow = yaml.load((ROOT / ".github/workflows/ai-agent-audit.yml").read_text(), Loader=yaml.BaseLoader)
+        step = next(s for s in workflow["jobs"]["auditoria"]["steps"] if s.get("id") == "ai_preflight")
+        with tempfile.TemporaryDirectory() as directory:
+            folder = Path(directory)
+            (folder / "artifacts").mkdir()
+            report = folder / "artifacts/ai-agent-report.md"
+            report.write_text("Evidencia offline preservada\n")
+            output = folder / "outputs"
+            result = subprocess.run(["bash", "-c", step["run"]], cwd=folder,
+                                    env={"PATH": os.environ["PATH"], "OPENAI_API_KEY": key,
+                                         "GITHUB_OUTPUT": str(output)}, capture_output=True, text=True, check=True)
+            return output.read_text(), report.read_text(), result.stdout + result.stderr
+
+    def test_missing_key_records_pending_and_preserves_report(self):
+        output, report, logs = self.run_preflight("")
+        self.assertEqual(output.strip(), "ready=false")
+        self.assertIn("Evidencia offline preservada", report)
+        self.assertIn("IA pendente", report)
+
+    def test_existing_key_is_not_emitted(self):
+        key = "sk-fake-only-preflight-test"
+        output, report, logs = self.run_preflight(key)
+        self.assertEqual(output.strip(), "ready=true")
+        self.assertNotIn(key, output + report + logs)
+        self.assertNotIn("IA pendente", report)
 
 
 if __name__ == "__main__":

@@ -9,10 +9,13 @@ contratos na main, em pull requests e diariamente às **11h17 UTC** (07h17 Porto
 Velho / 08h17 São Paulo), sujeito a atrasos do GitHub. Não depende desta conversa.
 Relatório e SQLite são anexados por 14 dias; o relatório aparece no resumo do run.
 
-Chamadas reais de IA dependem do secret **OPENAI_API_KEY**. Por padrão, CI e agenda
-executam só o grafo offline, sem chamadas à API. A agenda passa a usar IA somente
-quando a variável **GIRO_AGENT_AI_ENABLED=true** for configurada. PRs nunca recebem
-a chave; IA só executa na main confiável por botão manual ou agenda autorizada.
+Chamadas reais de IA dependem do secret **OPENAI_API_KEY**. **Rotina diária de IA
+habilitada pelo responsável em 12/10/2026.** A agenda usa IA por padrão quando a
+variável **GIRO_AGENT_AI_ENABLED** está ausente ou vale `true`; `false` ou outro
+valor desabilita as chamadas agendadas. PRs e commits comuns continuam offline.
+Sem chave, o relatório registra IA pendente e não chama a API. A chave nunca é
+emitida; a checagem retorna apenas disponibilidade. IA só executa na main confiável
+por agenda, botão manual ou commit explicitamente marcado `[test-ai]` para teste.
 
 Não implementado: agentes que corrigem código, abrem PRs, dão merge ou publicam
 notícias. Ruflo e OpenHands são avaliados separadamente; n8n não foi instalado.
@@ -81,8 +84,9 @@ as etapas registram que a análise IA não foi solicitada, sem consultar provedo
 3. Após merge e testes, abrir Actions → `Giro Madeira - laboratorio de agentes
    (sem publicar)` → Run workflow na **main**, marcar `use_ai=true`.
 4. Validar os dois pareceres no artefato `giro-ai-agent-readonly-report`.
-5. Para IA diária, adicionar em Actions → Variables **GIRO_AGENT_AI_ENABLED=true**.
-   Para parar só as chamadas pagas, remover a variável ou mudar para `false`.
+5. IA diária já está habilitada no código. Se houver variável de bloqueio anterior,
+   definir **GIRO_AGENT_AI_ENABLED=true**. Para parar só as chamadas pagas, definir
+   **GIRO_AGENT_AI_ENABLED=false**; remover a variável volta ao padrão habilitado.
    A auditoria offline continua. São até duas chamadas por run, sem retentativa
    automática, cada uma com até 1.800 tokens de saída. Isso não é um teto de gasto
    em reais: configurar limites de gasto na conta OpenAI. A API tem cobrança
@@ -126,6 +130,6 @@ python scripts/ai_agents/orchestrate.py --use-ai \
 - Diagnóstico estático não comprova publicação real, estado das filas, saúde do
   Supabase ou ausência de bloqueios das redes sociais.
 
-Reversão: desativar `GIRO_AGENT_AI_ENABLED` interrompe IA; remover apenas o cron
+Reversão: definir `GIRO_AGENT_AI_ENABLED=false` interrompe IA agendada; remover apenas o cron
 interrompe agenda; reverter o commit remove esta integração. Não reativar o arquivo
 legado de 04/10 sem revisão, pois ele insere notícias antigas e faz git push.
