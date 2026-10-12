@@ -279,7 +279,7 @@ function licensingTopic(title:string,cat:string):string[]{
   if(/m[uú]sica|festival|show|cultura|teatro/.test(s))return ["theater interior audience","concert stage"];
   if(/reciclagem|meio ambiente|sustent[aá]vel/.test(s))return ["recycling bins city","recycling collection"];
   if(/economia|pix|banco|dinheiro|empresa|pre[cç]o/.test(s))return ["Brazilian real banknotes","Brazil financial district"];
-  return ["Porto Velho Rio Madeira","Porto Velho city"];
+  return []; // Unknown subjects cannot use generic city photography as the news image.
 }
 function stripPhotoMarkup(v:any){return clean(String(v||"").replace(/<[^>]*>/g," ").replace(/&nbsp;/g," ").replace(/&amp;/g,"&")).slice(0,90);}
 async function licensedEditorialPhoto(title:string,category:string):Promise<EditorialPhoto|null>{
@@ -576,7 +576,11 @@ Deno.serve(async(req)=>{
       return new Response(JSON.stringify({success:false,error:"approved_visual_protected_no_regeneration"}),{status:409,headers:H});
     if(body?.preview_art===true){
       const visualSmoke=body?.qa_layout_smoke===true&&body?.qa_embed===true;
-      const title=visualSmoke?"GIRO MADEIRA: DESTAQUES DE PORTO VELHO":clean(item.titulo);
+      const title=visualSmoke
+        ? (body.qa_layout_smoke_long===true
+            ? "POLÍCIA CIVIL LOCALIZA E PRENDE EM CUIABÁ INVESTIGADO POR HOMICÍDIO E TENTATIVA DE HOMICÍDIO EM JARU"
+            : "GIRO MADEIRA: DESTAQUES DE PORTO VELHO")
+        :clean(item.titulo);
       const category=visualSmoke?"REGIÃO":clean(item.categoria)||classify(title);
       await prepareBrandLogo();await ensureWasm();const font=await getFont();
       const isRegional=isRondoniaEditorial(title,clean(item.fonte_nome));
