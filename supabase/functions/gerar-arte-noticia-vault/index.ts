@@ -446,42 +446,7 @@ async function licensedRioMadeiraPhoto():Promise<EditorialPhoto|null>{
   }catch(e){rioPhotoQaState="exception_"+String(e).slice(0,100);return null}
 }
 
-function originalBackdrop(kind:"feed"|"story",_category:string){
-  // Arte gráfica própria para pautas oficiais verificadas, sem simular fotografia da ocorrência.
-  const W=1080,H=kind==="feed"?1080:1920;
-  const police=/POL[IÍ]CIA|SEGURAN[CÇ]A|HOMIC[IÍ]DIO/.test(_category.toUpperCase());
-  const categoryMotif=police?'<g opacity=".84">'+
-    '<ellipse cx="780" cy="295" rx="220" ry="125" fill="#0c3976" opacity=".42"/>'+
-    '<ellipse cx="780" cy="295" rx="145" ry="85" fill="#c34228" opacity=".19"/>'+
-    '<path d="M770 172 L869 212 V297 C869 364 814 403 770 425 C726 403 671 364 671 297 V212 Z" fill="#081f37" stroke="#f8c747" stroke-width="9"/>'+
-    '<path d="M770 234 L785 266 L821 270 L794 296 L801 333 L770 315 L739 333 L746 296 L719 270 L755 266 Z" fill="#ffd053"/>'+
-    '<path d="M642 410 H904" stroke="#dfca83" stroke-width="6" stroke-opacity=".54"/>'+
-    '</g>':'';
-
-  const shift=kind==="feed"?0:380;
-  return '<defs>'+
-    '<linearGradient id="brandArt" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="#071724"/><stop offset=".46" stop-color="#174969"/><stop offset="1" stop-color="#031421"/></linearGradient>'+
-    '<radialGradient id="horizon" cx=".75" cy=".36" r=".67"><stop stop-color="#ecaa4b" stop-opacity=".65"/><stop offset=".65" stop-color="#e9a442" stop-opacity=".05"/><stop offset="1" stop-color="#e9a442" stop-opacity="0"/></radialGradient>'+
-    '<linearGradient id="riverLight" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#65b2c9"/><stop offset=".5" stop-color="#3186a9"/><stop offset="1" stop-color="#103651"/></linearGradient>'+
-    '</defs>'+
-    '<rect width="'+W+'" height="'+H+'" fill="url(#brandArt)"/>'+
-    '<rect width="'+W+'" height="'+H+'" fill="url(#horizon)"/>'+
-    '<g transform="translate(0 '+shift+')">'+
-    '<circle cx="835" cy="320" r="116" fill="#edb65e" opacity=".46"/>'+
-    '<path d="M0 390 Q140 365 280 395 T580 376 T880 400 T1120 363 V690 H0Z" fill="#0a2a3d" opacity=".94"/>'+
-    '<path d="M-30 475 C160 455 275 535 430 510 S740 452 1100 485 V750 H-30Z" fill="#071d2c"/>'+
-    '<path d="M1100 438 C887 457 824 500 672 528 C522 559 356 531 190 572 C98 595 14 643 -30 695 L-30 990 C195 754 428 767 610 680 C825 576 940 631 1100 559Z" fill="url(#riverLight)" opacity=".91"/>'+
-    '<path d="M1090 482 C899 488 796 539 639 571 C508 600 339 583 147 665" fill="none" stroke="#b9e3e8" stroke-opacity=".34" stroke-width="5"/>'+
-    '<path d="M1021 544 C853 577 726 591 585 643 C414 708 224 685 88 776" fill="none" stroke="#d7eff1" stroke-opacity=".22" stroke-width="4"/>'+
-    '<path d="M-30 680 Q160 582 270 608 Q360 625 443 613 L250 865 L-30 1010Z" fill="#05202a" opacity=".86"/>'+
-    '<path d="M1090 563 Q969 600 864 613 Q908 685 1090 735Z" fill="#062632" opacity=".84"/>'+
-    '<g fill="#041b26" opacity=".75">'+
-    '<path d="M42 520 l17 -85 16 85 z M111 518 l14 -106 14 106 z M184 527 l19 -87 19 87 z"/>'+
-    '<path d="M909 461 l17 -82 17 82 z M956 455 l15 -98 15 98 z M1010 460 l22 -90 22 90 z"/>'+
-    '</g>'+
-    '<text x="72" y="515" font-family="Inter" font-size="25" font-weight="800" letter-spacing="3" fill="#f9cb75" opacity=".92">RIO MADEIRA</text>'+
-    '</g>'+categoryMotif;
-}
+// Generic illustrated heroes intentionally disabled: photographic editorial layout only.
 // Identidade oficial aprovada 10/10/2026; cenário Rio Madeira fixo no rodapé.
 function rioFooterSvg(W:number,H:number,portrait:boolean){
   const y=portrait?1764:960, hh=H-y;
@@ -610,7 +575,9 @@ Deno.serve(async(req)=>{
     if(item.visual_approved===true)
       return new Response(JSON.stringify({success:false,error:"approved_visual_protected_no_regeneration"}),{status:409,headers:H});
     if(body?.preview_art===true){
-      const title=clean(item.titulo),category=clean(item.categoria)||classify(title);
+      const visualSmoke=body?.qa_layout_smoke===true&&body?.qa_embed===true;
+      const title=visualSmoke?"GIRO MADEIRA: DESTAQUES DE PORTO VELHO":clean(item.titulo);
+      const category=visualSmoke?"REGIÃO":clean(item.categoria)||classify(title);
       await prepareBrandLogo();await ensureWasm();const font=await getFont();
       const isRegional=isRondoniaEditorial(title,clean(item.fonte_nome));
       // Em operacoes policiais locais, evitar fotos de outras policias/estados:
@@ -620,19 +587,18 @@ Deno.serve(async(req)=>{
         /opera[cç][aã]o|apreens[aã]o|pris[aã]o|investiga[cç][aã]o|homic/i.test(title+" "+category);
       // QA must obey the same bounded photo search as production; avoid timeout 546.
       const previewStarted=Date.now();
-      const photo=await Promise.race([
+      const photo=visualSmoke?await licensedRioMadeiraPhoto():await Promise.race([
           licensedEditorialPhoto(title,category),
           new Promise<null>(resolve=>setTimeout(()=>resolve(null),12500))
         ]);
-      const isOfficial=new URL(String(item.fonte_url||"https://invalid.example")).hostname.endsWith(".gov.br");
       if(!photo)throw new Error("Foto temática licenciada ausente; arte visual não autorizada. Sem fallback.");
       const attribution=photo?(photo.creator+" • "+photo.license):"";
-      const feedSvg=makeSvg("feed",title,clean(item.resumo),clean(item.fonte_nome)||"Giro Madeira",category,photo?.dataUri||"",item.urgente===true,attribution);
-      const storySvg=makeSvg("story",title,clean(item.resumo),clean(item.fonte_nome)||"Giro Madeira",category,photo?.dataUri||"",item.urgente===true,attribution);
+      const feedSvg=makeSvg("feed",title,visualSmoke?"PRÉVIA DE LAYOUT • NÃO PUBLICAR":clean(item.resumo),visualSmoke?"FOTOGRAFIA CC0":clean(item.fonte_nome)||"Giro Madeira",category,photo.dataUri,visualSmoke?false:item.urgente===true,attribution);
+      const storySvg=makeSvg("story",title,visualSmoke?"PRÉVIA DE LAYOUT • NÃO PUBLICAR":clean(item.resumo),visualSmoke?"FOTOGRAFIA CC0":clean(item.fonte_nome)||"Giro Madeira",category,photo.dataUri,visualSmoke?false:item.urgente===true,attribution);
       const feed=await render(feedSvg,font),story=await render(storySvg,font);
       // Authenticated read-only visual QA: no new rows, no uploads, no publishing.
       if(body?.qa_embed===true) return new Response(JSON.stringify({
-        success:true,preview_art:true,qa_embed:true,publication_id:item.id,
+        success:true,preview_art:true,qa_embed:true,publication_id:item.id,layout_smoke_test:visualSmoke,not_for_publication:visualSmoke,
         visual_mode:photo?"licensed_editorial_photo":"original_illustration",
         illustrative_photo_credit:photo?{creator:photo.creator,license:photo.license,source:photo.source}:null,
         rio_photo_qa:rioPhotoQaState,
@@ -740,7 +706,7 @@ Deno.serve(async(req)=>{
         source_image_url:imageUrl||null,source_video_url:videoRaw||null,
         publicar_story:false,publicar_reel:reelRecommended,
         reel_interesse_ro:reelInterestRo,
-        media_pipeline_version:5,visual_approved:false,
+        media_pipeline_version:channel==="feed"?6:5,visual_approved:false,
         media_status:"aguardando_arte_tematica",
         status:"pendente",
         erro:"Aguardando arte temática aprovada; não publicar ou usar foto de outra ocorrência."
@@ -776,7 +742,7 @@ Deno.serve(async(req)=>{
       image_url:feedUrl,feed_image_url:feedUrl,story_image_url:storyUrl,
       source_image_url:imageUrl||null,source_video_url:vid.source||null,
       publicar_story:true,publicar_reel:reelRecommended,reel_interesse_ro:reelInterestRo,video_url:item.video_url||null,
-      status:"pendente",erro:null,story_erro:null,reel_erro:null,media_pipeline_version:5,media_status:"feed_pronto"
+      status:"pendente",erro:null,story_erro:null,reel_erro:null,media_pipeline_version:channel==="feed"?6:5,media_status:"feed_pronto"
     };
     const up=await sb.from(publicationTable).update(upd).eq("id",id); if(up.error) throw up.error;
     return new Response(JSON.stringify({success:true,id,feed_image_url:feedUrl,story_image_url:storyUrl,reel_ready:Boolean(item.video_url),reel_recommended:reelRecommended,reel_interesse_ro:reelInterestRo,reel_generated:false,source_image_url:imageUrl||null,visual_mode:"licensed_editorial_photo",illustrative_photo_credit:{creator:photo.creator,license:photo.license,source:photo.source}}),{headers:H});
