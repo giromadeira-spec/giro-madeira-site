@@ -30,6 +30,19 @@ OpenHands e Ruflo acrescentam execução de ferramentas e permissões que não s
 necessárias para uma auditoria. A quantidade de papéis de um framework não prova
 que dezenas de modelos estejam conectados ou executando neste projeto.
 
+Testes de compatibilidade realizados em ambientes isolados, sem tokens de produção:
+
+| Componente | Versão | Resultado comprovado | Limite |
+|---|---|---|---|
+| LangGraph / SQLite | 1.2.14 / 3.1.1 | Grafo real, retomada do revisor sem repetir auditor, tarefa concluída sem novas chamadas; testes passaram | API simulada; não comprova acesso da conta OpenAI |
+| OpenHands SDK | 1.54.0 | Instalação, importação e criação de `Agent` com `tools=[]`; rede bloqueada no smoke test | Não executou conversa, shell, edição nem modelo real |
+| Ruflo CLI | 3.56.7 | Instalação npm com scripts de instalação desativados; `ruflo --version` retornou `ruflo v3.56.7`, exit 0 | Não iniciou daemon, MCP, swarm ou provedor |
+
+Ruflo foi instalado fora do repositório, em workspace descartável. O npm exec
+encontrou problemas locais de certificado/cache; instalação com prefixo e cache
+isolados funcionou usando autoridades certificadoras do sistema, sem desativar TLS.
+OpenHands e Ruflo não foram adicionados às dependências do workflow de auditoria.
+
 Fontes oficiais consultadas:
 - https://docs.langchain.com/oss/python/langgraph/checkpointers
 - https://docs.openhands.dev/sdk/getting-started
