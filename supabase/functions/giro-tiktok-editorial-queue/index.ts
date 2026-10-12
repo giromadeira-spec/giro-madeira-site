@@ -1,22 +1,11 @@
 import { createClient } from "npm:@supabase/supabase-js@2.57.0";
+import { geographicScope, eligible, comparePriority } from "./editorial-policy.ts";
 const headers={"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"};
 const resp=(o:unknown,s=200)=>new Response(JSON.stringify(o),{status:s,headers});
 const normalize=(s:unknown)=>String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"")
  .toLowerCase().replace(/[^a-z0-9 ]+/g," ").replace(/\s+/g," ").trim();
 
-function scopeOf(v:{titulo:string;fonte_nome:string;fonte_url:string}):"brasil"|"mundo"|"rondonia"|null{
- const t=normalize(v.titulo), src=normalize(v.fonte_nome), link=String(v.fonte_url||"").toLowerCase();
- if (/\/mundo\/|\/internacional\/|\/(world|global)\//.test(link) ||
-    /^(deutsche welle|dw brasil|onu news|un news|reuters|bbc mundo|bbc news brasil mundo)$/.test(src))return "mundo";
- if (/\b(rondonia|porto velho|ji parana|ariquemes|vilhena|cacoal|guajara mirim|rio madeira)\b/.test(t) ||
-     /\/ro\/rondonia\/|\.ro\.gov\.br/.test(link) ||
-     /^(rondonia ao vivo|rondoniagora|g1 rondonia|portal jipa|tudo rondonia|sictv|ge rondonia|news rondonia|rondonia dinamica)$/.test(src))
-     return /\b(municipios brasileiros|governo federal|todo o brasil|em todo o pais|no brasil)\b/.test(t) ? "brasil" : "rondonia";
- if(/^(g1 brasil|forbes brasil|senado federal|policia federal|prf|agencia brasil)$/.test(src)
-   || /(g1\.globo\.com\/politica\/|g1\.globo\.com\/economia\/|g1\.globo\.com\/brasil\/|forbes\.com\.br\/)/.test(link)
-   || link.includes("gov.br/pf/") || link.includes("gov.br/prf/"))return "brasil";
- return null;
-}
+const scopeOf=geographicScope;
 const blocked = (title:string,source:string,url:string) => {
  const t=normalize(title),s=normalize(source);
  if(!title||title.length<28||title.length>160)return true;
@@ -224,7 +213,7 @@ Deno.serve(async(req:Request)=>{
      sb.from("giro_radar_tiktok")
        .select("id,fonte_id,titulo,url,score,urgente,created_at,source_published_at,status")
        .gte("created_at",new Date(Date.now()-36*3600000).toISOString())
-       .gte("score",25).order("score",{ascending:false}).limit(450),
+       .gte("score",25).order("created_at",{ascending:false}).limit(1000),
      sb.from("giro_madeira_fontes").select("id,nome")
    ]);
    if(candidates.error)throw candidates.error;
@@ -236,17 +225,14 @@ Deno.serve(async(req:Request)=>{
      urgente:c.urgente,created_at:c.created_at,source_published_at:c.source_published_at,
      score:c.score,status:c.status
    })).filter(c=>
-     (!c.source_published_at || Date.parse(c.source_published_at)>=Date.now()-48*3600000) &&
+     eligible(c) &&
      !blocked(String(c.titulo),String(c.fonte_nome),String(c.fonte_url)) &&
      (!!scopeOf({titulo:c.titulo,fonte_nome:c.fonte_nome,fonte_url:c.fonte_url}) || isSports(c))
    );
    const finishedReports=uniqueFootballReports(options);
    // One football roundup at 22h Porto Velho (23h BRT) only when
    // multiple independent reports confirm final match scores.
-   const extraCount=settings.data.football_bonus_enabled===true
-      ?Math.min(1,settings.data.football_bonus_max||0,
-          Math.floor(finishedReports.length/Math.max(2,settings.data.football_bonus_min_confirmed||2)))
-      :0;
+   const extraCount=0; // TikTok important-news policy has no sports bonus.
    const bonusSlots=extraCount>0?[{h:23,m:0,scope:"esporte",footballExtra:true}]:[];
    const daySlots=[...baseSlots.map(s=>({...s,footballExtra:false})),...bonusSlots]
      .sort((a,b)=>(a.h*60+a.m)-(b.h*60+b.m));
@@ -257,8 +243,8 @@ Deno.serve(async(req:Request)=>{
      if(count>=targetMax)break;
      const scheduled=new Date(start+(slot.h*60+slot.m)*60000).toISOString();
      if(todayBySlot.has(scheduled))continue;
-     // Do not schedule news retrospectively beyond two hours.
-     if(new Date(scheduled).getTime()<Date.now()-2*3600000)continue;
+     // Schedule only future slots; never fill missed slots retrospectively.
+     if(new Date(scheduled).getTime()<Date.now())continue;
      // Last football slot may be a genuine multi-match roundup rather than an
      // unrelated individual story. 3 verified results -> 3 scenes/3 source links.
      if(slot.footballExtra && slot.h===23 && finishedReports.length>=3){
@@ -288,21 +274,9 @@ Deno.serve(async(req:Request)=>{
        !seenTitles.some(t=>sameStory(t,c.titulo)) &&
        !created.some(v=>sameStory(v.title,c.titulo))
      );
-     const wanted=(c:typeof options[number])=>
-       slot.footballExtra?hasFinalFootballScore(c):
-       slot.scope==="policial"?isPolice(c):
-       slot.scope==="politica"?isPolitics(c):
-       slot.scope==="rondonia"?(scopeOf(c)==="rondonia"&&!isSports(c)):
-       slot.scope==="em_alta"?(isHighImpact(c)&&!isSports(c)):
-       false;
-     // Strongest verified story in target category wins; use other relevant
-     // non-sports news if a target is unavailable. Never force football here.
-     const rank=(a:typeof options[number],b:typeof options[number])=>
-       (editorialScore(b,slot.scope as "policial"|"politica"|"rondonia"|"em_alta")-
-        editorialScore(a,slot.scope as "policial"|"politica"|"rondonia"|"em_alta"));
-     const preferred=unused.filter(c=>wanted(c) && (settings.data.daily_goal>2 || isHighImpact(c) && !isSports(c))).sort(rank);
-     const fallback=unused.filter(c=>!isSports(c) && (settings.data.daily_goal>2 || isHighImpact(c))).sort(rank);
-     const match=slot.footballExtra?preferred[0]:(preferred[0]||fallback[0]);
+     const preferred=unused.filter(c=>eligible(c)).sort(comparePriority);
+     const fallback:typeof preferred=[]; // Never fill a slot with routine/local low-impact news.
+     const match=preferred[0];
      slotDiagnostics.push({slot:scheduled,unused:unused.length,preferred:preferred.length,fallback:fallback.length,selected:!!match});
      if(!match)continue;
      const inserted=await sb.from("giro_social_video_queue").insert({
@@ -336,3 +310,4 @@ Deno.serve(async(req:Request)=>{
    return resp({success:false,error:"shorts_editorial_queue_error"},500);
  }
 });
+

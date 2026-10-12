@@ -1,6 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 import { load } from "npm:cheerio@1.0.0";
 
+import { articleIsFresh } from "./article-date.ts";
 const headers={"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"};
 const respond=(data:unknown,status=200)=>new Response(JSON.stringify(data),{headers,status});
 const clean=(v:unknown)=>String(v||"").replace(/\s+/g," ").trim();
@@ -111,6 +112,20 @@ Deno.serve(async req=>{
          if(type && !type.includes("text/html"))throw Error("non_html_source");
          const html=(await sourceResp.text()).slice(0,1800000);
          const $=load(html);
+         // Verify the article date itself; homepage/RSS discovery timestamps can be misleading.
+         let published=String($('meta[property="article:published_time"]').attr("content")||$('meta[name="datePublished"]').attr("content")||"");
+         if(!published){
+           for(const el of $('script[type="application/ld+json"]').toArray()){
+             try{
+               const raw=JSON.parse($(el).text());
+               const nodes=[...(Array.isArray(raw)?raw:[raw]),...(raw?.['@graph']||[])];
+               const article=nodes.find(n=>/NewsArticle|Article/.test(String(n?.['@type']||''))&&n?.datePublished);
+               if(article){published=String(article.datePublished);break;}
+             }catch{}
+           }
+         }
+         if(!articleIsFresh(published,sourceUrl.toString()))
+           throw Error("article_date_unverified_or_outdated");
          $("script,style,nav,footer,header,aside,form,iframe,.advertisement,.ads,.related,.share-buttons,.newsletter").remove();
          const description=clean($('meta[property="og:description"]').attr("content")||$('meta[name="description"]').attr("content")||"");
          const facts=$("article p, .entry-content p, .post-content p, .article-body p, main p").toArray()
@@ -120,7 +135,7 @@ Deno.serve(async req=>{
          scenes=meaningfulSegments(clean(row.titulo),description,facts,"Radar Giro Madeira");
          if(!scenes||scenes.length!==3||!scenes.every(fitCard))fault="insufficient_verified_facts";
        }catch(e){
-         fault=e instanceof Error && /source_url_mismatch|non_html_source|source_http_/.test(e.message)
+         fault=e instanceof Error && /source_url_mismatch|non_html_source|source_http_|article_date_unverified_or_outdated/.test(e.message)
            ?e.message:"source_fetch_or_parse_failed";
        }
      }
@@ -149,4 +164,5 @@ Deno.serve(async req=>{
    return respond({success:false,error:"storyboard_internal_error"},500);
  }
 });
+
 
