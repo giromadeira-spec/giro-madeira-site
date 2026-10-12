@@ -44,7 +44,7 @@ def article_subject(title):
     # TikTok-only topic fixes; preserve the working Shorts classification.
     if PLATFORM == "tiktok":
         if re.search(r"\btse\b|tribunal|supremo|\bstf\b", t):
-            return "brazil electronic voting machine", "POLÍTICA"
+            return "justice gavel", "POLÍTICA"
         if re.search(r"pres[ií]dio|prisional|policial penal|apreens[aã]o|apreende|mandado", t):
             return "police car emergency lights", "SEGURANÇA"
     mapping=[
@@ -113,6 +113,8 @@ def photo_matches_topic(topic, title):
       "newspaper printing press":r"\b(printing press|newspaper printing|newspaper press)\b",
       "aircraft airplane":r"\b(aircraft|airplane|aeroplane|jetplane|avi[aã]o|aeronave|plane)\b"
     }
+    if PLATFORM == "tiktok":
+        groups["justice gavel"] = r"\b(gavel|gavels|martelo de juiz)\b"
     pattern=groups.get(topic)
     if topic=="aircraft airplane" and re.search(r"\b(toy|model|paper plane|simulator|diagram|poster|illustration|drawing|game|cartoon)\b",title,re.I):
       return False
@@ -122,6 +124,7 @@ def licensed_commons_download(topic):
     """Fallback: Wikimedia Commons photo with per-file licensing, subject and bytes verified."""
     endpoint="https://commons.wikimedia.org/w/api.php"
     fallback_terms={
+      "justice gavel":["gavel", "judge gavel"],
       "world globe earth":["EXACT:File:The Earth seen from Apollo 17.jpg", "earth globe", "world globe", "globe"],
       "brazil electronic voting machine":["urna eletrônica", "electronic voting machine"],
       "police car emergency lights":["police car", "police vehicle"],
@@ -507,7 +510,7 @@ def render_self_test():
         for headline, expected in (
             ("Operação apreende trator, caminhão e madeira em Terra Indígena em RO", ("police car emergency lights", "SEGURANÇA")),
             ("Ocorrência no presídio Urso Panda relata apreensão de material proibido e denúncia entre servidores", ("police car emergency lights", "SEGURANÇA")),
-            ("TSE derruba suspensão do canal Exército do Lula", ("brazil electronic voting machine", "POLÍTICA")),
+            ("TSE derruba suspensão do canal Exército do Lula", ("justice gavel", "POLÍTICA")),
         ):
             if article_subject(headline) != expected:
                 raise RuntimeError("TikTok headline misclassified: " + headline)
