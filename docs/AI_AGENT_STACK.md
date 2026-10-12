@@ -1,92 +1,118 @@
-# Laboratório de agentes externos — Giro Madeira
+# Laboratório de agentes — Giro Madeira
 
-## Escopo e status (12/10/2026)
+## Status em 12/10/2026
 
-**Implementado nesta proposta:** um laboratório somente leitura com verificações locais e
-dois papéis de IA (auditor e revisor), acionados manualmente no GitHub Actions. O relatório
-é anexado como artefato. O fluxo de pull request executa apenas verificações offline,
-sem necessidade de segredos.
+Implementado: auditoria somente leitura com **LangGraph 1.2.14**, checkpoints
+**langgraph-checkpoint-sqlite 3.1.1**, verificações locais e dois papéis opcionais de
+IA (auditor e revisor). Roda no GitHub Actions em alterações de scripts/workflows/
+contratos na main, em pull requests e diariamente às **11h17 UTC** (07h17 Porto
+Velho / 08h17 São Paulo), sujeito a atrasos do GitHub. Não depende desta conversa.
+Relatório e SQLite são anexados por 14 dias; o relatório aparece no resumo do run.
 
-**Não implementado:** instalação ou execução de Ruflo, OpenHands, LangGraph ou n8n;
-nenhum desses serviços fica magicamente conectado à conversa do ChatGPT. São candidatos
-a uma etapa separada, após avaliação de licenças, custos, segurança e compatibilidade.
+Chamadas reais de IA dependem do secret **OPENAI_API_KEY**. Por padrão, CI e agenda
+executam só o grafo offline, sem chamadas à API. A agenda passa a usar IA somente
+quando a variável **GIRO_AGENT_AI_ENABLED=true** for configurada. PRs nunca recebem
+a chave; IA só executa na main confiável por botão manual ou agenda autorizada.
 
-## Objetivo
+Não implementado: agentes que corrigem código, abrem PRs, dão merge ou publicam
+notícias. Ruflo e OpenHands são avaliados separadamente; n8n não foi instalado.
 
-Usar GitHub como fonte do código e contratos, ChatGPT como interface de orientação e
-agentes executados em infraestrutura própria/CI para testes e auditoria. Não substituir
-os mecanismos de publicação já existentes no Supabase e nas filas por um orquestrador
-externo sem validação.
+## Avaliação e decisão
 
-### Peças avaliadas e papéis potenciais
+| Projeto oficial | Papel | Decisão |
+|---|---|---|
+| https://github.com/langchain-ai/langgraph | Orquestração e checkpoints | Integrado ao laboratório; retomada testada sem escrita em produção |
+| https://github.com/OpenHands/software-agent-sdk | Programação e testes em workspace efêmero | Candidato a gerar propostas de correção; precisa workspace sem credenciais sociais e revisão antes do merge |
+| https://github.com/ruvnet/ruflo | Coordenação de agentes CLI/MCP | Candidato; depende de cliente executor/provedor configurado, não se conecta ao chat apenas por existir no GitHub |
 
-| Projeto | Código oficial | Papel possível | Condição para adotar |
-|---|---|---|---|
-| Ruflo | https://github.com/ruvnet/ruflo | Coordenação de agentes via CLI/MCP | Testar localmente em sandbox isolado, sem tokens de produção |
-| OpenHands SDK | https://github.com/OpenHands/software-agent-sdk | Agentes de programação e testes | Ambiente efêmero + PR com revisão |
-| LangGraph | https://github.com/langchain-ai/langgraph | Checkpoint/retomada de tarefas | Estado separado por plataforma, nenhuma duplicação de publicação |
-| n8n | https://github.com/n8n-io/n8n | Orquestração de gatilhos externos | Restrição de acesso, credenciais seguras e regras anti-duplicação |
+LangGraph atende primeiro à necessidade de controlar etapas e retomar tarefas.
+OpenHands e Ruflo acrescentam execução de ferramentas e permissões que não são
+necessárias para uma auditoria. A quantidade de papéis de um framework não prova
+que dezenas de modelos estejam conectados ou executando neste projeto.
 
-Preferir poucos componentes com responsabilidades claras a instalar quatro plataformas
-sobrepostas. A integração com ferramentas MCP depende do **cliente que executa** o servidor;
-ter o código desses projetos no GitHub não adiciona automaticamente ferramentas a este chat.
+Fontes oficiais consultadas:
+- https://docs.langchain.com/oss/python/langgraph/checkpointers
+- https://docs.openhands.dev/sdk/getting-started
+- https://github.com/ruvnet/ruflo
+- https://developers.openai.com/api/docs/guides/text
+- https://developers.openai.com/api/docs/models/gpt-5.5
 
-## Laboratório entregue
+## Arquivos e testes
 
-Arquivos:
-- `scripts/ai_agents/audit.py`: verifica documentação, contratos e sintaxe sem executar
-  publicadores; pode solicitar duas análises por IA exclusivamente para o relatório.
-- `tests/test_ai_agents_audit.py`: testes offline, sem dependências externas.
-- `.github/workflows/ai-agent-audit.yml`: PR = teste offline; botão manual = teste e
-  auditoria, com opção explícita de IA.
-
-### Rodar sem API nem custo de tokens
+- `scripts/ai_agents/audit.py`: evidência estática, sintaxe Python e YAML, API sem ferramentas.
+- `scripts/ai_agents/orchestrate.py`: grafo LangGraph com auditor, revisor e conclusão.
+- `scripts/ai_agents/requirements.txt`: dependências diretas/transitivas fixadas e testadas.
+- `tests/test_ai_agents_*.py`: testes offline, API simulada e retomada real do grafo.
+- `.github/workflows/ai-agent-audit.yml`: CI/agenda offline e IA opt-in na main.
+- `docs/archive/publicar-noticias-04-10.yml.disabled`: conteúdo legado preservado.
+  Tinha YAML inválido na linha 22 e gerava erro a cada commit. Foi arquivado fora
+  da pasta de workflows, sem reativar a inserção de notícias antigas nem alterar
+  `news.js`. Os demais workflows de publicação permanecem intactos.
 
 ```sh
+python -m pip install -r scripts/ai_agents/requirements.txt
 python -m unittest discover -s tests -p 'test_ai_agents_*.py' -v
-python scripts/ai_agents/audit.py --report artifacts/ai-agent-report.md
+python scripts/ai_agents/orchestrate.py --task-id auditoria-local
 ```
 
-### Rodar agentes de IA
+Fluxo: evidência estática → auditor → revisor → conclusão/relatório. Sem `--use-ai`,
+as etapas registram que a análise IA não foi solicitada, sem consultar provedores.
 
-1. Adicionar **OPENAI_API_KEY** em GitHub → Settings → Secrets and variables →
-   Actions → Repository secrets. Nunca colocar uma chave no código.
-2. Opcional: configurar a variável `OPENAI_AGENT_AUDIT_MODEL` para um modelo
-   disponível na sua conta API (padrão do script: `gpt-5.5`).
-3. Somente depois de revisar o PR e aprovar o merge para `main`, abra a aba
-   Actions, escolha `Giro Madeira - laboratorio de agentes (sem publicar)`,
-   execute `Run workflow` e marque `use_ai=true`. O GitHub disponibiliza
-   `workflow_dispatch` após o workflow existir na branch padrão.
-4. Abrir o artefato `giro-ai-agent-readonly-report`; dois papéis produzem um parecer
-   e plano. A API pode gerar cobrança **separada da assinatura ChatGPT**.
+## Ativação da IA
 
-O modo IA envia à API somente o resumo de checagens produzido sobre arquivos públicos
-do repositório. Não envia chaves, arquivos .env, notícias, imagens nem dados de usuários.
+1. Criar uma chave na conta API OpenAI e adicionar **OPENAI_API_KEY** em GitHub →
+   Settings → Secrets and variables → Actions → Repository secrets. Nunca enviar
+   a chave por chat nem inseri-la no código.
+2. Opcional: variável **OPENAI_AGENT_AUDIT_MODEL** com modelo acessível à conta
+   API. Padrão preservado: `gpt-5.5`. Acesso real exige teste com a conta do usuário.
+3. Após merge e testes, abrir Actions → `Giro Madeira - laboratorio de agentes
+   (sem publicar)` → Run workflow na **main**, marcar `use_ai=true`.
+4. Validar os dois pareceres no artefato `giro-ai-agent-readonly-report`.
+5. Para IA diária, adicionar em Actions → Variables **GIRO_AGENT_AI_ENABLED=true**.
+   Para parar só as chamadas pagas, remover a variável ou mudar para `false`.
+   A auditoria offline continua. São até duas chamadas por run, sem retentativa
+   automática, cada uma com até 1.800 tokens de saída. Isso não é um teto de gasto
+   em reais: configurar limites de gasto na conta OpenAI. A API tem cobrança
+   separada da assinatura ChatGPT.
 
-## Guardrails obrigatórios
+O modo IA envia somente o checklist sobre arquivos públicos e o parecer anterior,
+sem chaves, arquivos .env, notícias, imagens ou dados de usuários. Responses API
+usa `store=false`; não são disponibilizadas ferramentas executáveis ao modelo.
+Respostas incompletas/sem texto falham. Corpos HTTP e detalhes de exceção não são
+persistidos. Falha da API preserva o relatório estático e etapas concluídas.
 
-- Contrato principal: `AGENTS.md`; identidade:
-  `GIRO_EDITORIAL_FOTO_MANCHETE_RIO_V1` e Rio Madeira sempre presente.
-- Radar, fila, status, autorização e agendamento independentes para `shorts`,
-  `tiktok`, `feed`, `stories` e `reels`.
-- Arte aprovada não equivale a publicação; confirmação exige ID válido do provedor.
-- Não mudar `publication_enabled`, `integrity_hold` ou agendamentos sem validação
-  por canal. Nunca liberar Instagram/Meta a partir de uma aprovação do TikTok.
-- Nenhum agente deste laboratório pode acessar tokens, publicar, alterar banco,
-  dar merge, reiniciar filas nem criar commits. Somente leitura e relatório.
-- Diagnóstico estático **não prova** publicação real, saúde do Supabase ou ausência
-  de bloqueio das redes sociais.
+## Checkpoints e retomada
 
-## Próximas integrações condicionadas
+Retomada local: reutilizar o mesmo `--task-id` e `--checkpoint`, com o MESMO código,
+modo IA e modelo. Falha do revisor preserva o auditor; tarefa concluída não chama
+novamente a API. Alterar código/modo/modelo bloqueia retomada: usar novo task-id.
+O estado contém apenas checklist público, assinatura dos arquivos, pareceres e
+conclusão. Serialização restrita a tipos básicos, sem pickle nem módulos externos.
 
-1. **OpenHands:** rodar em workspace descartável, abrir PRs propostos, executar
-   testes e exigir revisão antes de qualquer merge.
-2. **LangGraph:** experimentar checkpoints somente sobre tarefas de auditoria.
-   Não mover estado do radar nem reiniciar etapas de publicação ao falhar.
-3. **Ruflo:** testar CLI/MCP em ambiente isolado, após inventário e avaliação das
-   permissões e dependências. NÃO usar instaladores remotos direto em produção.
-4. **n8n:** considerar apenas como ponte de notificações/observabilidade, não como
-   segundo publicador concorrente do Supabase.
+No Actions cada run novo inicia auditoria independente. O SQLite anexado **não é
+restaurado automaticamente** em runs seguintes. Para retomar, baixar seu SQLite
+e usar localmente o mesmo commit e task-id (`RUN_ID-ai`), com a chave apenas no
+ambiente protegido. Exemplo, após baixar o arquivo do run:
 
-Critério de aceite: relatórios consistentes, testes passando, nenhum segredo exposto,
-nenhuma alteração em `main` sem revisão e nenhum envio social durante o experimento.
+```sh
+python scripts/ai_agents/orchestrate.py --use-ai \
+  --task-id RUN_ID-ai --checkpoint /caminho/checkpoint.sqlite \
+  --report artifacts/ai-agent-report.md
+```
+
+## Limites operacionais
+
+- Contrato: `AGENTS.md`, padrão `GIRO_EDITORIAL_FOTO_MANCHETE_RIO_V1`, Rio Madeira.
+- Radares, filas, autorização, status e horários independentes de Shorts, TikTok,
+  Feed, Stories e Reels. Compartilhar arte não compartilha estado de consumo.
+- Não alterar `publication_enabled`, `integrity_hold`, aprovação ou agendamento.
+- Arte aprovada não confirma publicação; é necessário ID válido do provedor.
+- Agentes não acessam Supabase, tokens sociais, publicadores, banco, filas,
+  comandos de shell, commits, PRs ou merge. Permissão Actions: `contents: read`.
+- Tracing externo desativado; checkout sem credenciais persistentes.
+- Diagnóstico estático não comprova publicação real, estado das filas, saúde do
+  Supabase ou ausência de bloqueios das redes sociais.
+
+Reversão: desativar `GIRO_AGENT_AI_ENABLED` interrompe IA; remover apenas o cron
+interrompe agenda; reverter o commit remove esta integração. Não reativar o arquivo
+legado de 04/10 sem revisão, pois ele insere notícias antigas e faz git push.
