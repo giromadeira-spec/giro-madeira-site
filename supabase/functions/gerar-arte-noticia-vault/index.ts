@@ -599,7 +599,12 @@ Deno.serve(async(req)=>{
       const attribution=photo?(photo.creator+" • "+photo.license):"";
       const feedSvg=makeSvg("feed",title,visualSmoke?"PRÉVIA DE LAYOUT • NÃO PUBLICAR":clean(item.resumo),visualSmoke?"FOTOGRAFIA CC0":clean(item.fonte_nome)||"Giro Madeira",category,photo.dataUri,visualSmoke?false:item.urgente===true,attribution);
       const storySvg=makeSvg("story",title,visualSmoke?"PRÉVIA DE LAYOUT • NÃO PUBLICAR":clean(item.resumo),visualSmoke?"FOTOGRAFIA CC0":clean(item.fonte_nome)||"Giro Madeira",category,photo.dataUri,visualSmoke?false:item.urgente===true,attribution);
-      const feed=await render(feedSvg,font),story=await render(storySvg,font);
+      // QA requests generate only the asked image: avoid a second unused 1080x1920
+      // render consuming memory and causing HTTP 503 with long headlines.
+      const embed=body?.qa_embed===true;
+      const onlyStory=body?.qa_format==="story";
+      const feed=embed&&onlyStory?new Uint8Array():await render(feedSvg,font);
+      const story=embed&&!onlyStory?new Uint8Array():await render(storySvg,font);
       // Authenticated read-only visual QA: no new rows, no uploads, no publishing.
       if(body?.qa_embed===true) return new Response(JSON.stringify({
         success:true,preview_art:true,qa_embed:true,publication_id:item.id,layout_smoke_test:visualSmoke,not_for_publication:visualSmoke,
