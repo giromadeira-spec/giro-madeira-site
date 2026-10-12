@@ -1,6 +1,13 @@
 name: Giro Madeira - laboratorio de agentes (sem publicar)
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/ai-agent-audit.yml'
+      - 'scripts/ai_agents/**'
+      - 'tests/test_ai_agents_*.py'
+      - 'docs/AI_AGENT_STACK.md'
   pull_request:
     paths:
       - '.github/workflows/ai-agent-audit.yml'
