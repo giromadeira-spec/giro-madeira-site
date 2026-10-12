@@ -81,8 +81,19 @@ Deno.serve(async req=>{
   // Third-party photographs and inaccessible sources stay under human review.
   let autoApproved=false;
   let approvalReason="awaiting_visual_review";
-  if(channel==="feed"&&result.needs_approved_art!==true&&
-     result.visual_mode==="original_illustration"){
+  const photo=result.illustrative_photo_credit;
+  let verifiedPhoto=false;
+  try{
+    const license=String(photo?.license||"");
+    const u=new URL(String(photo?.source||""));
+    verifiedPhoto=result.visual_mode==="licensed_editorial_photo"&&
+      (license==="CC0"||/^CC BY(?: |$)/.test(license))&&
+      ((u.hostname==="commons.wikimedia.org"&&u.pathname.startsWith("/wiki/File:"))||
+       (u.hostname==="www.flickr.com"&&u.pathname.startsWith("/photos/")))&&
+      String(photo?.creator||"").length>=2;
+  }catch{}
+  if(channel==="feed"&&result.needs_approved_art!==true&&verifiedPhoto&&
+     cfg.visual_contract==="GIRO_EDITORIAL_FOTO_MANCHETE_RIO_V2"){
    const check=await db.from(table).select(
      "id,fonte_url,legenda,feed_image_url,story_image_url,editorial_expires_at,media_pipeline_version,status,visual_approved"
    ).eq("id",item.id).maybeSingle();
@@ -91,7 +102,7 @@ Deno.serve(async req=>{
    let official=false;
    try{const u=new URL(String(m?.fonte_url||""));official=u.protocol==="https:"&&u.hostname.endsWith(".gov.br")}catch{}
    const verified=official&&m?.status==="pendente"&&m.visual_approved===false&&
-     Number(m.media_pipeline_version)>=5&&Date.parse(String(m.editorial_expires_at||""))>Date.now()&&
+     Number(m.media_pipeline_version)===6&&Date.parse(String(m.editorial_expires_at||""))>Date.now()&&
      String(m.legenda||"").length>=400&&
      String(m.legenda||"").includes("Fonte: ")&&String(m.legenda||"").includes("Matéria original: ")&&
      String(m.feed_image_url||"").startsWith(url+"/storage/v1/object/public/news-images/auto/jpeg/feed/feed/")&&
@@ -100,20 +111,20 @@ Deno.serve(async req=>{
      String(m.story_image_url||"").endsWith(".jpg");
    if(verified){
      const approved=await db.from(table).update({
-       status:"aprovada",visual_approved:true,media_status:"feed_pronto",
+       status:"aprovada",visual_approved:true,media_status:"feed_foto_verificada",
        scheduled_at:new Date().toISOString(),erro:null
      }).eq("id",item.id).eq("status","pendente").eq("visual_approved",false)
        .select("id").maybeSingle();
      if(approved.error)throw approved.error;
      autoApproved=!!approved.data;
-     approvalReason=autoApproved?"original_official_art_verified":"approval_conflict";
+     approvalReason=autoApproved?"v6_licensed_photo_official_source_verified":"approval_conflict";
    }else approvalReason="official_source_or_media_contract_not_verified";
   }
   if(!autoApproved){
    const status=result.needs_approved_art?"aguardando_arte_tematica":
      channel==="reels"&&!videoReady?"aguardando_reel":"aguardando_revisao_visual";
    const saved=await db.from(table).update({
-     status:"pendente",media_status:status,media_pipeline_version:5,
+     status:"pendente",media_status:status,media_pipeline_version:channel==="feed"?6:5,
      publicar_story:channel==="stories",
      publicar_reel:channel==="reels"&&result.reel_recommended===true
    }).eq("id",item.id).eq("visual_approved",false);
@@ -123,7 +134,7 @@ Deno.serve(async req=>{
      auto_qa:approvalReason});
   }
   return response({success:true,channel,publication_id:item.id,processed:1,
-    media_status:"feed_pronto",auto_approved:true,auto_qa:approvalReason,
+    media_status:"feed_foto_verificada",auto_approved:true,auto_qa:approvalReason,
     verified_artwork_only:true,publication_not_attempted:true});
  }catch{return response({success:false,error:"independent_preparation_failed",no_publish:true},500)}
 });
