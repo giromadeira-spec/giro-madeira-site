@@ -38,6 +38,9 @@ Deno.serve(async req=>{
      .select("daily_goal,shorts_render_enabled,visual_template_version,editorial_queue_enabled")
      .eq("id","giro_madeira").single();
   if(settingsError)throw settingsError;
+  const lane=await db.from("giro_channel_settings").select("preparation_enabled").eq("channel","tiktok").single();
+  if(lane.error)throw lane.error;
+  if(!lane.data.preparation_enabled)return response({success:true,processed:0,reason:"preparation_disabled"});
   if(action==="status")return response({success:true,mode:"github_oidc",renderer_enabled:settings.shorts_render_enabled,daily_goal:settings.daily_goal});
   if(!["claim","complete","fail"].includes(action))return response({success:false,error:"invalid_action"},400);
   if(!settings.shorts_render_enabled)return response({success:true,processed:0,reason:"renderer_disabled"});
@@ -63,7 +66,7 @@ Deno.serve(async req=>{
     if(qe)throw qe;
     for(const item of items||[]){
       const scenes=item.scene_cards;
-      const finite=/(?<![\p{L}])(é|são|foi|foram|está|estão|estava|tem|têm|teve|terá|há|haverá|pode|podem|deve|devem|será|serão|disse|diz|afirma|afirmou|anunciou|determinou|determina|decidiu|investiga|investigam|prendeu|registra|registrou|cai|caiu|subiu|sobe|chega|chegou|fez|faz|marca|marcou|fará|reduziu|aumentou|planeja|planejam|recebeu|recebe|aponta|apontou|deixa|deixou|ocorreu|ocorre|difere|privatizará|ficou|mantém|confirmou|confirma|realizará|realizou|retotalizará|atingiu|atinge|segue|seguem|retoma|retomou|apresenta|apresentou|destaca|destacou|aprova|aprovou|rejeita|rejeitou|começa|começou|atuam|atua|traz|trouxe|anula|anulou|lançou|lança|prevê|previu|define|definiu|aciona|acionou|renova|renovam|renovaram|remove|removem|removeram|liberou|liberaram|garantiu|garantem|bloqueia|bloqueou|paralisa|paralisou|interrompe|interromperá|retorna|retornarão|afeta|afetará|registram|registraram|fica|ficará|indica|indicou|publicou|divulgou|desmentiu|provocou|adiou|retirou|enfrenta|sofreu|alertou|alerta|suspende|suspendeu|revela|revelou|prorroga|prorrogou|expande|amplia|vence|venceu|vencem|venceram|derrota|derrotou|goleia|goleou|golearam|empata|empatou|empataram|perde|perdeu|perderam|eliminou|elimina|eliminaram|classificou|classificaram|avancou|avancaram|terminou|terminaram|vitória|vitoria|informa|informou)(?![\p{L}])/iu;
+      const finite=/(?<![\p{L}])(é|são|foi|foram|está|estão|estava|estavam|tem|têm|teve|terá|há|haverá|pode|podem|poderá|deve|devem|será|serão|disse|diz|afirma|afirmou|anunciou|determinou|determina|decidiu|decide|investiga|investigam|investigou|prendeu|prenderam|registra|registrou|cai|caiu|subiu|sobe|chega|chegou|fez|faz|marca|marcou|dará|fará|reduziu|aumentou|planeja|planejam|recebeu|recebe|aponta|apontou|deixa|deixou|ocorreu|ocorre|difere|privatizará|ficou|ficaram|mantém|confirmou|confirma|realizará|realizou|retotalizará|atingiu|atinge|segue|seguem|retoma|retomou|apresenta|apresentou|explica|explicou|destaca|destacou|aprova|aprovou|rejeita|rejeitou|começa|começou|trabalham|trabalhou|atuam|atua|traz|trouxe|anula|anulou|lançou|lança|prevê|previu|define|definiu|obriga|obrigou|aciona|acionou|renova|renovam|renovaram|remove|removem|removeram|liberou|liberaram|garantiu|garantem|bloqueia|bloqueou|paralisa|paralisou|interrompe|interromperá|retorna|retornarão|afeta|afetará|registram|registraram|fica|ficará|indica|indicou|publicou|divulgou|desmentiu|provocou|adiou|retirou|enfrenta|sofreu|alertou|alerta|suspende|suspendeu|revela|revelou|prorroga|prorrogou|expande|amplia|vence|venceu|vencem|venceram|derrota|derrotou|goleia|goleou|golearam|empata|empatou|empataram|perde|perdeu|perderam|eliminou|elimina|eliminaram|classificou|classificaram|avancou|avancaram|terminou|terminaram|vitória|vitoria|informa|informou)(?![\p{L}])/iu;
       if(!Array.isArray(scenes)||scenes.some(v=>!finite.test(String(v))))continue;
 
       if(!Array.isArray(scenes)||scenes.length!==3 ||
@@ -75,6 +78,7 @@ Deno.serve(async req=>{
       const {data:pub}=await db.from("giro_radar_tiktok")
         .select("id,fonte_id,url,score,created_at").eq("id",item.source_id).maybeSingle();
       if(!pub || pub.url!==sourceUrl || Number(pub.score||0)<25)continue;
+      if(scenes.some(s=>/é redator|produção jornalística|conteúdos para plataformas digitais|biografia|sobre o autor/i.test(String(s))))continue;
       const {data:source}=await db.from("giro_madeira_fontes")
         .select("nome").eq("id",pub.fonte_id).maybeSingle();
       const uuid=crypto.randomUUID();
@@ -111,7 +115,7 @@ Deno.serve(async req=>{
   if(!Number.isSafeInteger(id)||id<1)return response({success:false,error:"invalid_queue_id"},400);
   const {data:row,error:re}=await db.from("giro_social_video_queue")
     .select("id,status,shorts_render_job_id,shorts_render_storage_path,shorts_render_version,provider_post_id")
-    .eq("id",id).maybeSingle();
+    .eq("id",id).eq("platform","tiktok").maybeSingle();
   if(re)throw re;
   if(!row||row.shorts_render_job_id!==jobId || row.status!=="aguardando_autorizacao"||
     row.provider_post_id||!row.shorts_render_storage_path)
@@ -155,3 +159,4 @@ Deno.serve(async req=>{
   return response({success:false,error:"bridge_operation_failed"},500);
  }
 });
+

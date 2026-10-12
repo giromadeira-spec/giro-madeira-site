@@ -27,6 +27,8 @@ function meaningfulSegments(title:string,summary:string,caption:string,source:st
  for(const raw of sourceSentences){
    const s=clean(raw).replace(/^[.!?\s-]+/,"").replace(/[.!?]+$/,"");
    if(!s||/^(foto|divulgacao|reproducao|crédito|credito):/i.test(s))continue;
+   // Author biographies and subscription boilerplate are not article facts.
+   if(/é redator|produção jornalística|conteúdos para plataformas digitais|sobre o autor|biografia|inscreva-se|acompanhar notícias/i.test(s))continue;
    // Never trim a sentence to fit the image: this can silently change the factual meaning.
    // Only a COMPLETE short sentence or a naturally delimited independent clause can be used.
    const candidate=s.length<=110?s:s.split(/[,;:]\s+/)[0];
@@ -147,3 +149,4 @@ Deno.serve(async req=>{
    return respond({success:false,error:"storyboard_internal_error"},500);
  }
 });
+

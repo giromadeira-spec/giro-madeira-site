@@ -41,6 +41,12 @@ def clean(s):
 
 def article_subject(title):
     t=title.lower()
+    # TikTok-only topic fixes; preserve the working Shorts classification.
+    if PLATFORM == "tiktok":
+        if re.search(r"\btse\b|tribunal|supremo|\bstf\b", t):
+            return "brazil electronic voting machine", "POLÍTICA"
+        if re.search(r"pres[ií]dio|prisional|policial penal|apreens[aã]o|apreende|mandado", t):
+            return "police car emergency lights", "SEGURANÇA"
     mapping=[
      (r"cadastro [uú]nico|cad[uú]nico|bolsa fam[ií]lia","cadastro unico editorial graphic","SERVIÇOS"),
      (r"mosquito|dengue|aedes|zika|sa[uú]de|vacina|hospital","mosquito aedes aegypti macro","SAÚDE"),
@@ -497,6 +503,14 @@ def render_self_test():
             raise RuntimeError("Unrelated printing-press photo passed semantic check")
         if not photo_matches_topic(query,"Police car emergency lights"):
             raise RuntimeError("Valid illustrative police photo rejected")
+    if PLATFORM == "tiktok":
+        for headline, expected in (
+            ("Operação apreende trator, caminhão e madeira em Terra Indígena em RO", ("police car emergency lights", "SEGURANÇA")),
+            ("Ocorrência no presídio Urso Panda relata apreensão de material proibido e denúncia entre servidores", ("police car emergency lights", "SEGURANÇA")),
+            ("TSE derruba suspensão do canal Exército do Lula", ("brazil electronic voting machine", "POLÍTICA")),
+        ):
+            if article_subject(headline) != expected:
+                raise RuntimeError("TikTok headline misclassified: " + headline)
     if article_subject("Evento inédito em Porto Velho")[0]:
         raise RuntimeError("Unknown editorial subject accepted unrelated default photo")
     with tempfile.TemporaryDirectory(prefix="giro-shorts-offline-qa-") as temporary:
@@ -619,4 +633,5 @@ if __name__=="__main__":
         render_self_test()
     else:
         main()
+
 
