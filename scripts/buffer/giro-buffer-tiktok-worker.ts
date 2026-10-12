@@ -17,7 +17,7 @@ async function bufferRequest(query:string,variables?:Record<string,unknown>){
  return json.data;
 }
 async function reconcile(organizationId:string,channelId:string){
- const threshold=new Date(Date.now()-45*60000).toISOString();
+ const threshold=new Date(Date.now()-5*60000).toISOString();
  const {data:pending,error}=await db.from("giro_buffer_tiktok_jobs")
    .select("id,buffer_post_id,created_at,updated_at").eq("status","queued")
    .not("buffer_post_id","is",null).lt("updated_at",threshold).limit(8);
@@ -103,6 +103,16 @@ Deno.serve(async req=>{
      }
      return respond({ok:true,channels:found});
    }catch{return respond({ok:false,error:"buffer_api_lookup_failed"},502)}
+ }
+
+ // Delivery-only reconciliation: query existing posts; never claim or create a post.
+ if(action==="reconcile"){
+   if(!BUFFER_KEY||!cfg.channel_id||!cfg.organization_id)
+     return respond({ok:false,error:"buffer_connection_not_configured"},503);
+   try{
+     const reconciliation=await reconcile(cfg.organization_id,cfg.channel_id);
+     return respond({ok:true,reconciliation,no_new_posts:true});
+   }catch{return respond({ok:false,error:"delivery_reconciliation_failed"},502);}
  }
 
  // Isolated, non-public connection test. The Buffer API documents
