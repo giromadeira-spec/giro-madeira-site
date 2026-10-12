@@ -70,7 +70,7 @@ def build_graph(checkpointer, consult=audit.consult_agent):
 
     def reviewer(state: AuditState):
         if not state["use_ai"]:
-            return {"reviewer": "Não solicitado: revisão IA depende de ativação e chave."}
+            return {"reviewer": "Análise IA desativada por preferência do responsável: auditoria sem API."}
         evidence = json.dumps(state["checks"], ensure_ascii=False)
         return {"reviewer": safe_consult("Revisor de arquitetura e testes", audit.REVIEWER_INSTRUCTIONS,
                                     evidence + "\nParecer do auditor:\n" + state["auditor"][:8_000])}
@@ -124,7 +124,7 @@ def run_audit(root: Path, report: Path, checkpoint: Path, task_id: str,
     result += ("**Etapas concluídas.**\n" if complete else
                "**Etapa IA não concluída.** Evidência e checkpoints preservados; "
                "retome com o mesmo task-id/checkpoint após corrigir a causa. "
-               "Verifique chave, modelo, saldo, rede e limite de saída.\n")
+               "Chamadas à API desativadas pela política de zero gasto adicional.\n")
     report.write_text(result, encoding="utf-8")
     if not complete:
         return 2
