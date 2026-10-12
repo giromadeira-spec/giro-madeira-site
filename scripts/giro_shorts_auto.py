@@ -45,6 +45,8 @@ def article_subject(title):
     if PLATFORM == "tiktok":
         if re.search(r"\btse\b|tribunal|supremo|\bstf\b", t):
             return "justice gavel", "POLÍTICA"
+        if re.search(r"br-\d+|colis[aã]o|tr[aâ]nsito|atropel|acidente.*(?:rodovia|carro|ve[ií]culo)", t):
+            return "road traffic highway", "TRÂNSITO"
         if re.search(r"pres[ií]dio|prisional|policial penal|apreens[aã]o|apreende|mandado", t):
             return "police car emergency lights", "SEGURANÇA"
     mapping=[
@@ -115,6 +117,7 @@ def photo_matches_topic(topic, title):
     }
     if PLATFORM == "tiktok":
         groups["justice gavel"] = r"\b(gavel|gavels|martelo de juiz)\b"
+        groups["road traffic highway"] = r"\b(highway traffic|road traffic|motorway traffic|traffic on|trafego|tráfego)\b"
     pattern=groups.get(topic)
     if topic=="aircraft airplane" and re.search(r"\b(toy|model|paper plane|simulator|diagram|poster|illustration|drawing|game|cartoon)\b",title,re.I):
       return False
@@ -124,6 +127,7 @@ def licensed_commons_download(topic):
     """Fallback: Wikimedia Commons photo with per-file licensing, subject and bytes verified."""
     endpoint="https://commons.wikimedia.org/w/api.php"
     fallback_terms={
+      "road traffic highway":["highway traffic", "road traffic"],
       "justice gavel":["gavel", "judge gavel"],
       "world globe earth":["EXACT:File:The Earth seen from Apollo 17.jpg", "earth globe", "world globe", "globe"],
       "brazil electronic voting machine":["urna eletrônica", "electronic voting machine"],
@@ -511,6 +515,7 @@ def render_self_test():
             ("Operação apreende trator, caminhão e madeira em Terra Indígena em RO", ("police car emergency lights", "SEGURANÇA")),
             ("Ocorrência no presídio Urso Panda relata apreensão de material proibido e denúncia entre servidores", ("police car emergency lights", "SEGURANÇA")),
             ("TSE derruba suspensão do canal Exército do Lula", ("justice gavel", "POLÍTICA")),
+            ("Acidente na BR-393 deixa cinco mortos e nove feridos no RJ", ("road traffic highway", "TRÂNSITO")),
         ):
             if article_subject(headline) != expected:
                 raise RuntimeError("TikTok headline misclassified: " + headline)
