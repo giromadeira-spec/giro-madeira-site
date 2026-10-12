@@ -207,15 +207,11 @@ function prepareBrandLogo(){
 }
 
 function brandHeader(x:number,y:number,scale=1){
-  // Official circular locomotive logo (repository asset), not a recreated brand.
-  const w=Math.round(202*scale),h=Math.round(202*scale);
-  const tx=x+Math.round(222*scale);
-  return '<g>'+
-    '<rect x="'+(x-9)+'" y="'+(y-4)+'" width="'+Math.round(665*scale)+'" height="'+Math.round(202*scale)+'" rx="13" fill="#061523" opacity=".80"/>'+
-    '<image href="'+brandLogoUri+'" x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" preserveAspectRatio="xMidYMid meet"/>'+
-    '<text x="'+tx+'" y="'+(y+Math.round(81*scale))+'" font-family="Anton" font-size="'+Math.round(91*scale)+'" font-weight="900" letter-spacing="-1" fill="#fff">GIRO</text>'+
-    '<text x="'+tx+'" y="'+(y+Math.round(160*scale))+'" font-family="Anton" font-size="'+Math.round(67*scale)+'" font-weight="900" letter-spacing="-1" fill="#f4b21a">MADEIRA</text>'+
-    '</g>';
+  // The Shorts/TikTok reference has a SINGLE authentic circular logo.
+  // Never add a synthetic second wordmark, logo panel or branding box.
+  const w=Math.round(235*scale);
+  return '<image href="'+brandLogoUri+'" x="'+x+'" y="'+y+
+    '" width="'+w+'" height="'+w+'" preserveAspectRatio="xMidYMid meet"/>';
 }
 function shouldReel(title:string,category:string,urgent:boolean){
   // Reserve Reels for breaking news, public safety, notable events and visual stories.
@@ -508,69 +504,54 @@ function headlineBlockOfficial(lines:string[],x:number,y:number,fs:number,lh:num
     lines.map((l,i)=>'<tspan x="'+x+'" dy="'+(i===0?0:lh)+'" fill="'+(i===1?"#FFCC1C":"#FFFFFF")+'">'+esc(l)+'</tspan>').join('') + '</text>';
 }
 function makeSvg(kind:"feed"|"story",title:string,summary:string,source:string,category:string,bg:string,urgent=false,photoCredit=""){
+  // Same approved photographic design family as Shorts and TikTok, with
+  // channel-specific safe areas. Absolutely no synthetic fallback shield/art.
   const portrait=kind==="story",W=1080,H=portrait?1920:1080;
-  const pad=portrait?70:60;
-  const categoryY=portrait?982:560, titleY=portrait?1200:671, maxBaseline=portrait?1660:918;
-  const layout=fitHeadline(title,W-2*pad,portrait?7:6,portrait?79:66,portrait?48:40,
-       maxBaseline-titleY,portrait?1.13:1.12);
-  const lh=Math.round(layout.size*(portrait?1.13:1.12));
-  const lastBaseline=titleY+(layout.lines.length-1)*lh;
-  if(lastBaseline>maxBaseline)throw Error("Manchete ultrapassa área segura da arte.");
-  const photo=bg.startsWith("data:image/");
-  const cat=clean(category||"GIRO AGORA").toUpperCase().slice(0,20);
-  const urgentTag=urgent?"URGENTE":"";
-  const catColor="#FFC516"; // Faixa oficial sempre amarela
-  const background=photo
-    ?'<image href="'+bg+'" x="0" y="0" width="'+W+'" height="'+H+'" preserveAspectRatio="xMidYMid slice"/>'
-    :originalBackdrop(kind,category);
-  const gradient='<defs>'+
-    '<linearGradient id="newsShade" x1="0" y1="0" x2="0" y2="1">'+
-    '<stop offset="0" stop-color="#04101c" stop-opacity=".65"/>'+
-    '<stop offset=".18" stop-color="#04101c" stop-opacity=".08"/>'+
-    '<stop offset=".43" stop-color="#03101d" stop-opacity=".25"/>'+
-    '<stop offset=".56" stop-color="#03101d" stop-opacity=".83"/>'+
-    '<stop offset=".75" stop-color="#020b15" stop-opacity=".97"/>'+
-    '<stop offset="1" stop-color="#020b15" stop-opacity="1"/></linearGradient>'+
-    '<linearGradient id="goldBar"><stop stop-color="#f7b414"/><stop offset="1" stop-color="#f9d523"/></linearGradient>'+
-    '</defs>';
-  const safeSummary=clean(summary);
-  // Don't clip facts; show subtitle only if it fully fits within reserved space.
-  const first=safeSummary.match(/^.{20,155}?[.!?](?:\s|$)/)?.[0]?.trim()||"";
-  const lines=first?wrapAll(first,portrait?50:52):[];
-  const canShow=lines.length>0&&lines.length<=2&&lastBaseline<=(portrait?1450:779);
-  const sub=canShow
-    ?textBlock(lines,pad,lastBaseline+(portrait?75:53),portrait?34:25,portrait?45:35,"#f3f6fc"):"";
-  const logo=brandHeader(portrait?52:44,portrait?41:29,portrait?.72:.60);
-  const location=portrait?"GIRO MADEIRA • RONDÔNIA":"PORTO VELHO • RONDÔNIA";
-  const locW=portrait?395:348,locX=W-locW-48,locY=portrait?48:38;
-  const tagW=Math.min(500,Math.max(195,cat.length*(portrait?22:19)+75));
-  const cY=categoryY+(portrait?48:44);
-  const footerY=portrait?1840:1033;
-  const footerBorder=portrait?1760:962;
-  const badgeY=portrait?1716:944; // leave clearance below long headlines
-  const credit=clean(photoCredit).slice(0,64);
-  const footSource=clean(source||"Giro Madeira").slice(0,36);
-  const rioStrip=rioFooterSvg(W,H,portrait);
-  const graphic= '<svg xmlns="http://www.w3.org/2000/svg" width="'+W+'" height="'+H+'" viewBox="0 0 '+W+' '+H+'">'+
-    gradient+background+
+  if(!bg.startsWith("data:image/"))throw new Error("visual_contract_photo_hero_required");
+  const pad=portrait?66:58;
+  const categoryY=portrait?930:545,titleY=portrait?1090:652,maxBaseline=portrait?1550:908;
+  const layout=fitHeadline(title,W-2*pad,portrait?7:7,portrait?80:68,portrait?43:37,
+    maxBaseline-titleY,portrait?1.12:1.12);
+  const lineHeight=Math.round(layout.size*1.12);
+  const last=titleY+(layout.lines.length-1)*lineHeight;
+  if(last>maxBaseline)throw new Error("visual_contract_headline_outside_safe_area");
+  const cat=clean(category||"GIRO AGORA").toUpperCase().slice(0,22);
+  const tagW=Math.min(735,Math.max(220,cat.length*(portrait?23:19)+90));
+  const footerY=portrait?1842:1038;
+  const brand=brandHeader(portrait?56:51,portrait?55:42,portrait?1.02:.86);
+  const photo='<image href="'+bg+'" x="0" y="0" width="'+W+'" height="'+H+'" preserveAspectRatio="xMidYMid slice"/>';
+  const gradient='<defs><linearGradient id="newsShade" x1="0" y1="0" x2="0" y2="1">'+
+    '<stop offset="0" stop-color="#04101c" stop-opacity=".55"/>'+
+    '<stop offset=".20" stop-color="#04101c" stop-opacity=".08"/>'+
+    '<stop offset=".39" stop-color="#04101c" stop-opacity=".17"/>'+
+    '<stop offset=".57" stop-color="#020c18" stop-opacity=".76"/>'+
+    '<stop offset=".83" stop-color="#020912" stop-opacity=".97"/>'+
+    '<stop offset="1" stop-color="#020912" stop-opacity="1"/></linearGradient></defs>';
+  const flag='<path d="M'+pad+' '+categoryY+' H'+(pad+tagW)+
+    ' L'+(pad+tagW-24)+' '+(categoryY+66)+' H'+pad+'Z" fill="#ffcc1c"/>'+
+    '<text x="'+(pad+23)+'" y="'+(categoryY+46)+'" font-family="Anton" font-size="'+(portrait?43:38)+
+    '" fill="#071526">'+esc(cat)+'</text>'+
+    '<path d="M'+(pad+tagW+9)+' '+(categoryY+62)+' H'+(W-pad)+
+    '" stroke="#ffcc1c" stroke-width="5"/>';
+  const credit='IMAGEM ILUSTRATIVA';
+  const labelY=portrait?878:491;
+  const illustrative='<rect x="'+pad+'" y="'+(labelY-28)+'" width="294" height="42" rx="4" fill="#041526" opacity=".91"/>'+
+    '<text x="'+(pad+10)+'" y="'+(labelY+1)+'" font-family="Inter" font-weight="800" font-size="20" fill="#fff">'+credit+'</text>';
+  const sourceName=clean(source||"Giro Madeira").slice(0,37);
+  const urgentTag=urgent?
+    '<rect x="799" y="57" width="231" height="58" rx="5" fill="#dc1729"/>'+
+    '<text x="814" y="98" font-family="Anton" font-size="35" fill="#fff">URGENTE</text>':"";
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="'+W+'" height="'+H+
+   '" viewBox="0 0 '+W+' '+H+'">'+gradient+photo+
     '<rect width="'+W+'" height="'+H+'" fill="url(#newsShade)"/>'+
-    '<path d="M0 0 L'+(portrait?180:135)+' 0 L0 '+(portrait?200:145)+'Z" fill="#f9bd12" opacity=".88"/>'+
-    '<path d="M'+(W-210)+' '+(portrait?790:430)+' L'+W+' '+(portrait?705:370)+' L'+W+' '+(portrait?745:400)+' L'+(W-210)+' '+(portrait?830:460)+'Z" fill="#e6b018" opacity=".7"/>'+
-    logo+
-    '<rect x="'+locX+'" y="'+locY+'" width="'+locW+'" height="'+(portrait?55:48)+'" rx="9" fill="#061629" fill-opacity=".94" stroke="#FFCB16" stroke-width="2"/>'+
-    '<text x="'+(locX+locW/2)+'" y="'+(locY+(portrait?37:32))+'" text-anchor="middle" font-family="Inter" font-size="'+(portrait?19:18)+'" font-weight="800" fill="#ffd02c">'+esc(location)+'</text>'+
-    '<rect x="'+pad+'" y="'+categoryY+'" width="'+tagW+'" height="'+(portrait?68:62)+'" rx="7" fill="'+catColor+'"/>'+
-    '<text x="'+(pad+20)+'" y="'+cY+'" font-family="Inter" font-size="'+(portrait?36:32)+'" font-weight="900" fill="'+"#061526"+'">'+esc(cat)+'</text>'+
-    (urgentTag?'<g><rect x="'+(W-289)+'" y="'+(categoryY-8)+'" width="224" height="67" rx="5" fill="#da142d"/>'+
-    '<text x="'+(W-177)+'" y="'+(categoryY+37)+'" text-anchor="middle" font-family="Inter" font-size="32" font-weight="900" fill="#fff">URGENTE</text></g>':"")+
-    headlineBlockOfficial(layout.lines,pad,titleY,layout.size,lh)+sub+rioStrip+
-    '<rect x="'+pad+'" y="'+footerBorder+'" width="'+(W-2*pad)+'" height="5" fill="#f6bd16"/>'+
-    '<text x="'+pad+'" y="'+footerY+'" font-family="Inter" font-size="'+(portrait?29:25)+'" font-weight="850" fill="#fff">@GIRO_MADEIRA</text>'+
-    '<text x="'+(W-pad)+'" y="'+footerY+'" text-anchor="end" font-family="Inter" font-size="'+(portrait?22:18)+'" font-weight="650" fill="#d6dfeb">FONTE: '+esc(footSource)+'</text>'+
-    (photo?'<text x="'+pad+'" y="'+badgeY+'" font-family="Inter" font-size="'+(portrait?21:16)+'" font-weight="750" fill="#ffce39">IMAGEM ILUSTRATIVA • '+esc(credit||"WIKIMEDIA COMMONS")+'</text>':
-    '<text x="'+pad+'" y="'+badgeY+'" font-family="Inter" font-size="'+(portrait?21:16)+'" font-weight="750" fill="#ffce39">ARTE EDITORIAL ILUSTRATIVA</text>')+
-    '</svg>';
-  return graphic;
+    brand+urgentTag+illustrative+flag+
+    headlineBlockOfficial(layout.lines,pad,titleY,layout.size,lineHeight)+
+    rioFooterSvg(W,H,portrait)+
+    '<path d="M'+pad+' '+(portrait?1761:961)+' H'+(W-pad)+'" stroke="#ffcc1c" stroke-width="6"/>'+
+    '<text x="'+pad+'" y="'+footerY+'" font-family="Anton" font-size="'+(portrait?33:27)+
+    '" fill="#fff">@GIRO_MADEIRA</text>'+
+    '<text x="'+(W-pad)+'" y="'+footerY+'" text-anchor="end" font-family="Inter" font-weight="750" font-size="'+(portrait?23:19)+
+    '" fill="#fff">FONTE: '+esc(sourceName)+'</text></svg>';
 }
 
 async function render(svg:string,font:Uint8Array){await prepareBrandLogo();const displayFont=await getDisplayFont();return new Resvg(svg,{font:{fontBuffers:[font,displayFont],loadSystemFonts:false,defaultFontFamily:"Inter"}}).render().asPng();}
@@ -644,8 +625,7 @@ Deno.serve(async(req)=>{
           new Promise<null>(resolve=>setTimeout(()=>resolve(null),12500))
         ]);
       const isOfficial=new URL(String(item.fonte_url||"https://invalid.example")).hostname.endsWith(".gov.br");
-      if(!photo&&!(isOfficial&&String(item.legenda||"").length>=250&&category!=="GIRO AGORA"))
-        throw new Error("Foto temática validada ausente. Prévia não aprovada: não usar imagem desconexa.");
+      if(!photo)throw new Error("Foto temática licenciada ausente; arte visual não autorizada. Sem fallback.");
       const attribution=photo?(photo.creator+" • "+photo.license):"";
       const feedSvg=makeSvg("feed",title,clean(item.resumo),clean(item.fonte_nome)||"Giro Madeira",category,photo?.dataUri||"",item.urgente===true,attribution);
       const storySvg=makeSvg("story",title,clean(item.resumo),clean(item.fonte_nome)||"Giro Madeira",category,photo?.dataUri||"",item.urgente===true,attribution);
@@ -751,9 +731,8 @@ Deno.serve(async(req)=>{
       ]);
     // Preservar a pauta e a legenda mesmo quando não há imagem adequada/licenciada.
     // Nunca publicar fotografia genérica ou afirmar que a arte está aprovada.
-    const officialSource=new URL(sourceLink).hostname.endsWith(".gov.br");
-    const ownVerifiedIllustration=!photo&&officialSource&&article.length>=280&&originalText.length>=250&&category!=="GIRO AGORA";
-    if(!photo&&!ownVerifiedIllustration){
+    // Never auto-render the abstract shields/background that produced the bad Feed post.
+    if(!photo){
       const draftCaption=`${originalText}\n\nFonte: ${source}\nMatéria original: ${sourceLink}\n\nARTE ILUSTRATIVA PENDENTE DE REVISÃO.\n\n#GiroMadeira #PortoVelho #Rondônia`;
       const pending=await sb.from(publicationTable).update({
         titulo:title,resumo:desc||item.resumo||null,categoria:category,
@@ -774,8 +753,8 @@ Deno.serve(async(req)=>{
         visual_mode:"no_verified_photo",reason:"Foto temática licenciada não encontrada; pauta e legenda preservadas."
       }),{headers:H});
     }
-    const attribution=photo?photo.creator+" • "+photo.license:"";
-    const bg=photo?.dataUri||"";
+    const attribution=photo.creator+" • "+photo.license;
+    const bg=photo.dataUri;
     await prepareBrandLogo();await ensureWasm(); const font=await getFont();
     const feed=await render(makeSvg("feed",title,desc,source,category,bg,item.urgente===true,attribution),font);
     const story=await render(makeSvg("story",title,desc,source,category,bg,item.urgente===true,attribution),font);
@@ -790,7 +769,7 @@ Deno.serve(async(req)=>{
     // A publisher's embedded video is not automatically licensed for republication.
     // Keep its source URL only; original Reel media is made by the approved worker.
     const vid={source:videoRaw,publicUrl:""};
-    const photoCredit=photo?"\nImagem ilustrativa: "+photo.creator+" ("+photo.license+") — "+photo.source:"\nArte editorial original ilustrativa do Giro Madeira; não é fotografia da ocorrência.";
+    const photoCredit="\nImagem ilustrativa: "+photo.creator+" ("+photo.license+") — "+photo.source;
     const legenda=`${originalText}\n\nFonte: ${source}\nMatéria original: ${sourceLink}${photoCredit}\n\n#GiroMadeira #PortoVelho #Rondônia`;
     const upd:any={
       titulo:title,resumo:desc||item.resumo||null,categoria:category,legenda,
@@ -800,7 +779,7 @@ Deno.serve(async(req)=>{
       status:"pendente",erro:null,story_erro:null,reel_erro:null,media_pipeline_version:5,media_status:"feed_pronto"
     };
     const up=await sb.from(publicationTable).update(upd).eq("id",id); if(up.error) throw up.error;
-    return new Response(JSON.stringify({success:true,id,feed_image_url:feedUrl,story_image_url:storyUrl,reel_ready:Boolean(item.video_url),reel_recommended:reelRecommended,reel_interesse_ro:reelInterestRo,reel_generated:false,source_image_url:imageUrl||null,visual_mode:photo?"licensed_editorial_photo":"original_illustration",illustrative_photo_credit:photo?{creator:photo.creator,license:photo.license,source:photo.source}:null}),{headers:H});
+    return new Response(JSON.stringify({success:true,id,feed_image_url:feedUrl,story_image_url:storyUrl,reel_ready:Boolean(item.video_url),reel_recommended:reelRecommended,reel_interesse_ro:reelInterestRo,reel_generated:false,source_image_url:imageUrl||null,visual_mode:"licensed_editorial_photo",illustrative_photo_credit:{creator:photo.creator,license:photo.license,source:photo.source}}),{headers:H});
   }catch(e){
     return new Response(JSON.stringify({success:false,error:e instanceof Error?e.message:String(e)}),{status:500,headers:H});
   }
