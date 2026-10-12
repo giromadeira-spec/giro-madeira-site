@@ -384,9 +384,18 @@ Deno.serve(async req=>{
     await db.from("giro_buffer_tiktok_jobs").update({status:"review_required",last_error:"public_video_not_reachable_or_wrong_type",updated_at:new Date().toISOString()}).eq("id",jobId);
     return respond({ok:false,processed:0,error:"public_video_not_reachable_or_wrong_type"},422);
    }
+   const source=await db.from("giro_social_video_queue")
+      .select("source_url,shorts_image_credit").eq("id",job.source_queue_id).eq("platform","tiktok").maybeSingle();
+   if(source.error || !source.data || !/^https:\/\//.test(String(source.data.source_url||"")) || !source.data.shorts_image_credit){
+     await db.from("giro_buffer_tiktok_jobs").update({status:"review_required",last_error:"source_or_image_attribution_missing",updated_at:new Date().toISOString()}).eq("id",jobId).eq("status","claimed");
+     return respond({ok:false,processed:0,error:"source_or_image_attribution_missing"},422);
+   }
+   const caption=String(job.caption)+"\n\nFonte: "+source.data.source_url+"\nImagem ilustrativa: "+source.data.shorts_image_credit;
+   const savedCaption=await db.from("giro_buffer_tiktok_jobs").update({caption}).eq("id",jobId).eq("status","claimed");
+   if(savedCaption.error)return respond({ok:false,processed:0,error:"caption_save_failed_do_not_send"},500);
    const gql="mutation CreatePost($input:CreatePostInput!){createPost(input:$input){... on PostActionSuccess{post{id,dueAt,status}} ... on MutationError{message}}}";
    const variables={input:{
-      channelId:cfg.channel_id,text:String(job.caption),schedulingType:"automatic",
+      channelId:cfg.channel_id,text:caption,schedulingType:"automatic",
       mode:"shareNow",saveToDraft:false,aiAssisted:true,
       metadata:{tiktok:{isAiGenerated:true}},
       assets:[{video:{url:videoUrl}}]
