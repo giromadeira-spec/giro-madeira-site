@@ -13,6 +13,17 @@ class AgentAuditTests(unittest.TestCase):
             self.assertTrue(any(c["status"] == "FAIL" for c in checks))
             self.assertIn("FAIL", render_report(checks))
 
+    def test_invalid_active_workflow_fails_without_leaking_source(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / ".github/workflows/broken.yml"
+            path.parent.mkdir(parents=True)
+            path.write_text("key: [\nPRIVATE_SOURCE_MARKER", encoding="utf-8")
+            checks = build_checks(root)
+            found = next(c for c in checks if c["name"] == "YAML inválido: broken.yml")
+            self.assertEqual(found["status"], "FAIL")
+            self.assertNotIn("PRIVATE_SOURCE_MARKER", render_report(checks))
+
     def test_complete_fixture_read_only(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
