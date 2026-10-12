@@ -75,11 +75,55 @@ Deno.serve(async req=>{
    const rd=await reel.json().catch(()=>({}));videoReady=reel.ok&&rd.success===true&&!!rd.video_url;
    if(!videoReady)await db.from(table).update({reel_erro:String(rd.error||"video_pending").slice(0,500)}).eq("id",item.id);
   }
-  // Each format has its own row, approval and lifecycle. No automatic visual approval.
-  const status=result.needs_approved_art?"aguardando_arte_tematica":channel==="reels"&&!videoReady?"aguardando_reel":"aguardando_revisao_visual";
-  const saved=await db.from(table).update({status:"pendente",media_status:status,media_pipeline_version:5,publicar_story:channel==="stories",publicar_reel:channel==="reels"&&result.reel_recommended===true})
-    .eq("id",item.id).eq("visual_approved",false);
-  if(saved.error)throw saved.error;
-  return response({success:true,channel,publication_id:item.id,processed:1,no_publish:true,media_status:status,video_ready:videoReady,awaiting_visual_approval:true});
+  // Each channel owns its own approval and final media. In production, only
+  // deterministic, self-authored graphics backed by an accessible official
+  // Brazilian government article may pass the automated artwork contract.
+  // Third-party photographs and inaccessible sources stay under human review.
+  let autoApproved=false;
+  let approvalReason="awaiting_visual_review";
+  if(channel==="feed"&&result.needs_approved_art!==true&&
+     result.visual_mode==="original_illustration"){
+   const check=await db.from(table).select(
+     "id,fonte_url,legenda,feed_image_url,story_image_url,editorial_expires_at,media_pipeline_version,status,visual_approved"
+   ).eq("id",item.id).maybeSingle();
+   if(check.error)throw check.error;
+   const m=check.data;
+   let official=false;
+   try{const u=new URL(String(m?.fonte_url||""));official=u.protocol==="https:"&&u.hostname.endsWith(".gov.br")}catch{}
+   const verified=official&&m?.status==="pendente"&&m.visual_approved===false&&
+     Number(m.media_pipeline_version)>=5&&Date.parse(String(m.editorial_expires_at||""))>Date.now()&&
+     String(m.legenda||"").length>=400&&
+     String(m.legenda||"").includes("Fonte: ")&&String(m.legenda||"").includes("Matéria original: ")&&
+     String(m.feed_image_url||"").startsWith(url+"/storage/v1/object/public/news-images/auto/jpeg/feed/feed/")&&
+     String(m.feed_image_url||"").endsWith(".jpg")&&
+     String(m.story_image_url||"").startsWith(url+"/storage/v1/object/public/news-images/auto/jpeg/feed/story/")&&
+     String(m.story_image_url||"").endsWith(".jpg");
+   if(verified){
+     const approved=await db.from(table).update({
+       status:"aprovada",visual_approved:true,media_status:"feed_pronto",
+       scheduled_at:new Date().toISOString(),erro:null
+     }).eq("id",item.id).eq("status","pendente").eq("visual_approved",false)
+       .select("id").maybeSingle();
+     if(approved.error)throw approved.error;
+     autoApproved=!!approved.data;
+     approvalReason=autoApproved?"original_official_art_verified":"approval_conflict";
+   }else approvalReason="official_source_or_media_contract_not_verified";
+  }
+  if(!autoApproved){
+   const status=result.needs_approved_art?"aguardando_arte_tematica":
+     channel==="reels"&&!videoReady?"aguardando_reel":"aguardando_revisao_visual";
+   const saved=await db.from(table).update({
+     status:"pendente",media_status:status,media_pipeline_version:5,
+     publicar_story:channel==="stories",
+     publicar_reel:channel==="reels"&&result.reel_recommended===true
+   }).eq("id",item.id).eq("visual_approved",false);
+   if(saved.error)throw saved.error;
+   return response({success:true,channel,publication_id:item.id,processed:1,no_publish:true,
+     media_status:status,video_ready:videoReady,awaiting_visual_approval:true,
+     auto_qa:approvalReason});
+  }
+  return response({success:true,channel,publication_id:item.id,processed:1,
+    media_status:"feed_pronto",auto_approved:true,auto_qa:approvalReason,
+    verified_artwork_only:true,publication_not_attempted:true});
  }catch{return response({success:false,error:"independent_preparation_failed",no_publish:true},500)}
 });
