@@ -21,3 +21,11 @@ assert.equal(articleIsFresh(new Date(now-25*3600000).toISOString(),'https://site
 assert.equal(articleIsFresh('', 'https://site.com/undated-news',now),false);
 assert.equal(articleIsFresh(new Date(now).toISOString(),'https://site.com/undated-news',now),true);
 console.log('Article-level dates prevent old or undated reports from being treated as current.');
+
+const {sourceRecovery}=await import('../supabase/functions/giro-tiktok-preparar-storyboard/recovery-policy.ts');
+assert.equal(sourceRecovery('source_http_429',0),'retry');
+assert.equal(sourceRecovery('source_http_503',1),'retry');
+assert.equal(sourceRecovery('source_http_429',2),'hold');
+assert.equal(sourceRecovery('article_date_unverified_or_outdated',0),null);
+assert.equal(sourceRecovery('source_http_401',0),null);
+console.log('Transient source failures resume the same item with bounded retries; invalid facts remain blocked.');

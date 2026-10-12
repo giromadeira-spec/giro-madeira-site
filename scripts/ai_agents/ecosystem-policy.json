@@ -1,0 +1,16 @@
+{
+  "channel": "tiktok",
+  "scope_priority": ["brasil", "mundo", "rondonia"],
+  "require_major_impact": true,
+  "require_article_date": true,
+  "max_age_hours": 24,
+  "paid_llm_calls": false,
+  "retry_limit": 2,
+  "resume_existing_item": true,
+  "resend_uncertain_delivery": false,
+  "posting_timezone": "America/Porto_Velho",
+  "posting_slots": ["06:30", "10:00", "13:30", "17:00", "20:30"],
+  "daily_limit": 5,
+  "min_interval_minutes": 90,
+  "other_channels_mutable": false
+}

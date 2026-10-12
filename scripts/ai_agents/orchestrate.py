@@ -22,7 +22,7 @@ if __package__ in (None, ""):
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
-from scripts.ai_agents import audit
+from scripts.ai_agents import audit, ecosystem
 
 
 class AuditState(TypedDict, total=False):
@@ -34,12 +34,15 @@ class AuditState(TypedDict, total=False):
     complete: bool
 
 
-def fingerprint(root: Path, use_ai: bool) -> str:
+def fingerprint(root: Path, use_ai: bool, tools: bool = False) -> str:
     digest = hashlib.sha256()
-    digest.update(b"giro-audit-graph-v1")
+    digest.update(b"giro-audit-graph-v2")
+    digest.update(str(tools).encode())
     model = os.environ.get("OPENAI_MODEL", "").strip() or audit.DEFAULT_MODEL
     digest.update(json.dumps({"use_ai": use_ai, "model": model if use_ai else "offline"}).encode())
     paths = set(audit.REQUIRED)
+    if tools:
+        paths.update(('scripts/ai_agents/ecosystem-policy.json','scripts/ai_agents/toolchain/package-lock.json'))
     for folder in (".github/workflows", "scripts/ai_agents"):
         paths.update(p.relative_to(root).as_posix() for p in (root / folder).glob("*")
                      if p.suffix in (".py", ".yml", ".yaml", ".txt"))
@@ -50,7 +53,7 @@ def fingerprint(root: Path, use_ai: bool) -> str:
     return digest.hexdigest()
 
 
-def build_graph(checkpointer, consult=audit.consult_agent):
+def build_graph(checkpointer, consult=audit.consult_agent, *, root=Path.cwd(), tools=False):
     def safe_consult(role, instructions, evidence):
         try:
             result = consult(role, instructions, evidence)
@@ -76,10 +79,14 @@ def build_graph(checkpointer, consult=audit.consult_agent):
                                     evidence + "\nParecer do auditor:\n" + state["auditor"][:8_000])}
 
     builder = StateGraph(AuditState)
+    def tool_checks(state: AuditState):
+        return {"checks": state["checks"] + (ecosystem.inspect_tools(root) if tools else [])}
+    builder.add_node("ferramentas", tool_checks)
     builder.add_node("auditor", auditor)
     builder.add_node("revisor", reviewer)
     builder.add_node("concluir", lambda state: {"complete": True})
-    builder.add_edge(START, "auditor")
+    builder.add_edge(START, "ferramentas")
+    builder.add_edge("ferramentas", "auditor")
     builder.add_edge("auditor", "revisor")
     builder.add_edge("revisor", "concluir")
     builder.add_edge("concluir", END)
@@ -87,9 +94,9 @@ def build_graph(checkpointer, consult=audit.consult_agent):
 
 
 def run_audit(root: Path, report: Path, checkpoint: Path, task_id: str,
-              use_ai: bool = False, consult=audit.consult_agent) -> int:
+              use_ai: bool = False, consult=audit.consult_agent, tools: bool = False) -> int:
     checks = audit.build_checks(root)
-    signature = fingerprint(root, use_ai)
+    signature = fingerprint(root, use_ai, tools)
     report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(audit.render_report(checks), encoding="utf-8")
     checkpoint.parent.mkdir(parents=True, exist_ok=True)
@@ -97,7 +104,7 @@ def run_audit(root: Path, report: Path, checkpoint: Path, task_id: str,
     # Estado contém somente dict/list/str/bool, sem pickle nem classes externas.
     serde = JsonPlusSerializer(allowed_msgpack_modules=[], pickle_fallback=False)
     with sqlite3.connect(str(checkpoint), check_same_thread=False) as connection:
-        graph = build_graph(SqliteSaver(connection, serde=serde), consult)
+        graph = build_graph(SqliteSaver(connection, serde=serde), consult, root=root, tools=tools)
         previous = graph.get_state(config)
         if previous.values and previous.values.get("fingerprint") != signature:
             report.write_text(audit.render_report(checks) +
@@ -115,6 +122,7 @@ def run_audit(root: Path, report: Path, checkpoint: Path, task_id: str,
             complete = False
         else:
             complete = bool(state.get("complete"))
+    checks = state.get("checks", checks)
     result = audit.render_report(checks)
     result += "\n## Orquestração LangGraph\n\n"
     result += "Modo: " + ("IA via API" if use_ai else "offline, sem API") + ".\n\n"
@@ -138,12 +146,14 @@ def main() -> int:
     parser.add_argument("--checkpoint", type=Path, default=Path("artifacts/ai-agent-checkpoints.sqlite"))
     parser.add_argument("--task-id", default=os.environ.get("GITHUB_RUN_ID", "local-audit"))
     parser.add_argument("--use-ai", action="store_true")
+    parser.add_argument("--ecosystem", action="store_true", help="Ruflo/OpenHands locais, sem LLM")
     args = parser.parse_args()
     status = run_audit(args.root.resolve(), args.report.resolve(), args.checkpoint.resolve(),
-                       args.task_id, args.use_ai)
+                       args.task_id, args.use_ai, tools=args.ecosystem)
     print(f"Auditoria LangGraph: status={status}; relatório e checkpoints preservados.")
     return status
 
 
 if __name__ == "__main__":
     sys.exit(main())
+

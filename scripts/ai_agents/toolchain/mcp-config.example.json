@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "giro-ruflo": {
+      "command": "npx",
+      "args": ["-y", "ruflo@3.56.7", "mcp", "start"]
+    }
+  }
+}

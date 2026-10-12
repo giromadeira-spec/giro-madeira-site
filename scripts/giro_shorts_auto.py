@@ -43,6 +43,10 @@ def article_subject(title):
     t=title.lower()
     # TikTok-only topic fixes; preserve the working Shorts classification.
     if PLATFORM == "tiktok":
+        if re.search(r"furac[aã]o|tempestade", t):
+            return "lightning storm", "CLIMA"
+        if re.search(r"tsunami|terremoto|naufr[aá]gio|imigrantes|[aá]frica|paquist[aã]o|cessar[- ]fogo|houthis", t):
+            return "world globe earth", "MUNDO"
         if re.search(r"\btse\b|tribunal|supremo|\bstf\b", t):
             return "justice gavel", "POLÍTICA"
         if re.search(r"br-\d+|colis[aã]o|tr[aâ]nsito|atropel|acidente.*(?:rodovia|carro|ve[ií]culo)", t):

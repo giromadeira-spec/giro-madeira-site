@@ -2,6 +2,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 import { load } from "npm:cheerio@1.0.0";
 
 import { articleIsFresh } from "./article-date.ts";
+import { sourceRecovery } from "./recovery-policy.ts";
 const headers={"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"};
 const respond=(data:unknown,status=200)=>new Response(JSON.stringify(data),{headers,status});
 const clean=(v:unknown)=>String(v||"").replace(/\s+/g," ").trim();
@@ -80,9 +81,9 @@ Deno.serve(async req=>{
    if(lane.error)throw lane.error;
    if(args.dry_run===true||!lane.data.preparation_enabled)return respond({success:true,dry_run:args.dry_run===true,no_publish:true,channel:'tiktok',preparation_enabled:lane.data.preparation_enabled});
    const {data:pending,error:qerr}=await db.from("giro_social_video_queue")
-     .select("id,source_kind,source_id,platform,status,source_url")
+     .select("id,source_kind,source_id,platform,status,source_url,shorts_render_retry_count")
      .eq("platform","tiktok").in("storyboard_status",["aguardando","revisar"]).eq("visual_review_status","pending")
-     .eq("status","pronto_para_revisao").gte("created_at",new Date(Date.now()-36*3600000).toISOString()).order("scheduled_for",{ascending:true}).limit(24);
+     .eq("status","pronto_para_revisao").or("storyboard_prepared_at.is.null,storyboard_prepared_at.lte."+new Date(Date.now()-15*60000).toISOString()).gte("created_at",new Date(Date.now()-36*3600000).toISOString()).order("scheduled_for",{ascending:true}).limit(24);
    if(qerr)throw qerr;
    const results=[];
    for(const item of pending||[]){
@@ -140,9 +141,15 @@ Deno.serve(async req=>{
        }
      }
      const valid=!!(scenes&&!fault);
+     const retries=Number(item.shorts_render_retry_count||0);
+     const recovery=sourceRecovery(fault,retries);
      const patch=valid?{
        scene_cards:scenes,story_image_url:null,storyboard_status:"preparado",
        storyboard_prepared_at:new Date().toISOString(),storyboard_error:null
+     }:recovery?{
+       status:recovery==="retry"?"pronto_para_revisao":"falha",storyboard_status:"revisar",
+       storyboard_error:fault,last_error:"Falha temporária da fonte; preservar a mesma pauta, sem publicar.",
+       shorts_render_retry_count:retries+1,storyboard_prepared_at:new Date().toISOString()
      }:{
        // An unverified source must not monopolize today's upload slot.
        // Preserve its audit record; the independent planner will choose another Radar item.

@@ -1,0 +1,6 @@
+{
+  "name": "giro-agent-toolchain",
+  "private": true,
+  "version": "1.0.0",
+  "dependencies": { "ruflo": "3.56.7" }
+}

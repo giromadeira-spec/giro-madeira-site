@@ -38,3 +38,14 @@ Fonte operacional: [docs/RADARES_INDEPENDENTES.md](docs/RADARES_INDEPENDENTES.md
 - A licença legal não comprova pertinência: são verificações diferentes. O teste offline deve rejeitar “Cherokee Phoenix printing press” nas três pautas policiais identificadas, além de validar 1080×1920, identidade visual, Rio Madeira e MP4.
 - As mídias da fila TikTok #49 e #52 foram rejeitadas; preservá-las para auditoria e bloquear os arquivos de conversão associados. Nunca alterar o status para aprovado por decreto nem republicar os vídeos antigos.
 - O canal TikTok independente `giro_social_video_queue.platform=tiktok` só poderá publicar itens novos que passem pela geração com a regra visual corrigida e tenham vídeo 30 fps, identificação da fonte, aprovações e limites de postagem. Shorts usa fila distinta.
+
+
+
+## TikTok — seleção e recuperação autorizadas em 12/10/2026
+
+- Prioridade Brasil, depois mundo, por último Rondônia. Somente notícias atuais de grande impacto; escore alto e marcador urgente não substituem relevância. Não preencher vaga com rotina policial, previsão comum, opinião, promessa ou entretenimento.
+- Conferir data na própria reportagem (até 24 horas), fonte, fatos, duplicidade e mídia. Não usar apenas a data recente de coleta/homepage para representar notícia antiga como atual.
+- Janelas Porto Velho: 06h30, 10h, 13h30, 17h, 20h30; até cinco vídeos/dia, mínimo 90min, janela 45min. Sem retroatividade ou obrigação de preencher slot sem pauta aprovada.
+- Fiscalização do ChatGPT autorizada a corrigir falhas técnicas claras e testadas SOMENTE no TikTok. Preservar e retomar o mesmo registro/mídia até duas vezes; sem duplicar. Publicação incerta exige reconciliação do Buffer antes de qualquer reenvio. HTTP 429/5xx/timeout da fonte tem backoff de 15min e retry limitado; falta de fatos/data/licença continua bloqueada.
+- Sucesso exige aprovação editorial/visual, vídeo vertical 1080x1920/30fps e Buffer sent com link público TikTok. Avisos de sucesso/falha devem ser únicos por ocorrência.
+- Ruflo, OpenHands e LangGraph do laboratório atuam em análise/revisão locais sem LLM pago. Não afirmar 60 IAs gratuitas ou conexão automática a este chat. Instalar modelos/provedores pagos continua proibido.

@@ -6,6 +6,8 @@ on:
     paths:
       - '.github/workflows/**'
       - 'scripts/**'
+      - 'supabase/functions/giro-tiktok-*/**'
+      - 'tests/test_tiktok_editorial.mjs'
       - 'tests/test_ai_agents_*.py'
       - 'docs/**'
       - 'AGENTS.md'
@@ -13,6 +15,8 @@ on:
     paths:
       - '.github/workflows/**'
       - 'scripts/**'
+      - 'supabase/functions/giro-tiktok-*/**'
+      - 'tests/test_tiktok_editorial.mjs'
       - 'tests/test_ai_agents_*.py'
       - 'docs/**'
       - 'AGENTS.md'
@@ -32,10 +36,12 @@ jobs:
   auditoria:
     if: github.repository == 'giromadeira-spec/giro-madeira-site'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     env:
       LANGSMITH_TRACING: 'false'
       LANGCHAIN_TRACING_V2: 'false'
+      LITELLM_LOCAL_MODEL_COST_MAP: 'True'
+      OPENHANDS_SUPPRESS_BANNER: '1'
     steps:
       - name: Obter codigo sem permissoes de escrita
         uses: actions/checkout@v4
@@ -45,14 +51,23 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Instalar Ruflo fixado
+        working-directory: scripts/ai_agents/toolchain
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Testar politica editorial TikTok
+        run: node --experimental-strip-types tests/test_tiktok_editorial.mjs
       - name: Instalar dependencias fixadas do laboratorio
-        run: python -m pip install --disable-pip-version-check -r scripts/ai_agents/requirements.txt
+        run: python -m pip install --disable-pip-version-check -r scripts/ai_agents/requirements-ecosystem.txt
       - name: Testar auditor offline
         run: python -m unittest discover -s tests -p 'test_ai_agents_*.py' -v
       - name: Executar LangGraph offline, sem publicar
         run: >-
           python scripts/ai_agents/orchestrate.py
           --task-id "${GITHUB_RUN_ID}-offline"
+          --ecosystem
           --report artifacts/ai-agent-report.md
       - name: Exibir diagnostico no resumo do Actions
         if: always()
@@ -60,3 +75,4 @@ jobs:
           if [ -f artifacts/ai-agent-report.md ]; then
             cat artifacts/ai-agent-report.md >> "$GITHUB_STEP_SUMMARY"
           fi
+
