@@ -547,7 +547,7 @@ function makeSvg(kind:"feed"|"story",title:string,summary:string,source:string,c
   const cY=categoryY+(portrait?48:44);
   const footerY=portrait?1840:1033;
   const footerBorder=portrait?1760:962;
-  const badgeY=portrait?1716:928;
+  const badgeY=portrait?1716:944; // leave clearance below long headlines
   const credit=clean(photoCredit).slice(0,64);
   const footSource=clean(source||"Giro Madeira").slice(0,36);
   const rioStrip=rioFooterSvg(W,H,portrait);
