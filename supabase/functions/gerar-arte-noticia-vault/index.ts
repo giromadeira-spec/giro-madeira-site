@@ -474,7 +474,7 @@ function makeSvg(kind:"feed"|"story",title:string,summary:string,source:string,c
   const portrait=kind==="story",W=1080,H=portrait?1920:1080;
   if(!bg.startsWith("data:image/"))throw new Error("visual_contract_photo_hero_required");
   const pad=portrait?66:58;
-  const categoryY=portrait?930:545,titleY=portrait?1090:652,maxBaseline=portrait?1550:908;
+  const categoryY=portrait?930:482,titleY=portrait?1090:626,maxBaseline=portrait?1550:918;
   const layout=fitHeadline(title,W-2*pad,portrait?7:7,portrait?80:68,portrait?43:37,
     maxBaseline-titleY,portrait?1.12:1.12);
   const lineHeight=Math.round(layout.size*1.12);
@@ -499,7 +499,7 @@ function makeSvg(kind:"feed"|"story",title:string,summary:string,source:string,c
     '<path d="M'+(pad+tagW+9)+' '+(categoryY+62)+' H'+(W-pad)+
     '" stroke="#ffcc1c" stroke-width="5"/>';
   const credit='IMAGEM ILUSTRATIVA';
-  const labelY=portrait?878:491;
+  const labelY=portrait?878:425;
   const illustrative='<rect x="'+pad+'" y="'+(labelY-28)+'" width="294" height="42" rx="4" fill="#041526" opacity=".91"/>'+
     '<text x="'+(pad+10)+'" y="'+(labelY+1)+'" font-family="Inter" font-weight="800" font-size="20" fill="#fff">'+credit+'</text>';
   const sourceName=clean(source||"Giro Madeira").slice(0,37);
