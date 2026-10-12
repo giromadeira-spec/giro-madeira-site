@@ -26,16 +26,11 @@ class AgentAuditTests(unittest.TestCase):
             (root / "docs/RADARES_INDEPENDENTES.md").write_text(
                 " ".join("giro_radar_" + ch for ch in CHANNELS), encoding="utf-8")
             (root / "scripts/giro_shorts_auto.py").write_text(
-                "def main():
-    return 0
-", encoding="utf-8")
+                "def main():\n    return 0\n", encoding="utf-8")
             (root / ".github/workflows/giro-tiktok-producao.yml").write_text(
-                "# giro-tiktok-production
-# --tiktok
-", encoding="utf-8")
+                "# giro-tiktok-production\n# --tiktok\n", encoding="utf-8")
             (root / ".github/workflows/giro-shorts-producao.yml").write_text(
-                "# independent shorts workflow\
-", encoding="utf-8")
+                "# independent shorts workflow\n", encoding="utf-8")
             checks = build_checks(root)
             self.assertFalse(any(c["status"] == "FAIL" for c in checks))
             report = render_report(checks)
