@@ -1,4 +1,4 @@
-name: Giro Madeira - laboratorio de agentes (sem publicar)
+name: Giro Madeira - auditoria gratuita (sem API)
 
 on:
   push:
@@ -20,12 +20,6 @@ on:
     # 07h17 Porto Velho / 08h17 Sao Paulo. GitHub pode atrasar o inicio.
     - cron: '17 11 * * *'
   workflow_dispatch:
-    inputs:
-      use_ai:
-        description: 'Consultar dois agentes via API OpenAI (requer secret; pode gerar custos)'
-        required: true
-        default: false
-        type: boolean
 
 permissions:
   contents: read
@@ -60,46 +54,9 @@ jobs:
           python scripts/ai_agents/orchestrate.py
           --task-id "${GITHUB_RUN_ID}-offline"
           --report artifacts/ai-agent-report.md
-      - name: Conferir disponibilidade da chave sem revelar valor
-        id: ai_preflight
-        if: >-
-          ${{ github.ref == 'refs/heads/main' &&
-          ((github.event_name == 'workflow_dispatch' && inputs.use_ai == true) ||
-          (github.event_name == 'schedule' &&
-          (vars.GIRO_AGENT_AI_ENABLED == '' || vars.GIRO_AGENT_AI_ENABLED == 'true')) ||
-          (github.event_name == 'push' && contains(github.event.head_commit.message, '[test-ai]'))) }}
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: |
-          if [ -n "$OPENAI_API_KEY" ]; then
-            echo "ready=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::IA diaria habilitada, aguardando secret OPENAI_API_KEY."
-            printf '\n**IA pendente:** rotina habilitada; cadastrar OPENAI_API_KEY em Actions Secrets. Nenhuma chamada API realizada.\n' >> artifacts/ai-agent-report.md
-          fi
-      - name: Executar agentes com chave protegida (main confiavel)
-        if: ${{ github.ref == 'refs/heads/main' && steps.ai_preflight.outputs.ready == 'true' }}
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_MODEL: ${{ vars.OPENAI_AGENT_AUDIT_MODEL }}
-        run: >-
-          python scripts/ai_agents/orchestrate.py --use-ai
-          --task-id "${GITHUB_RUN_ID}-ai"
-          --report artifacts/ai-agent-report.md
       - name: Exibir diagnostico no resumo do Actions
         if: always()
         run: |
           if [ -f artifacts/ai-agent-report.md ]; then
             cat artifacts/ai-agent-report.md >> "$GITHUB_STEP_SUMMARY"
           fi
-      - name: Guardar relatorio (sem alterar producao)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: giro-ai-agent-readonly-report
-          path: |
-            artifacts/ai-agent-report.md
-            artifacts/ai-agent-checkpoints.sqlite
-          if-no-files-found: ignore
-          retention-days: 14

@@ -3,9 +3,8 @@
 
 Modos:
   python scripts/ai_agents/audit.py --report artifacts/ai-agent-report.md
-  python scripts/ai_agents/audit.py --use-ai --report artifacts/ai-agent-report.md
 
-O modo IA exige OPENAI_API_KEY configurada no ambiente (secret do GitHub).
+Chamadas à API desativadas por solicitação do responsável; --use-ai falha sem rede.
 """
 from __future__ import annotations
 
@@ -13,10 +12,8 @@ import argparse
 import ast
 from datetime import datetime, timezone
 import json
-import os
 from pathlib import Path
 import sys
-from urllib import error, request
 
 import yaml
 
@@ -149,60 +146,16 @@ def render_report(checks: list[dict[str, str]]) -> str:
     return "\n".join(lines)
 
 
-def response_text(body: dict) -> str:
-    fragments = []
-    for item in body.get("output", []):
-        if item.get("type") != "message":
-            continue
-        for part in item.get("content", []):
-            if part.get("type") == "output_text":
-                fragments.append(part.get("text", ""))
-    return "\n".join(fragments).strip()
-
-
 def consult_agent(role: str, instructions: str, evidence: str) -> str:
-    key = os.environ.get("OPENAI_API_KEY", "").strip()
-    if not key:
-        raise RuntimeError("OPENAI_API_KEY ausente: configure como secret do GitHub")
-    model = os.environ.get("OPENAI_MODEL", "").strip() or DEFAULT_MODEL
-    payload = {
-        "model": model,
-        "instructions": instructions,
-        "input": "Papel: " + role + "\nEvidência estática do repositório:\n" + evidence,
-        "max_output_tokens": MAX_RESPONSE,
-        "reasoning": {"effort": "low"},
-        "store": False,
-    }
-    req = request.Request(
-        "https://api.openai.com/v1/responses",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Authorization": "Bearer " + key,
-                 "Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        with request.urlopen(req, timeout=90) as response:
-            result = json.load(response)
-    except error.HTTPError as exc:
-        # Não imprima o corpo HTTP (pode incluir dados do provedor).
-        raise RuntimeError(f"API de IA retornou HTTP {exc.code}") from None
-    except (error.URLError, TimeoutError, OSError):
-        raise RuntimeError("API de IA indisponível ou falha de rede") from None
-    if result.get("status") != "completed":
-        raise RuntimeError("Resposta IA incompleta: não considerar parecer concluído")
-    output = response_text(result)
-    if not output:
-        raise RuntimeError("API de IA não retornou texto; valide modelo e limite de saída")
-    if key in output:
-        raise RuntimeError("Resposta IA bloqueada pelo filtro de credenciais")
-    return output
+    """API desativada por pedido do responsável: nenhum custo de tokens."""
+    raise RuntimeError("Chamadas à API desativadas: política de zero gasto adicional")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=Path, default=REPO_ROOT)
     parser.add_argument("--report", type=Path, default=Path("artifacts/ai-agent-report.md"))
-    parser.add_argument("--use-ai", action="store_true", help="Duas análises IA, com chave secreta")
+    parser.add_argument("--use-ai", action="store_true", help="Indisponível: API desativada por política de zero gasto")
     args = parser.parse_args()
 
     checks = build_checks(args.root.resolve())
@@ -223,7 +176,7 @@ def main() -> int:
             report += "\n\n## Agente 2 — Revisor\n\n" + planner + "\n"
         except Exception:
             path.write_text(report + "\n\n**IA não concluída.** Evidência preservada; "
-                            "verifique chave, modelo, saldo, rede e limite de saída.\n", encoding="utf-8")
+                            "chamadas à API desativadas pela política de zero gasto adicional.\n", encoding="utf-8")
             print("IA não concluída; relatório estático preservado (sem detalhes sensíveis).")
             return 2
     path.write_text(report, encoding="utf-8")

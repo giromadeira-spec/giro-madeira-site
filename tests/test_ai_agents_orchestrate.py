@@ -1,13 +1,10 @@
 """Testa orquestração real LangGraph e API simulada; nunca publica nem cobra."""
-import io
 import json
 import os
-import subprocess
 from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
-from urllib.error import HTTPError
 
 import yaml
 
@@ -30,7 +27,7 @@ class OrchestrationTests(unittest.TestCase):
 
     def test_offline_never_calls_api_or_modifies_sources(self):
         before = {name: (ROOT / name).read_bytes() for name in audit.REQUIRED}
-        with patch.object(audit.request, "urlopen", side_effect=AssertionError("network")):
+        with patch("urllib.request.urlopen", side_effect=AssertionError("network")):
             self.assertEqual(self.run_graph(), 0)
         self.assertIn("offline, sem API", self.report.read_text())
         self.assertTrue(self.db.is_file())
@@ -92,103 +89,46 @@ class OrchestrationTests(unittest.TestCase):
         self.assertIn("FAIL", self.report.read_text())
 
 
-class ResponsesTests(unittest.TestCase):
-    def setUp(self):
-        context = patch.dict(os.environ, {"OPENAI_API_KEY": "sk-fake-test-key", "OPENAI_MODEL": "gpt-5.5"})
-        context.start()
-        self.addCleanup(context.stop)
-
-    def test_response_parsing_and_payload_no_tools_or_storage(self):
-        response = {"status": "completed", "output": [
-            {"type": "reasoning"}, {"type": "message", "content": [
-                {"type": "output_text", "text": "Parecer"}]}]}
-        with patch.object(audit.request, "urlopen", return_value=io.BytesIO(json.dumps(response).encode())) as call:
-            self.assertEqual(audit.consult_agent("Auditor", "read only", "public checklist"), "Parecer")
-        request = call.call_args.args[0]
-        payload = json.loads(request.data)
-        self.assertEqual(request.full_url, "https://api.openai.com/v1/responses")
-        self.assertIs(payload["store"], False)
-        self.assertNotIn("tools", payload)
-        self.assertEqual(payload["max_output_tokens"], audit.MAX_RESPONSE)
-        self.assertNotIn("sk-fake", request.data.decode())
-
-    def test_incomplete_response_rejected(self):
-        data = {"status": "incomplete", "output": [{"type": "message", "content": [
-            {"type": "output_text", "text": "partial"}]}]}
-        with patch.object(audit.request, "urlopen", return_value=io.BytesIO(json.dumps(data).encode())):
-            with self.assertRaisesRegex(RuntimeError, "incompleta"):
-                audit.consult_agent("a", "b", "c")
-
-    def test_http_body_not_exposed(self):
-        error = HTTPError("https://api.openai.com", 401, "secret detail", {}, io.BytesIO(b"secret body"))
-        with patch.object(audit.request, "urlopen", side_effect=error):
-            with self.assertRaisesRegex(RuntimeError, "HTTP 401") as result:
-                audit.consult_agent("a", "b", "c")
-        self.assertNotIn("secret", str(result.exception))
-
-    def test_no_key_makes_no_network_request(self):
-        with patch.dict(os.environ, {"OPENAI_API_KEY": ""}), patch.object(audit.request, "urlopen") as call:
-            with self.assertRaisesRegex(RuntimeError, "ausente"):
-                audit.consult_agent("a", "b", "c")
+class PaidApiDisabledTests(unittest.TestCase):
+    def test_api_disabled_even_with_key_in_environment(self):
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-fake-test-key"}), patch("urllib.request.urlopen") as call:
+            with self.assertRaisesRegex(RuntimeError, "desativadas"):
+                audit.consult_agent("Auditor", "instruções", "evidência pública")
         call.assert_not_called()
 
-    def test_legacy_cli_preserves_offline_report_on_api_failure(self):
+    def test_cli_preserves_report_without_api(self):
         with tempfile.TemporaryDirectory() as folder:
             report = Path(folder) / "report.md"
-            with patch.object(audit, "consult_agent", side_effect=RuntimeError("secret")), patch(
+            with patch("urllib.request.urlopen") as call, patch(
                 "sys.argv", ["audit.py", "--use-ai", "--report", str(report)]):
                 self.assertEqual(audit.main(), 2)
-            self.assertIn("IA não concluída", report.read_text())
-            self.assertNotIn("secret", report.read_text())
+            call.assert_not_called()
+            self.assertIn("zero gasto adicional", report.read_text())
+
+    def test_graph_paid_mode_cannot_call_api(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder)
+            with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-fake-test-key"}), patch("urllib.request.urlopen") as call:
+                self.assertEqual(run_audit(ROOT, path / "report.md", path / "state.sqlite", "blocked", use_ai=True), 2)
+            call.assert_not_called()
+            self.assertIn("zero gasto adicional", (path / "report.md").read_text())
 
 
 class WorkflowTests(unittest.TestCase):
-    def test_schedule_and_secret_are_isolated_from_prs(self):
-        workflow = yaml.load((ROOT / ".github/workflows/ai-agent-audit.yml").read_text(), Loader=yaml.BaseLoader)
+    def test_workflow_has_no_paid_api_path_secrets_or_artifact_storage(self):
+        source = (ROOT / ".github/workflows/ai-agent-audit.yml").read_text()
+        workflow = yaml.load(source, Loader=yaml.BaseLoader)
         self.assertEqual(workflow["permissions"], {"contents": "read"})
         self.assertIn("schedule", workflow["on"])
-        self.assertEqual(workflow["on"]["workflow_dispatch"]["inputs"]["use_ai"]["default"], "false")
+        self.assertEqual(workflow["on"]["workflow_dispatch"], "")
+        self.assertEqual(workflow["jobs"]["auditoria"]["runs-on"], "ubuntu-latest")
+        self.assertNotIn("secrets.", source)
+        self.assertNotIn("--use-ai", source)
+        self.assertNotIn("OPENAI_API_KEY", source)
+        self.assertNotIn("upload-artifact", source)
         steps = workflow["jobs"]["auditoria"]["steps"]
-        secret_steps = [s for s in steps if "OPENAI_API_KEY" in s.get("env", {})]
-        self.assertEqual(len(secret_steps), 2)
-        condition = secret_steps[0]["if"]
-        self.assertIn("refs/heads/main", condition)
-        self.assertIn("workflow_dispatch", condition)
-        self.assertIn("GIRO_AGENT_AI_ENABLED == 'true'", condition)
-        self.assertIn("GIRO_AGENT_AI_ENABLED == ''", condition)
-        self.assertIn("[test-ai]", condition)
-        self.assertNotIn("pull_request", condition)
-        self.assertIn("refs/heads/main", secret_steps[1]["if"])
-        self.assertIn("steps.ai_preflight.outputs.ready == 'true'", secret_steps[1]["if"])
         checkout = next(s for s in steps if "actions/checkout" in s.get("uses", ""))
         self.assertEqual(checkout["with"]["persist-credentials"], "false")
-
-    def run_preflight(self, key):
-        workflow = yaml.load((ROOT / ".github/workflows/ai-agent-audit.yml").read_text(), Loader=yaml.BaseLoader)
-        step = next(s for s in workflow["jobs"]["auditoria"]["steps"] if s.get("id") == "ai_preflight")
-        with tempfile.TemporaryDirectory() as directory:
-            folder = Path(directory)
-            (folder / "artifacts").mkdir()
-            report = folder / "artifacts/ai-agent-report.md"
-            report.write_text("Evidencia offline preservada\n")
-            output = folder / "outputs"
-            result = subprocess.run(["bash", "-c", step["run"]], cwd=folder,
-                                    env={"PATH": os.environ["PATH"], "OPENAI_API_KEY": key,
-                                         "GITHUB_OUTPUT": str(output)}, capture_output=True, text=True, check=True)
-            return output.read_text(), report.read_text(), result.stdout + result.stderr
-
-    def test_missing_key_records_pending_and_preserves_report(self):
-        output, report, logs = self.run_preflight("")
-        self.assertEqual(output.strip(), "ready=false")
-        self.assertIn("Evidencia offline preservada", report)
-        self.assertIn("IA pendente", report)
-
-    def test_existing_key_is_not_emitted(self):
-        key = "sk-fake-only-preflight-test"
-        output, report, logs = self.run_preflight(key)
-        self.assertEqual(output.strip(), "ready=true")
-        self.assertNotIn(key, output + report + logs)
-        self.assertNotIn("IA pendente", report)
 
 
 if __name__ == "__main__":
