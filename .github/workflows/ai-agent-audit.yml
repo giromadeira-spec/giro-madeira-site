@@ -1,0 +1,62 @@
+name: Giro Madeira - laboratorio de agentes (sem publicar)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/ai-agent-audit.yml'
+      - 'scripts/ai_agents/**'
+      - 'tests/test_ai_agents_*.py'
+      - 'docs/AI_AGENT_STACK.md'
+  pull_request:
+    paths:
+      - '.github/workflows/ai-agent-audit.yml'
+      - 'scripts/ai_agents/**'
+      - 'tests/test_ai_agents_*.py'
+      - 'docs/AI_AGENT_STACK.md'
+  workflow_dispatch:
+    inputs:
+      use_ai:
+        description: 'Consultar dois agentes via API OpenAI (requer OPENAI_API_KEY; pode gerar custos)'
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: giro-ai-agent-audit-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  auditoria:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Obter codigo sem permissoes de escrita
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Testar auditor offline
+        run: python -m unittest discover -s tests -p 'test_ai_agents_*.py' -v
+      - name: Gerar diagnostico sem IA, sem publicar
+        run: python scripts/ai_agents/audit.py --report artifacts/ai-agent-report.md
+      - name: Executar agentes sob demanda com chave protegida
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.use_ai == true }}
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ vars.OPENAI_AGENT_AUDIT_MODEL }}
+        run: python scripts/ai_agents/audit.py --use-ai --report artifacts/ai-agent-report.md
+      - name: Guardar relatorio (sem alterar producao)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: giro-ai-agent-readonly-report
+          path: artifacts/ai-agent-report.md
+          if-no-files-found: ignore
+          retention-days: 7
