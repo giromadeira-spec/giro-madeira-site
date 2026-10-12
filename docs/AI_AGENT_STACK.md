@@ -53,8 +53,10 @@ python scripts/ai_agents/audit.py --report artifacts/ai-agent-report.md
    Actions → Repository secrets. Nunca colocar uma chave no código.
 2. Opcional: configurar a variável `OPENAI_AGENT_AUDIT_MODEL` para um modelo
    disponível na sua conta API (padrão do script: `gpt-5.5`).
-3. Na aba Actions, escolher `Giro Madeira - laboratorio de agentes (sem publicar)`,
-   executar `Run workflow` e marcar `use_ai=true`.
+3. Somente depois de revisar o PR e aprovar o merge para `main`, abra a aba
+   Actions, escolha `Giro Madeira - laboratorio de agentes (sem publicar)`,
+   execute `Run workflow` e marque `use_ai=true`. O GitHub disponibiliza
+   `workflow_dispatch` após o workflow existir na branch padrão.
 4. Abrir o artefato `giro-ai-agent-readonly-report`; dois papéis produzem um parecer
    e plano. A API pode gerar cobrança **separada da assinatura ChatGPT**.
 
