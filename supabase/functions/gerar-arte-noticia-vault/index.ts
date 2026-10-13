@@ -594,7 +594,7 @@ Deno.serve(async(req)=>{
       const title=visualSmoke
         ? (body.qa_layout_smoke_long===true
             ? "POLÍCIA CIVIL LOCALIZA E PRENDE EM CUIABÁ INVESTIGADO POR HOMICÍDIO E TENTATIVA DE HOMICÍDIO EM JARU"
-            : "GIRO MADEIRA: DESTAQUES DE PORTO VELHO")
+            : "PRÉVIA TÉCNICA — NÃO PUBLICAR")
         :clean(item.titulo);
       const category=visualSmoke?"REGIÃO":clean(item.categoria)||classify(title);
       await prepareBrandLogo();const font=new Uint8Array();
