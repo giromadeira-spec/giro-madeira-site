@@ -277,6 +277,10 @@ function licensingTopic(title:string,cat:string):string[]{
   if(/acidente|colis[aã]o|rodovia|tr[aâ]nsito|br-?364/.test(s))return ["Brazil federal highway","rodovia brasileira"];
   if(/chuva|rio madeira|enchente|seca|tempor|clima/.test(s))return ["Rio Madeira Porto Velho","storm sky Brazil"];
   if(/sa[uú]de|hospital|vacina|doen[cç]a/.test(s))return ["hospital Brazil","hospital public health"];
+  if(/escola|ensino|educa[cç][aã]o|alun[oa]|salas? de aula|feriado escolar|professor/.test(s))
+    return ["escola pública brasil sala de aula", "public school Brazil", "Brazil school classroom"];
+  if(/servi[cç]o p[uú]blico|atendimento municipal|assist[eê]ncia social|prefeitura/.test(s))
+    return ["Porto Velho Rondônia city", "Brazil public administration building"];
   if(/futebol|copa|sele[cç][aã]o|gol|esporte|campeonato/.test(s))return ["Brazil football stadium","football soccer stadium"];
   if(/pol[ií]tica|govern|congresso|c[aâ]mara|deputad|senado|elei[cç][aã]o/.test(s))return ["Congresso Nacional Brasilia","Brazil National Congress"];
   if(/m[uú]sica|festival|show|cultura|teatro/.test(s))return ["theater interior audience","concert stage"];
@@ -722,9 +726,13 @@ Deno.serve(async(req)=>{
     const sensitiveRegionalOperation=isRegional &&
       !isTimberVisualStory(title+" "+category) &&
       /opera[cç][aã]o|apreens[aã]o|pris[aã]o|investiga[cç][aã]o|homic/i.test(title+" "+category);
+    const isCityIdentityStory=isRegional&&
+      /(?:hist[oó]ria de porto velho|anivers[aá]rio de porto velho|rio madeira|locomotiva|cidade de porto velho|capital de rond[oô]nia)/i.test(title)&&
+      !/(?:acidente|homic[ií]dio|pris[aã]o|inc[eê]ndio|v[ií]tima|suspeito|morte|opera[cç][aã]o|pol[ií]cia)/i.test(title);
     const photo=!withinBudget()?null:
       await Promise.race([
-        licensedEditorialPhoto(title,category),
+        (async()=>await licensedEditorialPhoto(title,category)||
+          (isCityIdentityStory?await licensedRioMadeiraPhoto():null))(),
         new Promise<null>(resolve=>setTimeout(()=>resolve(null),Math.min(12500,remainingGenerationMs())))
       ]);
     // Preservar a pauta e a legenda mesmo quando não há imagem adequada/licenciada.
