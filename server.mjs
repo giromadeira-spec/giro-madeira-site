@@ -2,6 +2,7 @@ import http from "node:http";
 import { promises as fs } from "node:fs";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { Resvg } from "@resvg/resvg-js";
 
 const PORT = Number(process.env.PORT || 3000);
 const WORKER_KEY = String(process.env.WORKER_KEY || "");
@@ -14,12 +15,12 @@ function sendJson(res, status, body) {
   res.end(data);
 }
 
-async function readJson(req) {
+async function readJson(req, maxBytes = 1024 * 1024) {
   const chunks = [];
   let total = 0;
   for await (const chunk of req) {
     total += chunk.length;
-    if (total > 1024 * 1024) throw new Error("body_too_large");
+    if (total > maxBytes) throw new Error("body_too_large");
     chunks.push(chunk);
   }
   return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
@@ -101,18 +102,53 @@ async function renderVideo(body) {
   }
 }
 
+
+const FONT_SOURCES = [
+  "https://raw.githubusercontent.com/google/fonts/main/ofl/inter/Inter%5Bopsz%2Cwght%5D.ttf",
+  "https://raw.githubusercontent.com/google/fonts/main/ofl/anton/Anton-Regular.ttf"
+];
+let fontCache = null;
+async function artFonts() {
+  if (!fontCache) {
+    fontCache = Promise.all(FONT_SOURCES.map(async (url) => {
+      const r = await fetch(url, { signal: AbortSignal.timeout(12000) });
+      if (!r.ok) throw new Error("font_unavailable_" + r.status);
+      const bytes = new Uint8Array(await r.arrayBuffer());
+      if (bytes.length < 10000 || bytes.length > 2_000_000) throw new Error("font_invalid");
+      return bytes;
+    })).catch(e => { fontCache = null; throw e; });
+  }
+  return fontCache;
+}
+async function renderArt(body) {
+  const svg = String(body?.svg || "");
+  if (svg.length < 300 || svg.length > 11_000_000 || !svg.startsWith("<svg")) throw new Error("invalid_svg");
+  if (/<script\\b|<foreignObject\\b|<!DOCTYPE|(?:href|src)\\s*=\\s*["']https?:/i.test(svg)) throw new Error("unsafe_svg");
+  const fonts = await artFonts();
+  const png = new Resvg(svg, {
+    font: { fontBuffers: fonts, loadSystemFonts: false, defaultFontFamily: "Inter" }
+  }).render().asPng();
+  if (png.length < 10000 || png.length > 16_000_000) throw new Error("invalid_rendered_png");
+  return png;
+}
+
 const server = http.createServer(async (req, res) => {
   try {
     if (req.method === "GET" && req.url === "/health") {
-      return sendJson(res, 200, { ok: true, service: "giro-reels-worker", ffmpeg: true });
+      return sendJson(res, 200, { ok: true, service: "giro-reels-worker", ffmpeg: true, renderArt: true });
     }
-    if (req.method !== "POST" || req.url !== "/render") {
+    if (req.method !== "POST" || !["/render", "/render-art"].includes(req.url)) {
       return sendJson(res, 404, { ok: false, error: "not_found" });
     }
     if (!WORKER_KEY || req.headers["x-giro-worker-key"] !== WORKER_KEY) {
       return sendJson(res, 401, { ok: false, error: "unauthorized" });
     }
-    const body = await readJson(req);
+    const body = await readJson(req, req.url === "/render-art" ? 14 * 1024 * 1024 : 1024 * 1024);
+    if (req.url === "/render-art") {
+      const png = await renderArt(body);
+      res.writeHead(200, { "content-type": "image/png", "content-length": png.length, "cache-control": "no-store" });
+      return res.end(png);
+    }
     const video = await renderVideo(body);
     res.writeHead(200, {
       "content-type": "video/mp4",
