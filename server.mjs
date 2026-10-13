@@ -123,7 +123,7 @@ async function artFonts() {
 async function renderArt(body) {
   const svg = String(body?.svg || "");
   if (svg.length < 300 || svg.length > 11_000_000 || !svg.startsWith("<svg")) throw new Error("invalid_svg");
-  if (/<script\\b|<foreignObject\\b|<!DOCTYPE|(?:href|src)\\s*=\\s*["']https?:/i.test(svg)) throw new Error("unsafe_svg");
+  if (/<script\b|<foreignObject\b|<!DOCTYPE|(?:href|src)\s*=\s*["']https?:/i.test(svg)) throw new Error("unsafe_svg");
   const fonts = await artFonts();
   const png = new Resvg(svg, {
     font: { fontBuffers: fonts, loadSystemFonts: false, defaultFontFamily: "Inter" }
