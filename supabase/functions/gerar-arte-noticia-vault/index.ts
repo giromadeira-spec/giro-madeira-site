@@ -271,6 +271,8 @@ function licensingTopic(title:string,cat:string):string[]{
   const s=(title+" "+cat).toLowerCase();
   if(isTimberVisualStory(s))
     return ["illegal logging Brazil timber truck", "Amazon Brazil timber logs", "Logging truck Amazon forest"];
+  if(/inc[eê]ndio|bombeir|queimad|combate.*fogo/.test(s))
+    return ["corpo de bombeiros brasil viatura", "brazil fire truck firefighters", "firefighters Brazil emergency truck"];
   if(/pol[ií]cia|pris[aã]o|pris[aã]o|homic|feminic|opera[cç][aã]o|tr[aá]fico|droga/.test(s))return ["police vehicle Brazil", "policia viatura Brasil"];
   if(/acidente|colis[aã]o|rodovia|tr[aâ]nsito|br-?364/.test(s))return ["Brazil federal highway","rodovia brasileira"];
   if(/chuva|rio madeira|enchente|seca|tempor|clima/.test(s))return ["Rio Madeira Porto Velho","storm sky Brazil"];
@@ -311,6 +313,9 @@ async function licensedEditorialPhoto(title:string,category:string):Promise<Edit
         // Commons search is fuzzy: e.g. "police vehicle Brazil" can return Norway.
         const headlineArea=(title+" "+category).toLowerCase();
         const isTimberCase=isTimberVisualStory(headlineArea);
+        const isFireCase=/inc[eê]ndio|bombeir|queimad|combate.*fogo/.test(headlineArea);
+        if(isFireCase&&!/bombeir|firefighte|fire.engine|fire.truck|inc[eê]ndio|combate.*fogo/i.test(fileTitle))continue;
+        if(isFireCase&&/historical|historic|vintage|desfile|parade|museum|museu|military.parade/i.test(fileTitle))continue;
         if(isTimberCase&&!/logging|timber|lumber|(?:^|[^a-z])logs(?:[^a-z]|$)|madeireir|desmat|troncos|toras|wood truck|caminh[aã]o.*madeira/.test(fileTitle.toLowerCase()))continue;
         if(isTimberCase&&/\.pdf\b|wood vault|carbon sequestration|bioenergy|biomass|rendering|chart|diagram|illustration|ai generated/.test(fileTitle.toLowerCase()))continue;
         if(isTimberCase&&/police vehicle|police car|viatura|patrol|dodge/.test(fileTitle.toLowerCase()))continue;
@@ -377,6 +382,9 @@ async function licensedOpenversePhoto(title:string,category:string):Promise<Edit
         const creator=clean(photo?.creator).slice(0,90);
         if(lic==="by"&&!creator)continue;
         const imageTitle=clean(photo?.title).toLowerCase();
+        const fireItem=/inc[eê]ndio|bombeir|queimad|combate.*fogo/.test(t);
+        if(fireItem&&!/bombeir|firefighte|fire.engine|fire.truck|inc[eê]ndio|combate.*fogo/i.test(imageTitle))continue;
+        if(fireItem&&/historical|historic|vintage|desfile|parade|museum|museu/i.test(imageTitle))continue;
         if(timberTopic&&!/logging|timber|lumber|(?:^|[^a-z])logs(?:[^a-z]|$)|madeireir|desmat|troncos|toras|wood truck|caminh[aã]o.*madeira/.test(imageTitle))continue;
         if(timberTopic&&/\.pdf\b|wood vault|carbon sequestration|bioenergy|biomass|rendering|chart|diagram|illustration|ai generated/.test(imageTitle))continue;
         if(timberTopic&&/police vehicle|police car|viatura|patrol|dodge/.test(imageTitle))continue;
