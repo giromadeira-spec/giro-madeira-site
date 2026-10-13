@@ -23,7 +23,7 @@ function absUrl(raw:string,base:string){try{return new URL(raw,base).toString()}
 function b64(bytes:Uint8Array){let out="";const step=0x8000;for(let i=0;i<bytes.length;i+=step) out+=String.fromCharCode(...bytes.subarray(i,Math.min(i+step,bytes.length)));return btoa(out);}
 
 function articleText($:any){
-  const root=load($.html());
+  const root=$;
   // Prefer source-native NewsArticle.articleBody when it is factual body text.
   // Social widgets and unrelated page recommendations are not article content.
   let structured="";
@@ -43,6 +43,7 @@ function articleText($:any){
   });
   root("script,style,noscript,nav,header,footer,aside,form,iframe,.advertisement,.ads,.related,.recommended,.share-buttons,.social-media,.newsletter,.comments").remove();
   const sel=[
+    "[itemprop=articleBody] p",".articleBody p",".story-body p",".content-text p",
     "article .entry-content p","article .post-content p","article .article-body p",
     ".post-content p",".entry-content p",".td-post-content p",".article-body p",
     ".texto-noticia p",".texto-da-noticia p",".conteudo-noticia p",".conteudo-da-noticia p",
@@ -160,7 +161,7 @@ async function fetchPage(url:string){
       const ct=String(r.headers.get("content-type")||"").toLowerCase();
       if(ct&&!ct.includes("text/html")){lastError="unexpected_content_type";continue;}
       const html=await r.text();
-      if(html.length>1_000_000){lastError="html_too_large";continue;}
+      if(html.length>3_000_000){lastError="html_too_large";continue;}
       const $=load(html);
       const score=articleText($).length;
       if(score>bestScore){best=html;bestScore=score;}
@@ -519,7 +520,21 @@ function makeSvg(kind:"feed"|"story",title:string,summary:string,source:string,c
     '" fill="#fff">FONTE: '+esc(sourceName)+'</text></svg>';
 }
 
-async function render(svg:string,font:Uint8Array){await prepareBrandLogo();const displayFont=await getDisplayFont();return new Resvg(svg,{font:{fontBuffers:[font,displayFont],loadSystemFonts:false,defaultFontFamily:"Inter"}}).render().asPng();}
+async function render(svg:string,_font:Uint8Array){
+ const u=Deno.env.get("SUPABASE_URL")||"",k=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"";
+ const sb=createClient(u,k);
+ const {data:key,error}=await sb.rpc("giro_reels_worker_key_get");
+ if(error||!key)throw new Error("render_worker_key_missing");
+ const r=await fetch("https://giro-reels-worker-production.up.railway.app/render-art",{
+  method:"POST",headers:{"Content-Type":"application/json","x-giro-worker-key":String(key)},
+  body:JSON.stringify({svg}),signal:AbortSignal.timeout(85000)
+ });
+ if(!r.ok)throw new Error("render_art_worker_http_"+r.status+":"+(await r.text()).slice(0,220));
+ if(!(r.headers.get("content-type")||"").includes("image/png"))throw new Error("render_worker_wrong_content_type");
+ const b=new Uint8Array(await r.arrayBuffer());
+ if(b.length<10000||b.length>16000000)throw new Error("render_worker_invalid_png");
+ return b;
+}
 async function maybeCopyVideo(sb:any,raw:string,id:number){
   if(!raw) return {source:"",publicUrl:""};
   try{
@@ -582,7 +597,7 @@ Deno.serve(async(req)=>{
             : "GIRO MADEIRA: DESTAQUES DE PORTO VELHO")
         :clean(item.titulo);
       const category=visualSmoke?"REGIÃO":clean(item.categoria)||classify(title);
-      await prepareBrandLogo();await ensureWasm();const font=await getFont();
+      await prepareBrandLogo();const font=new Uint8Array();
       const isRegional=isRondoniaEditorial(title,clean(item.fonte_nome));
       // Em operacoes policiais locais, evitar fotos de outras policias/estados:
       // elas seriam confundidas com a ocorrencia. Usar a arte original do Rio Madeira.
@@ -730,7 +745,7 @@ Deno.serve(async(req)=>{
     }
     const attribution=photo.creator+" • "+photo.license;
     const bg=photo.dataUri;
-    await prepareBrandLogo();await ensureWasm(); const font=await getFont();
+    await prepareBrandLogo(); const font=new Uint8Array();
     const feed=await render(makeSvg("feed",title,desc,source,category,bg,item.urgente===true,attribution),font);
     const story=await render(makeSvg("story",title,desc,source,category,bg,item.urgente===true,attribution),font);
     const feedPath=`auto/feed/${channel}/${id}-${Date.now()}.png`,storyPath=`auto/story/${channel}/${id}-${Date.now()}.png`;
