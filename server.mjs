@@ -49,6 +49,30 @@ function execFfmpeg(args, timeoutMs = 120000) {
   });
 }
 
+async function verifyMp4(path) {
+  const args = ["-v", "error", "-show_entries",
+    "stream=codec_type,codec_name,width,height,avg_frame_rate",
+    "-show_entries", "format=duration", "-of", "json", path];
+  const data = await new Promise((resolve,reject) => {
+    const p=spawn("ffprobe",args,{stdio:["ignore","pipe","pipe"]});
+    let output="",err="";
+    const timer=setTimeout(()=>{p.kill("SIGKILL");reject(new Error("ffprobe_timeout"));},10000);
+    p.stdout.on("data",d=>{if(output.length<50000)output+=d.toString();});
+    p.stderr.on("data",d=>{if(err.length<3000)err+=d.toString();});
+    p.on("error",e=>{clearTimeout(timer);reject(e);});
+    p.on("close",status=>{clearTimeout(timer);status===0?resolve(output):reject(new Error("ffprobe_exit_"+status+":"+err.slice(0,200)));});
+  });
+  let obj;try{obj=JSON.parse(data);}catch{throw new Error("invalid_ffprobe_metadata");}
+  const streams=obj.streams||[],video=streams.find(x=>x.codec_type==="video"),audio=streams.find(x=>x.codec_type==="audio");
+  const [num,den]=String(video?.avg_frame_rate||"").split("/").map(Number);
+  const fps=den>0?num/den:0;
+  const duration=Number(obj.format?.duration||0);
+  if(video?.codec_name!=="h264"||video.width!==1080||video.height!==1920||fps<29.5||fps>30.5||
+     audio?.codec_name!=="aac"||duration<7.5||duration>8.5)
+    throw new Error("invalid_reel_spec_1080x1920_30fps_h264_aac_8s");
+  return {fps,duration,codec:video.codec_name};
+}
+
 function validateImageUrl(raw) {
   const u = new URL(String(raw || ""));
   if (u.protocol !== "https:" || u.host !== ALLOWED_HOST) throw new Error("invalid_image_host");
@@ -94,6 +118,7 @@ async function renderVideo(body) {
       output
     ];
     await execFfmpeg(args);
+    await verifyMp4(output);
     const out = await fs.readFile(output);
     if (out.length < 10000) throw new Error("video_too_small");
     return out;
