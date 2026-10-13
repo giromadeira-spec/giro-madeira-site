@@ -48,7 +48,7 @@ Deno.serve(async req=>{
    // Bad/inaccessible factual sources are not a video-publishing failure.
    // Skip them, preserve the audit reason and let the radar choose a new story.
    // Transient render/worker failures remain retryable.
-   const sourceInvalid=/Fonte sem dados suficientes|Matéria não tem detalhes suficientes|Informações insuficientes|Descrição genérica do portal|Matéria vaga\\/promocional|Fonte editorialmente bloqueada/.test(reason);
+   const sourceInvalid=/Fonte sem dados suficientes|Matéria não tem detalhes suficientes|Informações insuficientes|Descrição genérica do portal|Matéria vaga|Fonte editorialmente bloqueada/.test(reason);
    const saved=await db.from(table).update({
      status:sourceInvalid?"descartada":"pendente",
      erro:reason,media_status:sourceInvalid?"descartada_sem_fonte":"erro_midia"
