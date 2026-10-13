@@ -18,7 +18,9 @@ Deno.serve(async req=>{
     .eq("status","pendente").eq("visual_approved",false).lt("preparation_attempts",2)
     .or("preparation_retry_at.is.null,preparation_retry_at.lte."+new Date().toISOString())
     .gte("created_at",new Date(Date.now()-36*3600000).toISOString())
-    .order("created_at",{ascending:true}).limit(1).maybeSingle();
+    // New, fresh stories first. Repeatedly failing old sources must not starve the queue.
+    .order("preparation_attempts",{ascending:true}).order("urgente",{ascending:false})
+    .order("created_at",{ascending:false}).limit(1).maybeSingle();
   if(pe)throw pe;
   if(body.dry_run===true||!cfg.preparation_enabled)return response({success:true,dry_run:body.dry_run===true,channel,no_publish:true,preparation_enabled:cfg.preparation_enabled,pending_id:pending?.id||null,visual_contract:cfg.visual_contract});
   let item=pending;
@@ -120,6 +122,43 @@ Deno.serve(async req=>{
      approvalReason=autoApproved?"v6_licensed_photo_official_source_verified":"approval_conflict";
    }else approvalReason="official_source_or_media_contract_not_verified";
   }
+  // Reels can be automatically approved ONLY after factual source extraction,
+  // independently licensed editorial photography, JPEG conversion and MP4 render.
+  // This never applies to an illustration awaiting review, a source with
+  // insufficient content, copied footage or a media generation failure.
+  if(channel==="reels"&&videoReady&&result.reel_recommended===true&&
+     result.needs_approved_art!==true&&verifiedPhoto&&
+     cfg.visual_contract==="GIRO_EDITORIAL_FOTO_MANCHETE_RIO_V1"){
+   const check=await db.from(table).select(
+     "id,fonte_url,legenda,story_image_url,video_url,editorial_expires_at,media_pipeline_version,status,visual_approved,publicar_story,publicar_reel,instagram_reel_media_id"
+   ).eq("id",item.id).maybeSingle();
+   if(check.error)throw check.error;
+   const m=check.data;
+   let sourceVerified=false;
+   try{const u=new URL(String(m?.fonte_url||""));sourceVerified=u.protocol==="https:"&&!!u.hostname&&u.pathname.length>10}catch{}
+   const verified=sourceVerified&&m?.status==="pendente"&&m.visual_approved===false&&
+     m.publicar_reel===true&&m.publicar_story===false&&!m.instagram_reel_media_id&&
+     Number(m.media_pipeline_version)===5&&
+     Date.parse(String(m.editorial_expires_at||""))>Date.now()&&
+     String(m.legenda||"").length>=330&&
+     String(m.legenda||"").includes("Fonte: ")&&
+     String(m.legenda||"").includes("Matéria original: ")&&
+     String(m.legenda||"").includes("Imagem ilustrativa: ")&&
+     String(m.story_image_url||"").startsWith(url+"/storage/v1/object/public/news-images/auto/jpeg/reels/story/")&&
+     /\\.jpg$/.test(String(m.story_image_url||""))&&
+     String(m.video_url||"").startsWith(url+"/storage/v1/object/public/news-videos/auto/reels/reels/")&&
+     /\\.mp4$/.test(String(m.video_url||""));
+   if(verified){
+     const approved=await db.from(table).update({
+       status:"aprovada",visual_approved:true,media_status:"reel_validado",
+       publicar_story:false,publicar_reel:true,scheduled_at:new Date().toISOString(),erro:null
+     }).eq("id",item.id).eq("status","pendente").eq("visual_approved",false)
+       .is("instagram_reel_media_id",null).select("id").maybeSingle();
+     if(approved.error)throw approved.error;
+     autoApproved=!!approved.data;
+     approvalReason=autoApproved?"reels_licensed_photo_and_mp4_verified":"approval_conflict";
+   }else approvalReason="reels_editorial_media_contract_not_verified";
+  }
   if(!autoApproved){
    const status=result.needs_approved_art?"aguardando_arte_tematica":
      channel==="reels"&&!videoReady?"aguardando_reel":"aguardando_revisao_visual";
@@ -134,7 +173,8 @@ Deno.serve(async req=>{
      auto_qa:approvalReason});
   }
   return response({success:true,channel,publication_id:item.id,processed:1,
-    media_status:"feed_foto_verificada",auto_approved:true,auto_qa:approvalReason,
-    verified_artwork_only:true,publication_not_attempted:true});
+    media_status:channel==="reels"?"reel_validado":"feed_foto_verificada",
+    auto_approved:true,auto_qa:approvalReason,verified_artwork_only:true,
+    publication_not_attempted:true});
  }catch{return response({success:false,error:"independent_preparation_failed",no_publish:true},500)}
 });
