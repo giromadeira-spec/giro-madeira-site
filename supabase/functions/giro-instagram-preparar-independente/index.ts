@@ -44,8 +44,19 @@ Deno.serve(async req=>{
   });
   const result=await render.json().catch(()=>({}));
   if(!render.ok||result.success!==true){
-   await db.from(table).update({erro:String(result.error||"media_preparation_failed").slice(0,500),media_status:"erro_midia"}).eq("id",item.id).eq("visual_approved",false);
-   return response({success:false,channel,publication_id:item.id,no_publish:true,error:"media_preparation_failed"},502);
+   const reason=String(result.error||"media_preparation_failed").slice(0,500);
+   // Bad/inaccessible factual sources are not a video-publishing failure.
+   // Skip them, preserve the audit reason and let the radar choose a new story.
+   // Transient render/worker failures remain retryable.
+   const sourceInvalid=/Fonte sem dados suficientes|Matéria não tem detalhes suficientes|Informações insuficientes|Descrição genérica do portal|Matéria vaga\\/promocional|Fonte editorialmente bloqueada/.test(reason);
+   const saved=await db.from(table).update({
+     status:sourceInvalid?"descartada":"pendente",
+     erro:reason,media_status:sourceInvalid?"descartada_sem_fonte":"erro_midia"
+   }).eq("id",item.id).eq("status","pendente").eq("visual_approved",false);
+   if(saved.error)throw saved.error;
+   return response({success:sourceInvalid,channel,publication_id:item.id,
+     no_publish:true,skipped_invalid_source:sourceInvalid,
+     error:sourceInvalid?"source_insufficient_skipped":"media_preparation_failed"},sourceInvalid?200:502);
   }
   // The renderer produces editorial PNGs; Meta IMAGE/STORIES requires verified JPEG.
   // Conversion is a preparation step only and never counts as visual approval.
