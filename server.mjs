@@ -82,10 +82,10 @@ async function renderVideo(body) {
 
     const args = [
       "-hide_banner", "-loglevel", "error", "-y",
-      "-loop", "1", "-framerate", "15", "-i", input,
+      "-loop", "1", "-framerate", "30", "-i", input,
       "-f", "lavfi", "-i", "aevalsrc=" + audioExpr(style) + ":s=44100:d=" + secs,
       "-vf", vf,
-      "-r", "15",
+      "-r", "30",
       "-t", String(secs),
       "-c:v", "libx264", "-preset", "ultrafast", "-crf", "25",
       "-profile:v", "main", "-level", "4.0", "-pix_fmt", "yuv420p",
