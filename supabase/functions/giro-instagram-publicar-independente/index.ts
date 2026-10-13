@@ -18,9 +18,22 @@ Deno.serve(async req=>{
   if(cfg.error)throw cfg.error;
   const gate=await db.rpc('giro_instagram_semaforo_gate',{p_media_type:types[channel]});
   if(gate.error)throw gate.error;
-  const meta=await db.from('giro_meta_rate_state').select('integrity_hold,rollout_stage').eq('id',1).single();
+  const meta=await db.from('giro_meta_rate_state').select('integrity_hold,rollout_stage,traffic_light_target,traffic_light_reel_test_enabled').eq('id',1).single();
   if(meta.error)throw meta.error;
-  const blocked=!cfg.data.publication_enabled||meta.data.integrity_hold===true||gate.data?.allowed!==true||(channel!=='feed'&&meta.data.rollout_stage!=='full');
+  // Gradual restart for Reels ONLY: single daily attempt near 12:00 Porto Velho.
+  // Stories remain blocked under feed_only. The central semaforo enforces 1/day,
+  // the variable gap, Meta rate limits and integrity holds independently.
+  const localParts=new Intl.DateTimeFormat('en-GB',{timeZone:'America/Porto_Velho',
+    hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date());
+  const localHour=Number(localParts.find(p=>p.type==='hour')?.value??-1);
+  const localMinute=Number(localParts.find(p=>p.type==='minute')?.value??-1);
+  const reelsNoon=channel==='reels'&&localHour===12&&localMinute>=0&&localMinute<10;
+  const reelsRecovery=reelsNoon&&meta.data.rollout_stage==='feed_only'&&
+    meta.data.traffic_light_target==='amarelo'&&meta.data.traffic_light_reel_test_enabled===true;
+  const channelAllowed=channel==='feed'||
+    (channel==='reels'?reelsRecovery:meta.data.rollout_stage==='full');
+  const blocked=!cfg.data.publication_enabled||meta.data.integrity_hold===true||
+    gate.data?.allowed!==true||!channelAllowed||(channel==='reels'&&!reelsNoon);
   if(body.dry_run===true||blocked)return response({success:true,channel,dry_run:body.dry_run===true,no_publish:true,publication_enabled:cfg.data.publication_enabled,gate:gate.data,integrity_hold:meta.data.integrity_hold,rollout_stage:meta.data.rollout_stage});
   const table='giro_publicacoes_'+channel;
   const found=await db.from(table).select('*').eq('status','aprovada').eq('visual_approved',true).gte('media_pipeline_version',channel==='feed'?6:5)
@@ -33,6 +46,15 @@ Deno.serve(async req=>{
    await db.from(table).update({status:'descartada',erro:'editorial_expired'}).eq('id',item.id).eq('status','aprovada');
    return response({success:true,channel,no_publish:true,reason:'editorial_expired'});
   }
+  // Never auto-release unreviewed Reel imagery or media.
+  if(channel==='reels'&&(
+    item.publicar_reel!==true||item.publicar_story===true||
+    !String(item.story_image_url||'').startsWith(url+'/storage/v1/object/public/news-images/')||
+    !String(item.video_url||'').endsWith('.mp4')||
+    !String(item.legenda||'').includes('Fonte: ')||
+    !String(item.legenda||'').includes('Matéria original: ')||
+    !String(item.legenda||'').includes('Imagem ilustrativa: ')
+  ))return response({success:true,channel,no_publish:true,reason:'reel_editorial_contract_failed'});
   if(channel==='feed'&&item.media_status!=='feed_foto_verificada'){
    return response({success:true,channel,no_publish:true,reason:'v6_verified_photo_required'});
   }
