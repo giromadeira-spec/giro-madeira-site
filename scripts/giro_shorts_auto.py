@@ -43,6 +43,17 @@ def article_subject(title):
     t=title.lower()
     # TikTok-only topic fixes; preserve the working Shorts classification.
     if PLATFORM == "tiktok":
+        # Contextual, individually licensed images are preferred to generic world imagery.
+        if re.search(r"r[uú]ss|ucr[aâ]ni|kharkiv|cessar[- ]fogo|bombardeio", t):
+            return "ukraine war damage", "MUNDO"
+        if re.search(r"paquist[aã]o|escolas? fechad|school closures", t):
+            return "school building exterior", "MUNDO"
+        if re.search(r"houthis|riad|riyadh|aeroport|bloqueia voos|suspender voos", t):
+            return "aircraft airplane", "MUNDO"
+        if re.search(r"trump.*(?:zelensky|putin|reuni[aã]o)|zelensky.*putin", t):
+            return "diplomacy meeting", "MUNDO"
+        if re.search(r"naufr[aá]gio|barco com imigrantes", t):
+            return "ocean waves", "MUNDO"
         if re.search(r"furac[aã]o|tempestade", t):
             return "lightning storm", "CLIMA"
         if re.search(r"tsunami|terremoto|naufr[aá]gio|imigrantes|[aá]frica|paquist[aã]o|cessar[- ]fogo|houthis", t):
@@ -123,7 +134,11 @@ def photo_matches_topic(topic, title):
       "newspaper printing press":r"\b(printing press|newspaper printing|newspaper press)\b",
       "aircraft airplane":r"\b(aircraft|airplane|aeroplane|jetplane|avi[aã]o|aeronave|plane)\b",
       "road traffic highway":r"\b(highway traffic|road traffic|motorway traffic|traffic on|trafego|tráfego)\b",
-      "fire engine firefighting":r"\b(fire engine|fire truck|fire brigade|firefighter|firefighters|firefighting|bombeiros)\b"
+      "fire engine firefighting":r"\b(fire engine|fire truck|fire brigade|firefighter|firefighters|firefighting|bombeiros)\b",
+       "ukraine war damage":r"(?=.*\b(?:ukraine|ukrainian|ukraina|kharkiv|kyiv|kiev)\b)(?=.*\b(?:war|damage|damaged|destroyed|bomb|attack|shelling|conflict|strike|ruins)\b)",
+       "school building exterior":r"\b(?:school|escola|schools)\b",
+       "diplomacy meeting":r"\b(?:diplomacy|diplomatic|diplomat|summit|bilateral meeting|foreign ministers)\b",
+       "ocean waves":r"\b(?:ocean waves|sea waves|rough sea|stormy sea)\b"
     }
     if PLATFORM == "tiktok":
         groups["justice gavel"] = r"\b(gavel|gavels|martelo de juiz)\b"
@@ -140,6 +155,10 @@ def licensed_commons_download(topic):
       "fire engine firefighting":["fire engine", "fire truck", "fire brigade"],
       "justice gavel":["gavel", "judge gavel"],
       "world globe earth":["EXACT:File:The Earth seen from Apollo 17.jpg", "earth globe", "world globe", "globe"],
+       "ukraine war damage":["Ukraine war damage","Ukraine damaged buildings"],
+       "school building exterior":["school building exterior","school exterior"],
+       "diplomacy meeting":["diplomatic meeting","diplomacy summit"],
+       "ocean waves":["ocean waves storm","rough sea waves"],
       "brazil electronic voting machine":["urna eletrônica", "electronic voting machine"],
       "police car emergency lights":["police car", "police vehicle"],
       "lightning storm":["lightning storm", "lightning"],
@@ -219,7 +238,7 @@ def licensed_openverse_photo(topic):
        if not re.search(r"\.(?:jpe?g|png|webp)$",parsed.path,re.I):continue
        title=clean(obj.get("title") or "foto ilustrativa")[:60]
        if not photo_matches_topic(topic,title):continue
-       if re.search(r"\b(building|brick|house|church|chapel|school|roof|architecture|protest|demonstration|person|people)\b",title,re.I):continue
+       if re.search(r"\b(building|brick|house|church|chapel|school|roof|architecture|protest|demonstration|person|people)\b",title,re.I) and topic!="school building exterior":continue
        try:
           img=fetch_picture(img_url)
        except Exception:
@@ -529,6 +548,17 @@ def render_self_test():
         ):
             if article_subject(headline) != expected:
                 raise RuntimeError("TikTok headline misclassified: " + headline)
+        for headline,expected in (
+            ("Ataques russos deixam 22 feridos em Kharkiv, na Ucrânia",("ukraine war damage","MUNDO")),
+            ("Ucrânia: Rússia atinge alvos do setor de energia",("ukraine war damage","MUNDO")),
+            ("Céu sobre Riad fica vazio após ataques de houthis a aeroportos",("aircraft airplane","MUNDO")),
+            ("Paquistão fecha escolas e bloqueia ruas",("school building exterior","MUNDO")),
+            ("Trump quer reunião entre Zelensky e Putin",("diplomacy meeting","MUNDO")),
+        ):
+            if article_subject(headline)!=expected:
+                raise RuntimeError("TikTok topical image mapping failed: "+headline)
+        if photo_matches_topic("ukraine war damage","The Earth seen from Apollo 17.jpg"):
+            raise RuntimeError("Unrelated Earth photo accepted for a war story")
     for headline, expected in (
         ("Mulher fica ferida após acidente envolvendo quatro veículos na Farquar", ("road traffic highway", "TRÂNSITO")),
         ("Ônibus são atingidos por incêndio em garagem de frigorífico", ("fire engine firefighting", "SEGURANÇA")),
