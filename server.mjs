@@ -41,10 +41,10 @@ function execFfmpeg(args, timeoutMs = 120000) {
       clearTimeout(timer);
       reject(e);
     });
-    proc.on("close", (code) => {
+    proc.on("close", (code, signal) => {
       clearTimeout(timer);
       if (code === 0) resolve();
-      else reject(new Error("ffmpeg_exit_" + code + ": " + stderr.slice(-6000)));
+      else reject(new Error("ffmpeg_exit_" + code + "_signal_" + String(signal||"none") + ": " + stderr.slice(-6000)));
     });
   });
 }
@@ -105,13 +105,13 @@ async function renderVideo(body) {
     const vf = "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black,format=yuv420p";
 
     const args = [
-      "-hide_banner", "-loglevel", "error", "-y",
+      "-hide_banner", "-loglevel", "error", "-y", "-filter_threads", "1",
       "-loop", "1", "-framerate", "30", "-i", input,
       "-f", "lavfi", "-i", "aevalsrc=" + audioExpr(style) + ":s=44100:d=" + secs,
       "-vf", vf,
       "-r", "30",
       "-t", String(secs),
-      "-c:v", "libx264", "-preset", "ultrafast", "-crf", "25",
+      "-c:v", "libx264", "-threads", "1", "-preset", "ultrafast", "-crf", "25",
       "-profile:v", "main", "-level", "4.0", "-pix_fmt", "yuv420p",
       "-c:a", "aac", "-b:a", "80k",
       "-movflags", "+faststart", "-shortest",
