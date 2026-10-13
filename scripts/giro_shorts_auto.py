@@ -60,6 +60,10 @@ def article_subject(title):
      (r"clima|temporal|chuva|enchente|calor|seca|granizo","lightning storm","CLIMA"),
      # Incidentes aéreos: evitar fotos genéricas de polícia ou gráficas de jornal.
      (r"avi[aã]o|aeronave|helic[oó]ptero|aeroporto|acidente a[eé]reo|queda de avi[aã]o","aircraft airplane","SEGURANÇA"),
+     # Road accidents and fire incidents should not be classified as unknown.
+     # Generic scene photos are illustrative, never presented as the real event.
+     (r"acidente.*(?:ve[ií]culos?|carros?|motos?|motociclet|caminh[aã]o|[oô]nibus)|colis[aã]o|atropel|tr[aâ]nsito|\bbr-\d+\b|(?:ve[ií]culos?|carros?).*acidente","road traffic highway","TRÂNSITO"),
+     (r"inc[eê]ndio|bombeir|em chamas|pegou fogo","fire engine firefighting","SEGURANÇA"),
      (r"pol[ií]cia|\bpf\b|prendeu|pris[aã]o|feminic[ií]dio|investiga|\bpres[oa]s?\b|\bdetid[oa]s?\b|agred|agress|viol[eê]ncia dom[eé]stica|criminos[oa]|tr[aá]fico|boca de fumo|suspeit[oa]|homic[ií]dio|assassin|ex[eé]rcito","police car emergency lights","SEGURANÇA"),
      (r"elei[cç][aã]o|voto|urna|tse|tre-|stf|supremo|congresso|senado|deputad|bolsonaro|lula","brazil electronic voting machine","POLÍTICA"),
      (r"futebol|sele[cç][aã]o|atleta|jogo|copa|fifa|gol ","soccer ball field","ESPORTES"),
@@ -117,11 +121,12 @@ def photo_matches_topic(topic, title):
       "financial city skyscrapers":r"\b(skyscraper|financial district|financial center|financial centre)\b",
       "computer circuit board macro":r"\b(circuit board|printed circuit|motherboard)\b",
       "newspaper printing press":r"\b(printing press|newspaper printing|newspaper press)\b",
-      "aircraft airplane":r"\b(aircraft|airplane|aeroplane|jetplane|avi[aã]o|aeronave|plane)\b"
+      "aircraft airplane":r"\b(aircraft|airplane|aeroplane|jetplane|avi[aã]o|aeronave|plane)\b",
+      "road traffic highway":r"\b(highway traffic|road traffic|motorway traffic|traffic on|trafego|tráfego)\b",
+      "fire engine firefighting":r"\b(fire engine|fire truck|fire brigade|firefighter|firefighters|firefighting|bombeiros)\b"
     }
     if PLATFORM == "tiktok":
         groups["justice gavel"] = r"\b(gavel|gavels|martelo de juiz)\b"
-        groups["road traffic highway"] = r"\b(highway traffic|road traffic|motorway traffic|traffic on|trafego|tráfego)\b"
     pattern=groups.get(topic)
     if topic=="aircraft airplane" and re.search(r"\b(toy|model|paper plane|simulator|diagram|poster|illustration|drawing|game|cartoon)\b",title,re.I):
       return False
@@ -132,6 +137,7 @@ def licensed_commons_download(topic):
     endpoint="https://commons.wikimedia.org/w/api.php"
     fallback_terms={
       "road traffic highway":["highway traffic", "road traffic"],
+      "fire engine firefighting":["fire engine", "fire truck", "fire brigade"],
       "justice gavel":["gavel", "judge gavel"],
       "world globe earth":["EXACT:File:The Earth seen from Apollo 17.jpg", "earth globe", "world globe", "globe"],
       "brazil electronic voting machine":["urna eletrônica", "electronic voting machine"],
@@ -523,6 +529,18 @@ def render_self_test():
         ):
             if article_subject(headline) != expected:
                 raise RuntimeError("TikTok headline misclassified: " + headline)
+    for headline, expected in (
+        ("Mulher fica ferida após acidente envolvendo quatro veículos na Farquar", ("road traffic highway", "TRÂNSITO")),
+        ("Ônibus são atingidos por incêndio em garagem de frigorífico", ("fire engine firefighting", "SEGURANÇA")),
+    ):
+        if article_subject(headline) != expected:
+            raise RuntimeError("Shorts accident/fire headline misclassified: " + headline)
+    if not photo_matches_topic("road traffic highway", "Highway traffic in Brazil"):
+        raise RuntimeError("Valid road-traffic photo rejected")
+    if photo_matches_topic("road traffic highway", "Cherokee Phoenix printing press"):
+        raise RuntimeError("Unrelated traffic photo accepted")
+    if not photo_matches_topic("fire engine firefighting", "Fire engine at station"):
+        raise RuntimeError("Valid fire-engine photo rejected")
     if article_subject("Evento inédito em Porto Velho")[0]:
         raise RuntimeError("Unknown editorial subject accepted unrelated default photo")
     with tempfile.TemporaryDirectory(prefix="giro-shorts-offline-qa-") as temporary:
