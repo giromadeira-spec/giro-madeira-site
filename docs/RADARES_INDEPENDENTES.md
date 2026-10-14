@@ -16,7 +16,7 @@ Cada formato tem coleta, consumo, cadência, fila, erros, revisão e confirmaç�
 
 Instagram coleta/prepara na janela 06h–23h30 de `America/Porto_Velho`, com mínimo de 90 minutos entre novos rascunhos por formato e máximo de oito em 24 horas. Consulta da fila não equivale a publicação.
 
-Shorts mantém planejamento para 08h/20h de Porto Velho. O workflow também renderiza antes, às 07h/19h, e conserva as recuperações. TikTok planeja 06h30/10h/13h30/17h/20h30 de Porto Velho e renderiza a própria fila: não exige vídeo já enviado, ID público ou sucesso do YouTube.
+**Agenda vigente desde 13/10/2026:** Shorts e TikTok publicam preferencialmente às 08h e 22h de Porto Velho, com renderização antecipada e verificações posteriores. Cada radar, fila, render e ID permanece independente; TikTok não depende do YouTube. O TikTok tem limite de 2/dia, janelas de 45min; Shorts tem meta 2/dia. Os registros de outras agendas abaixo são históricos.
 
 ## Identidade visual comum
 
