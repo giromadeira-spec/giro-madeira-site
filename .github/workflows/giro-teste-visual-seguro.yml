@@ -38,6 +38,10 @@ jobs:
         env:
           GITHUB_EVENT_NAME: push
         run: python scripts/giro_shorts_auto.py --self-test
+      - name: Testar também o TikTok e bloquear imagens de outro acontecimento
+        env:
+          GITHUB_EVENT_NAME: push
+        run: python scripts/giro_shorts_auto.py --tiktok --self-test
       - name: Anexar capa e video
         uses: actions/upload-artifact@v4
         with:
