@@ -1,7 +1,9 @@
 name: Giro Madeira - TikTok independente
 on:
   schedule:
-    - cron: '4,19,34,49 * * * *'
+    # 07:30/21:30 preflight; 08:05/08:20 and 22:05/22:20 recovery (Porto Velho UTC-4).
+    - cron: '30 1,11 * * *'
+    - cron: '5,20 2,12 * * *'
   workflow_dispatch:
 permissions:
   contents: read
