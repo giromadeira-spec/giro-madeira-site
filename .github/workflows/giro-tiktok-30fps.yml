@@ -5,7 +5,8 @@ on:
     paths:
       - '.github/workflows/giro-tiktok-30fps.yml'
   schedule:
-    - cron: '13 * * * *'
+    # Converter fallback near 08h and 22h PV only; the primary TikTok workflow converts independently.
+    - cron: '15,45 2,12 * * *'
   workflow_dispatch:
 
 permissions:
