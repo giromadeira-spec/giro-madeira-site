@@ -1,9 +1,7 @@
 name: Giro Madeira - TikTok 30fps (isolado)
 
 on:
-  push:
-    paths:
-      - '.github/workflows/giro-tiktok-30fps.yml'
+  # Scheduled production only. Do not run OIDC upload bridge on push QA events.
   schedule:
     # Converter fallback near 08h and 22h PV only; the primary TikTok workflow converts independently.
     - cron: '15,45 2,12 * * *'
