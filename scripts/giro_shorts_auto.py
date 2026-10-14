@@ -423,8 +423,7 @@ def make_frame(photo,river,logo,claim,scene,idx,credit,path):
     # Every retrieved license is for an illustrative photo, never evidence of this event.
     # Explicit annotation prevents viewers from treating generic police visuals as real footage.
     d.rounded_rectangle((58,790,401,838),radius=4,fill=(3,16,36,232))
-    visual_label="ARTE EDITORIAL" if PLATFORM=="tiktok" and credit.startswith("arte editorial original") else "IMAGEM ILUSTRATIVA"
-    d.text((74,802),visual_label,font=ImageFont.truetype(regular,26),fill=WHITE)
+    d.text((74,802),"IMAGEM ILUSTRATIVA",font=ImageFont.truetype(regular,26),fill=WHITE)
     if claim.get("urgent") is True:
         d.rounded_rectangle((785,45,1034,117),radius=6,fill=(222,31,45,255))
         d.text((800,55),"URGENTE",font=ImageFont.truetype(heavy,43),fill=WHITE)
@@ -690,31 +689,21 @@ def main():
         query,category=article_subject(result["title"])
         if not query:
             raise RuntimeError("No safe topic for photographic illustration; editorial review required")
-        # Publish only a photograph tied to the article, not a generic world image.
-        # TikTok falls back to branded original editorial artwork when no safe photo
-        # is available. The independently produced YouTube Shorts flow is unchanged.
-        picture=credit=file_title=None
-        for provider in (licensed_openverse_photo,licensed_commons_download):
-            try:
-                candidate,candidate_credit,candidate_title=provider(query)
-                if not candidate_credit.startswith(("openverse_","wikimedia_")):
-                    raise RuntimeError("Unlicensed visual candidate")
-                if not photo_matches_story(result["title"],query,candidate_title):
-                    raise RuntimeError("Unrelated visual candidate")
-                if category=="SEGURANÇA" and re.search(
-                    r"press|newspaper|cherokee|printing",candidate_title,re.I):
-                    raise RuntimeError("Unrelated newspaper image for crime headline")
-                picture,credit,file_title=candidate,candidate_credit,candidate_title
-                break
-            except Exception as visual_error:
-                print("Rejected image:",provider.__name__,type(visual_error).__name__)
-        if picture is None:
-            if PLATFORM!="tiktok":
-                raise RuntimeError("No suitable licensed photograph; do not render Shorts")
-            picture=render_text_only_background(category)
-            credit="arte editorial original Giro Madeira — sem fotografia externa"
-            file_title="arte jornalística original, sem foto de ocorrência diferente"
-            print("TikTok selected original artwork rather than an unrelated photo")
+        # A published story MUST have a genuinely related, licensed photograph.
+        # Never substitute an unrelated globe, foreign leader or out-of-country image.
+        try:
+            picture,credit,file_title=licensed_openverse_photo(query)
+            if not photo_matches_story(result["title"],query,file_title):
+                raise RuntimeError("Openverse photo unrelated to the headline")
+        except Exception as primary_error:
+            print("Openverse photo rejected:",type(primary_error).__name__)
+            picture,credit,file_title=licensed_commons_download(query)
+        if not credit.startswith(("openverse_","wikimedia_")):
+            raise RuntimeError("Visual standard failed: unlicensed or non-photographic hero")
+        if not photo_matches_story(result["title"],query,file_title):
+            raise RuntimeError("Visual standard failed: photo mismatches actual story")
+        if category=="SEGURANÇA" and re.search(r"press|newspaper|cherokee|printing",file_title,re.I):
+            raise RuntimeError("Crime headline cannot use unrelated newspaper imagery")
         logo=Image.open(ROOT/"assets/logo-oficial.webp").convert("RGB")
         # O Rio Madeira segue presente no rodapé. Priorizar fotografia CC0 regional.
         try:
@@ -735,10 +724,8 @@ def main():
         preview_dir.mkdir(exist_ok=True)
         # Checagem de qualidade estrutural: não confundir renderização concluída
         # com conformidade visual. Fotografia ligada à pauta é condição obrigatória.
-        allowed_credit=credit.startswith(("openverse_","wikimedia_")) or (
-            PLATFORM=="tiktok" and credit=="arte editorial original Giro Madeira — sem fotografia externa")
-        if len(frames)!=3 or not allowed_credit:
-            raise RuntimeError("Approved visual QA failed: image relevance required")
+        if len(frames)!=3 or not credit.startswith(("openverse_","wikimedia_")):
+            raise RuntimeError("Approved visual QA failed: photo/scene requirements")
         for frame in frames:
             with Image.open(frame) as review:
                 if review.size!=(1080,1920) or review.mode!="RGB":
@@ -750,7 +737,7 @@ def main():
         if response.status_code not in (200,201):
             raise RuntimeError("Supabase signed upload failed with HTTP "+str(response.status_code))
         confirmed=bridge(token,"complete",queue_id=qid,storage_path=result["storage_path"],
-                 quality_passed=(len(frames)==3 and allowed_credit),image_credit=credit)
+                 quality_passed=(len(frames)==3 and credit.startswith(("openverse_","wikimedia_"))),image_credit=credit)
         print("Rendered and stored approved video for queue",confirmed["queue_id"])
         print("Openverse-licensed illustration:",file_title)
     except Exception as e:
