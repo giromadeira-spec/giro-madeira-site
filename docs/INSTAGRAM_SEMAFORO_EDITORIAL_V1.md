@@ -1,5 +1,8 @@
 # Giro Madeira — Semáforo Instagram e Cadência Editorial (v1)
 
+**Situação verificada em 13/10/2026:** o gate interno retornou AMARELO; `integrity_hold=false`, Feed habilitado com IDs confirmados, teste de Reels permitido e Stories desativados. O histórico VERMELHO abaixo refere-se à situação anterior. Ainda há erro HTTP 403 em registro Meta, então não aumentar frequência nem declarar todas as restrições externas encerradas sem teste de publicação.
+
+
 Configuração implantada no Supabase do projeto `dsihvbdhocbqscaypraw` em 10/10/2026. Documentação sem segredos e sem tokens.
 
 ## Estado atual: VERMELHO (não publicar)
