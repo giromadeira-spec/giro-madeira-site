@@ -45,7 +45,7 @@ Fonte operacional: [docs/RADARES_INDEPENDENTES.md](docs/RADARES_INDEPENDENTES.md
 
 - Prioridade Brasil, depois mundo, por último Rondônia. Somente notícias atuais de grande impacto; escore alto e marcador urgente não substituem relevância. Não preencher vaga com rotina policial, previsão comum, opinião, promessa ou entretenimento.
 - Conferir data na própria reportagem (até 24 horas), fonte, fatos, duplicidade e mídia. Não usar apenas a data recente de coleta/homepage para representar notícia antiga como atual.
-- Janelas Porto Velho: 06h30, 10h, 13h30, 17h, 20h30; até cinco vídeos/dia, mínimo 90min, janela 45min. Sem retroatividade ou obrigação de preencher slot sem pauta aprovada.
+- Agenda vigente desde 13/10/2026: TikTok e Shorts às **08h e 22h de Porto Velho**; TikTok até 2 vídeos/dia, mínimo 90min, janela 45min, sem urgência fora dos horários. Não preencher sem pauta aprovada.
 - Fiscalização do ChatGPT autorizada a corrigir falhas técnicas claras e testadas SOMENTE no TikTok. Preservar e retomar o mesmo registro/mídia até duas vezes; sem duplicar. Publicação incerta exige reconciliação do Buffer antes de qualquer reenvio. HTTP 429/5xx/timeout da fonte tem backoff de 15min e retry limitado; falta de fatos/data/licença continua bloqueada.
-- Sucesso exige aprovação editorial/visual, vídeo vertical 1080x1920/30fps e Buffer sent com link público TikTok. Avisos de sucesso/falha devem ser únicos por ocorrência.
+- Sucesso exige aprovação editorial/visual, vídeo vertical 1080x1920/30fps e Buffer sent com link público TikTok. A sincronização Buffer -> fila editorial vale apenas quando platform=tiktok; não modificar IDs ou filas do YouTube. Avisos únicos por ocorrência.
 - Ruflo, OpenHands e LangGraph do laboratório atuam em análise/revisão locais sem LLM pago. Não afirmar 60 IAs gratuitas ou conexão automática a este chat. Instalar modelos/provedores pagos continua proibido.
