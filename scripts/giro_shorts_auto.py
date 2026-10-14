@@ -43,6 +43,9 @@ def article_subject(title):
     t=title.lower()
     # TikTok-only topic fixes; preserve the working Shorts classification.
     if PLATFORM == "tiktok":
+        # A stabbing attack at a supermarket must not be illustrated by a globe.
+        if re.search(r"facadas?|esfaquead",t) and re.search(r"supermercad",t):
+            return "supermarket aisle", "SEGURANÇA"
         # Contextual, individually licensed images are preferred to generic world imagery.
         if re.search(r"r[uú]ss|ucr[aâ]ni|kharkiv|cessar[- ]fogo|bombardeio", t):
             return "ukraine war damage", "MUNDO"
@@ -128,6 +131,7 @@ def photo_matches_topic(topic, title):
       "mosquito aedes aegypti macro":r"\b(mosquito|aedes aegypti)\b",
       "lightning storm":r"\b(lightning|thunderstorm|electric storm)\b",
       "police car emergency lights":r"\b(police car|police vehicle|police lights|police cruiser)\b",
+      "supermarket aisle":r"\b(supermarket|grocery store|supermercado)\b",
       "soccer ball field":r"\b(soccer ball|football ball|soccer field|football field)\b",
       "financial city skyscrapers":r"\b(skyscraper|financial district|financial center|financial centre)\b",
       "computer circuit board macro":r"\b(circuit board|printed circuit|motherboard)\b",
@@ -147,6 +151,38 @@ def photo_matches_topic(topic, title):
       return False
     return bool(pattern and re.search(pattern,title,re.I))
 
+def photo_matches_story(headline, topic, image_title):
+    """Reject unrelated stock photos even if broad category matches the headline."""
+    if not photo_matches_topic(topic,image_title):
+        return False
+    if PLATFORM != "tiktok":
+        return True
+    head=clean(headline).lower()
+    image=clean(image_title).lower()
+    if topic=="world globe earth":
+        return False
+    if topic=="diplomacy meeting":
+        leaders=[name for name in ("trump","zelensky","putin","lula","bolsonaro","biden")
+                 if name in head]
+        if leaders and sum(name in image for name in leaders)<min(2,len(leaders)):
+            return False
+    # Metadata must anchor international incidents to the country/city mentioned.
+    places=[
+        (r"\b(coreia do sul|seul|incheon)\b",r"\b(south korea|korea|korean|incheon|seoul|coreia)\b"),
+        (r"\b(paquist[aã]o|paquistan[eê]s)\b",r"\b(pakistan|pakistani|paquist[aã]o)\b"),
+        (r"\b(riad|riyadh|ar[aá]bia saudita|houthis|iem[eê]n)\b",
+         r"\b(riyadh|riad|saudi|yemen|houthi)\b"),
+        (r"\b(m[eé]xico|mexican[oa])\b",r"\b(mexico|mexican|m[eé]xico)\b"),
+    ]
+    for headline_place,image_place in places:
+        if re.search(headline_place,head) and not re.search(image_place,image):
+            return False
+    if topic=="police car emergency lights" and re.search(
+        r"\b(porto velho|rond[oô]nia|em ro|em mt)\b",head
+    ) and not re.search(r"\b(brasil|brazil|porto velho|rond[oô]nia|mato grosso)\b",image):
+        return False
+    return True
+
 def licensed_commons_download(topic):
     """Fallback: Wikimedia Commons photo with per-file licensing, subject and bytes verified."""
     endpoint="https://commons.wikimedia.org/w/api.php"
@@ -161,6 +197,7 @@ def licensed_commons_download(topic):
        "ocean waves":["ocean waves storm","rough sea waves"],
       "brazil electronic voting machine":["urna eletrônica", "electronic voting machine"],
       "police car emergency lights":["police car", "police vehicle"],
+      "supermarket aisle":["supermarket aisle", "supermarket interior"],
       "lightning storm":["lightning storm", "lightning"],
       "soccer ball field":["soccer ball", "football field"],
       "aircraft airplane":["airplane on runway", "aircraft at airport", "airplane"],
@@ -386,7 +423,8 @@ def make_frame(photo,river,logo,claim,scene,idx,credit,path):
     # Every retrieved license is for an illustrative photo, never evidence of this event.
     # Explicit annotation prevents viewers from treating generic police visuals as real footage.
     d.rounded_rectangle((58,790,401,838),radius=4,fill=(3,16,36,232))
-    d.text((74,802),"IMAGEM ILUSTRATIVA",font=ImageFont.truetype(regular,26),fill=WHITE)
+    visual_label="ARTE EDITORIAL" if PLATFORM=="tiktok" and credit.startswith("arte editorial original") else "IMAGEM ILUSTRATIVA"
+    d.text((74,802),visual_label,font=ImageFont.truetype(regular,26),fill=WHITE)
     if claim.get("urgent") is True:
         d.rounded_rectangle((785,45,1034,117),radius=6,fill=(222,31,45,255))
         d.text((800,55),"URGENTE",font=ImageFont.truetype(heavy,43),fill=WHITE)
@@ -559,6 +597,24 @@ def render_self_test():
                 raise RuntimeError("TikTok topical image mapping failed: "+headline)
         if photo_matches_topic("ukraine war damage","The Earth seen from Apollo 17.jpg"):
             raise RuntimeError("Unrelated Earth photo accepted for a war story")
+        # Regression cases taken from previous TikTok render records.
+        for headline,query,photo in (
+            ("Ataque a facadas em supermercado deixa 8 feridos na Coreia do Sul",
+             "world globe earth","The Earth seen from Apollo 17.jpg"),
+            ("Paquistão fecha escolas e bloqueia ruas",
+             "school building exterior","Miami Indian School"),
+            ("Trump quer reunião entre Zelensky e Putin",
+             "diplomacy meeting","Tallinn Digital Summit. Meeting of Emmanuel Macron"),
+            ("Furacão Simon ameaça costa do México",
+             "lightning storm","June lightning storm Seaside Park NJ"),
+        ):
+            if photo_matches_story(headline,query,photo):
+                raise RuntimeError("TikTok accepted disconnected visual: "+headline)
+        if article_subject("Ataque a facadas em supermercado na Coreia do Sul") != ("supermarket aisle","SEGURANÇA"):
+            raise RuntimeError("Korean supermarket attack mapped to wrong illustration")
+        if not photo_matches_story("Ataque em supermercado na Coreia do Sul",
+                                   "supermarket aisle","South Korea supermarket aisle"):
+            raise RuntimeError("Relevant Korean supermarket photo rejected")
     for headline, expected in (
         ("Mulher fica ferida após acidente envolvendo quatro veículos na Farquar", ("road traffic highway", "TRÂNSITO")),
         ("Ônibus são atingidos por incêndio em garagem de frigorífico", ("fire engine firefighting", "SEGURANÇA")),
@@ -634,19 +690,31 @@ def main():
         query,category=article_subject(result["title"])
         if not query:
             raise RuntimeError("No safe topic for photographic illustration; editorial review required")
-        # O padrão visual aprovado exige fotografia REAL, licenciada e pertinente.
-        # Se nenhuma foto válida existir, bloquear o Short em vez de publicar arte genérica.
-        try:
-            picture,credit,file_title=licensed_openverse_photo(query)
-        except Exception as primary_error:
-            print("Openverse without topical licensed photo:",type(primary_error).__name__)
-            picture,credit,file_title=licensed_commons_download(query)
-        if not credit.startswith(("openverse_","wikimedia_")):
-            raise RuntimeError("Visual standard failed: unlicensed or non-photographic hero")
-        if not photo_matches_topic(query,file_title):
-            raise RuntimeError("Visual standard failed: photo mismatches headline topic")
-        if category=="SEGURANÇA" and re.search(r"press|newspaper|cherokee|printing",file_title,re.I):
-            raise RuntimeError("Crime headline cannot use unrelated newspaper imagery")
+        # Publish only a photograph tied to the article, not a generic world image.
+        # TikTok falls back to branded original editorial artwork when no safe photo
+        # is available. The independently produced YouTube Shorts flow is unchanged.
+        picture=credit=file_title=None
+        for provider in (licensed_openverse_photo,licensed_commons_download):
+            try:
+                candidate,candidate_credit,candidate_title=provider(query)
+                if not candidate_credit.startswith(("openverse_","wikimedia_")):
+                    raise RuntimeError("Unlicensed visual candidate")
+                if not photo_matches_story(result["title"],query,candidate_title):
+                    raise RuntimeError("Unrelated visual candidate")
+                if category=="SEGURANÇA" and re.search(
+                    r"press|newspaper|cherokee|printing",candidate_title,re.I):
+                    raise RuntimeError("Unrelated newspaper image for crime headline")
+                picture,credit,file_title=candidate,candidate_credit,candidate_title
+                break
+            except Exception as visual_error:
+                print("Rejected image:",provider.__name__,type(visual_error).__name__)
+        if picture is None:
+            if PLATFORM!="tiktok":
+                raise RuntimeError("No suitable licensed photograph; do not render Shorts")
+            picture=render_text_only_background(category)
+            credit="arte editorial original Giro Madeira — sem fotografia externa"
+            file_title="arte jornalística original, sem foto de ocorrência diferente"
+            print("TikTok selected original artwork rather than an unrelated photo")
         logo=Image.open(ROOT/"assets/logo-oficial.webp").convert("RGB")
         # O Rio Madeira segue presente no rodapé. Priorizar fotografia CC0 regional.
         try:
@@ -667,8 +735,10 @@ def main():
         preview_dir.mkdir(exist_ok=True)
         # Checagem de qualidade estrutural: não confundir renderização concluída
         # com conformidade visual. Fotografia ligada à pauta é condição obrigatória.
-        if len(frames)!=3 or not credit.startswith(("openverse_","wikimedia_")):
-            raise RuntimeError("Approved visual QA failed: photo/scene requirements")
+        allowed_credit=credit.startswith(("openverse_","wikimedia_")) or (
+            PLATFORM=="tiktok" and credit=="arte editorial original Giro Madeira — sem fotografia externa")
+        if len(frames)!=3 or not allowed_credit:
+            raise RuntimeError("Approved visual QA failed: image relevance required")
         for frame in frames:
             with Image.open(frame) as review:
                 if review.size!=(1080,1920) or review.mode!="RGB":
@@ -680,7 +750,7 @@ def main():
         if response.status_code not in (200,201):
             raise RuntimeError("Supabase signed upload failed with HTTP "+str(response.status_code))
         confirmed=bridge(token,"complete",queue_id=qid,storage_path=result["storage_path"],
-                 quality_passed=(len(frames)==3 and credit.startswith(("openverse_","wikimedia_"))),image_credit=credit)
+                 quality_passed=(len(frames)==3 and allowed_credit),image_credit=credit)
         print("Rendered and stored approved video for queue",confirmed["queue_id"])
         print("Openverse-licensed illustration:",file_title)
     except Exception as e:
