@@ -470,11 +470,11 @@ Deno.serve(async req=>{
    }
    const source=await db.from("giro_social_video_queue")
       .select("source_url,shorts_image_credit").eq("id",job.source_queue_id).eq("platform","tiktok").maybeSingle();
-   if(source.error || !source.data || !/^https:\/\//.test(String(source.data.source_url||"")) || !source.data.shorts_image_credit){
+   if(source.error || !source.data || !/^https:\/\//.test(String(source.data.source_url||"")) || !/^wikimedia_event_/.test(String(source.data.shorts_image_credit||""))){
      await db.from("giro_buffer_tiktok_jobs").update({status:"review_required",last_error:"source_or_image_attribution_missing",updated_at:new Date().toISOString()}).eq("id",jobId).eq("status","claimed");
      return respond({ok:false,processed:0,error:"source_or_image_attribution_missing"},422);
    }
-   const caption=String(job.caption)+"\n\nFonte: "+source.data.source_url+"\nImagem ilustrativa: "+source.data.shorts_image_credit;
+   const caption=String(job.caption)+"\n\nFonte: "+source.data.source_url+"\nFoto do acontecimento: "+source.data.shorts_image_credit;
    const savedCaption=await db.from("giro_buffer_tiktok_jobs").update({caption}).eq("id",jobId).eq("status","claimed");
    if(savedCaption.error)return respond({ok:false,processed:0,error:"caption_save_failed_do_not_send"},500);
    const gql="mutation CreatePost($input:CreatePostInput!){createPost(input:$input){... on PostActionSuccess{post{id,dueAt,status}} ... on MutationError{message}}}";
