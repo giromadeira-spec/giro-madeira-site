@@ -58,6 +58,7 @@ Deno.serve(async req=>{
       .eq("platform","tiktok").eq("source_kind","radar")
       .eq("status","pronto_para_revisao")
       .eq("storyboard_status","preparado")
+      .in("topic_scope",["brasil","mundo"])
       .eq("visual_review_status","pending")
       .eq("shorts_render_version",0).is("provider_post_id",null)
       .gte("created_at",yesterday).gte("scheduled_for",new Date(Date.parse(todayInPortoVelho)-6*3600000).toISOString())
@@ -65,6 +66,10 @@ Deno.serve(async req=>{
       .order("scheduled_for",{ascending:true}).limit(8);
     if(qe)throw qe;
     for(const item of items||[]){
+      // Defense in depth: never render regional/local-only news on video lanes.
+      const headline=String(item.title||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+      const roLocal=/\b(rondonia|porto velho|ji parana|ariquemes|vilhena|cacoal|guajara mirim|jaru|rolim de moura|pimenta bueno|candeias do jamari|machadinho do oeste|ouro preto do oeste|buritis|em ro)\b/;
+      if(roLocal.test(headline)&&!/\b(em todo o brasil|em todo o pais|todo territorio nacional|rodovias federais)\b/.test(headline))continue;
       const scenes=item.scene_cards;
       const finite=/(?<![\p{L}])(é|são|foi|foram|está|estão|estava|estavam|tem|têm|teve|terá|há|haverá|pode|podem|poderá|deve|devem|será|serão|disse|diz|afirma|afirmou|anunciou|determinou|determina|decidiu|decide|investiga|investigam|investigou|prendeu|prenderam|registra|registrou|cai|caiu|subiu|sobe|chega|chegou|fez|faz|marca|marcou|dará|fará|reduziu|aumentou|planeja|planejam|recebeu|recebe|aponta|apontou|deixa|deixou|ocorreu|ocorre|difere|privatizará|ficou|ficaram|mantém|confirmou|confirma|realizará|realizou|retotalizará|atingiu|atinge|segue|seguem|retoma|retomou|apresenta|apresentou|explica|explicou|destaca|destacou|aprova|aprovou|rejeita|rejeitou|começa|começou|trabalham|trabalhou|atuam|atua|traz|trouxe|anula|anulou|lançou|lança|prevê|previu|define|definiu|obriga|obrigou|aciona|acionou|renova|renovam|renovaram|remove|removem|removeram|liberou|liberaram|garantiu|garantem|bloqueia|bloqueou|paralisa|paralisou|interrompe|interromperá|retorna|retornarão|afeta|afetará|registram|registraram|fica|ficará|indica|indicou|publicou|divulgou|desmentiu|provocou|adiou|retirou|enfrenta|sofreu|alertou|alerta|suspende|suspendeu|revela|revelou|prorroga|prorrogou|expande|amplia|vence|venceu|vencem|venceram|derrota|derrotou|goleia|goleou|golearam|empata|empatou|empataram|perde|perdeu|perderam|eliminou|elimina|eliminaram|classificou|classificaram|avancou|avancaram|terminou|terminaram|vitória|vitoria|informa|informou|soaram|soou|revelou|revelaram|identificou|identificaram|detectou|detectaram)(?![\p{L}])/iu;
       if(!Array.isArray(scenes)||scenes.some(v=>!finite.test(String(v))))continue;
