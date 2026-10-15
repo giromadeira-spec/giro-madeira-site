@@ -38,7 +38,7 @@ Deno.serve(async(req:Request)=>{
       .eq("platform","tiktok").eq("status","pronto_para_revisao")
       .in("topic_scope",["brasil","mundo"])
       .eq("editor_approved",true).eq("visual_review_status","approved")
-      .eq("shorts_render_origin","tiktok_github_oidc_v1").eq("storyboard_status","preparado")
+      .eq("shorts_render_origin","tiktok_github_oidc_v1").like("shorts_image_credit","wikimedia_event_%").eq("storyboard_status","preparado")
       .gte("shorts_rendered_at",new Date(Date.now()-18*3600000).toISOString())
       .order("scheduled_for",{ascending:false}).limit(16);
     if(e)return response({success:false,error:"source_lookup_failed"},503);
