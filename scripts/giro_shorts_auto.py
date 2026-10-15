@@ -677,9 +677,9 @@ def render_frames(frames,out,music):
     concat=[]
     for idx,frame in enumerate(frames):
         segment=out.parent/("scene"+str(idx)+".mp4")
-        subprocess.run(["ffmpeg","-hide_banner","-loglevel","error","-y","-loop","1","-framerate","15","-i",str(frame),
+        subprocess.run(["ffmpeg","-hide_banner","-loglevel","error","-y","-loop","1","-framerate","30","-i",str(frame),
          "-t","9","-vf","fade=t=in:st=0:d=0.3,fade=t=out:st=8.65:d=0.35",
-         "-r","15","-c:v","libx264","-preset","veryfast","-crf","26","-pix_fmt","yuv420p","-an",str(segment)],
+         "-r","30","-c:v","libx264","-preset","veryfast","-crf","26","-pix_fmt","yuv420p","-an",str(segment)],
          check=True,timeout=130)
         concat.append(segment)
     listing=out.parent/"frames.txt"
@@ -690,10 +690,13 @@ def render_frames(frames,out,music):
     if not (100000<out.stat().st_size<30*1024*1024):raise RuntimeError("Output out of bounds")
     # Validate actual encode parameters, not only extension.
     proc=subprocess.run(["ffprobe","-v","error","-select_streams","v:0","-show_entries",
-        "stream=width,height,codec_name","-of","json",str(out)],capture_output=True,text=True,check=True)
+        "stream=width,height,codec_name,avg_frame_rate","-of","json",str(out)],capture_output=True,text=True,check=True)
     stream=json.loads(proc.stdout)["streams"][0]
     if stream.get("codec_name")!="h264" or stream["width"]!=1080 or stream["height"]!=1920:
         raise RuntimeError("Output video dimensions or codec invalid")
+    fps=stream.get("avg_frame_rate","0/1").split("/")
+    if len(fps)!=2 or int(fps[1])==0 or abs(int(fps[0])/int(fps[1])-30)>0.01:
+        raise RuntimeError("Output video must be 30 fps")
 
 def render_self_test():
     """Offline QA: no OIDC, no Supabase, no YouTube and no network requests.
