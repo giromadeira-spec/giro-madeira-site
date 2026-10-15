@@ -16,6 +16,7 @@ ROOT=Path(__file__).resolve().parents[1]
 HEADERS={"User-Agent":"GiroMadeiraShorts/1.0 (editorial illustration; github.com/giromadeira-spec/giro-madeira-site)"}
 W,H=1080,1920
 NAVY=(4,17,40); YELLOW=(255,212,0); WHITE=(250,250,254)
+ORIGINAL_CREDIT="arte editorial original Giro Madeira — sem fotografia externa"
 
 def github_token():
     url=os.environ.get("ACTIONS_ID_TOKEN_REQUEST_URL")
@@ -68,6 +69,7 @@ def article_subject(title):
         if re.search(r"pres[ií]dio|prisional|policial penal|apreens[aã]o|apreende|mandado", t):
             return "police car emergency lights", "SEGURANÇA"
     mapping=[
+     (r"(?=.*(?:crian[cç]as|adolescentes))(?=.*(?:internet|online|digital|redes sociais))|(?:crimes? de [oó]dio|amea[cç]as) na internet","cyber safety editorial","SEGURANÇA"),
      (r"cadastro [uú]nico|cad[uú]nico|bolsa fam[ií]lia","cadastro unico editorial graphic","SERVIÇOS"),
      (r"mosquito|dengue|aedes|zika|sa[uú]de|vacina|hospital","mosquito aedes aegypti macro","SAÚDE"),
      (r"gasolina|combust[ií]vel|petr[oó]leo|petrobras|posto","gas station petrol pump","ECONOMIA"),
@@ -336,6 +338,38 @@ def render_text_only_background(category):
     d.ellipse((620,270,1030,680),outline=(74,105,128),width=12)
     d.ellipse((700,350,950,600),outline=(74,105,128),width=6)
     d.rectangle((70,1160,1010,1172),fill=YELLOW)
+    return image
+
+def render_topic_illustration(headline,category):
+    """Original symbolic illustration; not documentary evidence or publisher photography."""
+    image=render_text_only_background(category)
+    d=ImageDraw.Draw(image)
+    title=clean(headline).lower()
+    accent=(247,206,24)
+    muted=(96,148,187)
+    if re.search(r"crian[cç]as|adolescentes|internet|digital|cibern[eé]tico|online",title):
+        # Digital safety: shield and padlock; never show minors.
+        d.rounded_rectangle((244,317,834,720),radius=38,outline=muted,width=14)
+        d.line([(540,381),(716,455),(693,598),(540,670),(387,598),(364,455),(540,381)],
+               fill=accent,width=17,joint="curve")
+        d.arc((467,476,613,604),180,360,fill=accent,width=14)
+        d.rounded_rectangle((455,546,625,645),radius=12,outline=accent,width=12)
+    elif re.search(r"energia|el[eé]tric|apag[aã]o|sem luz|r[uú]ss|ucr[aâ]ni",title):
+        # Symbolic power grid; no invented explosion, injury or location.
+        for xx in (274,744):
+            d.line([(xx,720),(xx+72,332),(xx+140,720)],fill=accent,width=13)
+            for yy in (421,512,610):
+                d.line((xx+18,yy,xx+121,yy),fill=muted,width=11)
+        d.line([(346,410),(530,350),(815,428)],fill=muted,width=8)
+        d.line([(346,497),(530,448),(815,515)],fill=muted,width=8)
+    elif re.search(r"acidente|rodovia|tr[aâ]nsito|colis[aã]o",title):
+        d.polygon([(450,360),(640,360),(860,745),(190,745)],outline=accent,width=10)
+        for yy in (415,513,631):
+            d.line((540,yy,540,yy+44),fill=accent,width=14)
+    else:
+        d.line([(540,366),(770,474),(741,680),(540,767),(339,680),(310,474),(540,366)],
+               fill=accent,width=20,joint="curve")
+        d.line([(452,565),(515,630),(640,500)],fill=muted,width=23,joint="curve")
     return image
 
 def cover(im,w,h,x=.5,y=.5):
@@ -614,6 +648,10 @@ def render_self_test():
         if not photo_matches_story("Ataque em supermercado na Coreia do Sul",
                                    "supermarket aisle","South Korea supermarket aisle"):
             raise RuntimeError("Relevant Korean supermarket photo rejected")
+    if article_subject("PF faz operação contra crimes de ódio e violência sexual contra crianças na internet") != ("cyber safety editorial","SEGURANÇA"):
+        raise RuntimeError("Child cybercrime story must use safe symbolic visuals")
+    if render_topic_illustration("Ataques russos deixam cidades sem energia na Ucrânia","MUNDO").size!=(W,H):
+        raise RuntimeError("Energy illustration must be 1080x1920")
     for headline, expected in (
         ("Mulher fica ferida após acidente envolvendo quatro veículos na Farquar", ("road traffic highway", "TRÂNSITO")),
         ("Ônibus são atingidos por incêndio em garagem de frigorífico", ("fire engine firefighting", "SEGURANÇA")),
@@ -689,19 +727,30 @@ def main():
         query,category=article_subject(result["title"])
         if not query:
             raise RuntimeError("No safe topic for photographic illustration; editorial review required")
-        # A published story MUST have a genuinely related, licensed photograph.
-        # Never substitute an unrelated globe, foreign leader or out-of-country image.
-        try:
-            picture,credit,file_title=licensed_openverse_photo(query)
-            if not photo_matches_story(result["title"],query,file_title):
-                raise RuntimeError("Openverse photo unrelated to the headline")
-        except Exception as primary_error:
-            print("Openverse photo rejected:",type(primary_error).__name__)
-            picture,credit,file_title=licensed_commons_download(query)
-        if not credit.startswith(("openverse_","wikimedia_")):
-            raise RuntimeError("Visual standard failed: unlicensed or non-photographic hero")
-        if not photo_matches_story(result["title"],query,file_title):
-            raise RuntimeError("Visual standard failed: photo mismatches actual story")
+        # Prefer licensed, genuinely related photos. If unavailable, use explicit
+        # original symbolic art instead of disconnected stock footage.
+        if query=="cyber safety editorial":
+            picture=render_topic_illustration(result["title"],category)
+            credit=ORIGINAL_CREDIT
+            file_title="Original symbolic cyber-safety illustration"
+        else:
+            try:
+                picture,credit,file_title=licensed_openverse_photo(query)
+                if not photo_matches_story(result["title"],query,file_title):
+                    raise RuntimeError("Openverse photograph unrelated to headline")
+            except Exception as primary_error:
+                print("Openverse unavailable or unrelated:",type(primary_error).__name__)
+                try:
+                    picture,credit,file_title=licensed_commons_download(query)
+                    if not photo_matches_story(result["title"],query,file_title):
+                        raise RuntimeError("Wikimedia photograph unrelated to headline")
+                except Exception as backup_error:
+                    print("Wikimedia unavailable or unrelated:",type(backup_error).__name__)
+                    picture=render_topic_illustration(result["title"],category)
+                    credit=ORIGINAL_CREDIT
+                    file_title="Original symbolic editorial illustration"
+        if credit!=ORIGINAL_CREDIT and not credit.startswith(("openverse_","wikimedia_")):
+            raise RuntimeError("Visual standard failed: unlicensed external image")
         if category=="SEGURANÇA" and re.search(r"press|newspaper|cherokee|printing",file_title,re.I):
             raise RuntimeError("Crime headline cannot use unrelated newspaper imagery")
         logo=Image.open(ROOT/"assets/logo-oficial.webp").convert("RGB")
@@ -724,8 +773,9 @@ def main():
         preview_dir.mkdir(exist_ok=True)
         # Checagem de qualidade estrutural: não confundir renderização concluída
         # com conformidade visual. Fotografia ligada à pauta é condição obrigatória.
-        if len(frames)!=3 or not credit.startswith(("openverse_","wikimedia_")):
-            raise RuntimeError("Approved visual QA failed: photo/scene requirements")
+        image_verified=(credit==ORIGINAL_CREDIT or credit.startswith(("openverse_","wikimedia_")))
+        if len(frames)!=3 or not image_verified:
+            raise RuntimeError("Approved visual QA failed: licensed photo or original illustration required")
         for frame in frames:
             with Image.open(frame) as review:
                 if review.size!=(1080,1920) or review.mode!="RGB":
@@ -737,7 +787,7 @@ def main():
         if response.status_code not in (200,201):
             raise RuntimeError("Supabase signed upload failed with HTTP "+str(response.status_code))
         confirmed=bridge(token,"complete",queue_id=qid,storage_path=result["storage_path"],
-                 quality_passed=(len(frames)==3 and credit.startswith(("openverse_","wikimedia_"))),image_credit=credit)
+                 quality_passed=(len(frames)==3 and image_verified),image_credit=credit)
         print("Rendered and stored approved video for queue",confirmed["queue_id"])
         print("Openverse-licensed illustration:",file_title)
     except Exception as e:
