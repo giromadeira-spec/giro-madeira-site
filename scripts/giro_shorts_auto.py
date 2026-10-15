@@ -5,6 +5,8 @@ Never uses unlicensed news-site photography or a secret from this repository.
 """
 import html, io, json, math, os, random, re, subprocess, sys, tempfile, time, urllib.parse, wave
 from pathlib import Path
+from html.parser import HTMLParser
+import unicodedata
 import requests
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
 
@@ -92,6 +94,108 @@ def article_subject(title):
     # Unknown subject: no generic newspaper/printing-press imagery is editorially acceptable.
     # Hold the item until a topic-specific licensed photograph can be selected.
     return "", "NOTÍCIAS"
+
+
+# Proveniência obrigatória: jamais escolher foto só pela categoria da manchete.
+# Somente a imagem ligada À PRÓPRIA matéria, com legenda factual e licença reutilizável.
+def event_tokens(text):
+    plain=unicodedata.normalize("NFKD",clean(text)).encode("ascii","ignore").decode().lower()
+    stop={"sobre","apos","para","pelo","pela","pelos","pelas","com","sem","entre","quando",
+          "noticia","noticias","foto","imagem","reportagem","brasil","brasileiro",
+          "novo","nova","hoje","ontem","foram","deixa","deixam","durante","mais",
+          "sobre","onde","esta","sao","uma","dois","tres","quatro","cinco"}
+    return {t for t in re.findall(r"[a-z0-9]{4,}",plain) if t not in stop}
+
+def event_caption_matches(headline,caption):
+    terms=event_tokens(headline)
+    overlaps=terms & event_tokens(caption)
+    return len(overlaps)>=2 and len(overlaps)>=min(3,len(terms))
+
+class EventPageImages(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.meta={}
+        self.images=[]
+    def handle_starttag(self,tag,attrs):
+        attrs=dict(attrs)
+        if tag=="meta":
+            key=(attrs.get("property") or attrs.get("name") or "").lower().strip()
+            if key and attrs.get("content"):self.meta[key]=attrs["content"]
+        if tag=="img":
+            src=attrs.get("src") or attrs.get("data-src") or ""
+            if src:self.images.append((src,attrs.get("alt") or ""))
+
+def licensed_event_photo(source_url,headline):
+    """Use ONLY the original story's image, described as the same event and CC-licensed.
+
+    An OG image alone only means editorial association, not an authentic event photo.
+    The source page must identify its specific content; individual Wikimedia licensing
+    is checked separately. Unverified or illustrative photos are rejected.
+    """
+    parsed=urllib.parse.urlsplit(source_url)
+    host=(parsed.hostname or "").lower()
+    if (parsed.scheme!="https" or not host or host in {"localhost","127.0.0.1"} or
+        host.endswith((".local",".internal")) or parsed.username or parsed.password):
+        raise RuntimeError("Original news source URL invalid")
+    response=requests.get(source_url,headers=HEADERS,timeout=18)
+    response.raise_for_status()
+    if "text/html" not in response.headers.get("Content-Type","text/html").lower() or len(response.content)>2_500_000:
+        raise RuntimeError("Original story HTML unavailable or too large")
+    page=EventPageImages()
+    page.feed(response.text)
+    title=page.meta.get("og:title","")
+    if not event_caption_matches(headline,title):
+        raise RuntimeError("Source page title does not match news headline")
+    img=page.meta.get("og:image","") or page.meta.get("twitter:image","")
+    if not img:
+        raise RuntimeError("No picture is attributed to the original news article")
+    img=urllib.parse.urljoin(response.url,img)
+    image_url=urllib.parse.urlsplit(img)
+    # Commons photo explicitly supplied by the article; never substitute a search hit.
+    if image_url.scheme!="https" or image_url.hostname!="upload.wikimedia.org":
+        raise RuntimeError("No source-linked photograph with a verifiable reuse license")
+    alt=(page.meta.get("og:image:alt") or page.meta.get("twitter:image:alt") or "")
+    if not alt:
+        for raw,description in page.images:
+            resolved=urllib.parse.urljoin(response.url,raw)
+            if resolved==img or urllib.parse.unquote(resolved.split("/")[-1])==urllib.parse.unquote(img.split("/")[-1]):
+                alt=description
+                break
+    if re.search(r"ilustrativ|meramente|foto de arquivo|imagem de arquivo|stock|shutterstock|freepik|representa[cç][aã]o|montagem|gen[eé]ric|arquivo pessoal",alt,re.I):
+        raise RuntimeError("The photo is illustrative or archival, not evidence of this event")
+    if not alt or not event_caption_matches(headline,alt):
+        raise RuntimeError("Original photo caption does not identify the reported occurrence")
+    parts=[urllib.parse.unquote(x) for x in image_url.path.split("/") if x]
+    filename=(parts[-2] if "thumb" in parts and len(parts)>2 else parts[-1]) if parts else ""
+    if not re.search(r"\.(jpe?g|png|webp)$",filename,re.I):
+        raise RuntimeError("Original news image is not an identified Wikimedia photo")
+    api=requests.get("https://commons.wikimedia.org/w/api.php",params={
+        "action":"query","titles":"File:"+filename,"prop":"imageinfo",
+        "iiprop":"url|size|extmetadata","iiurlwidth":"1600",
+        "format":"json","formatversion":"2"
+    },headers=HEADERS,timeout=20)
+    api.raise_for_status()
+    pages=api.json().get("query",{}).get("pages",[])
+    for p in pages:
+        info=(p.get("imageinfo") or [None])[0]
+        if not info:continue
+        meta=info.get("extmetadata") or {}
+        lic=clean(html.unescape(re.sub("<[^>]*>"," ",str((meta.get("LicenseShortName") or {}).get("value","")))))
+        license_url=str((meta.get("LicenseUrl") or {}).get("value",""))
+        cc0=bool(re.search(r"\bCC0\b",lic,re.I) and "creativecommons.org/publicdomain/zero/" in license_url)
+        ccby=bool(re.fullmatch(r"CC[ -]*BY[ -]*(?:2\.0|2\.5|3\.0|4\.0)",lic,re.I) and
+            license_url.startswith("https://creativecommons.org/licenses/by/"))
+        if not (cc0 or ccby):continue
+        if int(info.get("width",0))<900 or int(info.get("height",0))<650:continue
+        artist=clean(html.unescape(re.sub("<[^>]*>"," ",str((meta.get("Artist") or {}).get("value","")))))
+        if ccby and not artist:continue
+        pic=str(info.get("thumburl") or info.get("url") or "")
+        if urllib.parse.urlsplit(pic).hostname not in ("upload.wikimedia.org","thumb.wikimedia.org"):continue
+        actual=fetch_picture(pic)
+        landing="https://commons.wikimedia.org/wiki/File:"+urllib.parse.quote(filename.replace(" ","_"),safe="()-_.")
+        credit=("wikimedia_event_"+filename[:55]+" — "+artist[:65]+" — "+lic+" — "+landing)[:445]
+        return actual,credit,filename
+    raise RuntimeError("The linked photograph has no verifiable reusable Commons license")
 
 def licensed_commons_photo(topic):
     # Wikimedia Commons is not a blanket license: verify each file's metadata.
@@ -454,10 +558,10 @@ def make_frame(photo,river,logo,claim,scene,idx,credit,path):
     d.polygon([(55,tag_top),(tag_right+28,tag_top),(tag_right,tag_top+74),(55,tag_top+74)],fill=YELLOW)
     d.text((85,tag_top+9),category,font=tagfont,fill=NAVY)
     d.line((tag_right+29,tag_top+69,1015,tag_top+69),fill=YELLOW,width=5)
-    # Every retrieved license is for an illustrative photo, never evidence of this event.
-    # Explicit annotation prevents viewers from treating generic police visuals as real footage.
+    # Precise visual provenance: an actual event photo or a non-publication QA illustration.
     d.rounded_rectangle((58,790,401,838),radius=4,fill=(3,16,36,232))
-    d.text((74,802),"IMAGEM ILUSTRATIVA",font=ImageFont.truetype(regular,26),fill=WHITE)
+    photo_label="FOTO DO ACONTECIMENTO" if credit.startswith("wikimedia_event_") else "ARTE EDITORIAL"
+    d.text((74,802),photo_label,font=ImageFont.truetype(regular,26),fill=WHITE)
     if claim.get("urgent") is True:
         d.rounded_rectangle((785,45,1034,117),radius=6,fill=(222,31,45,255))
         d.text((800,55),"URGENTE",font=ImageFont.truetype(heavy,43),fill=WHITE)
@@ -658,18 +762,17 @@ def render_self_test():
             calls=[]
             def fake_bridge(token,action,**kwargs):
                 calls.append(action)
-                return {"processed":True,"queue_id":207,"title":headline} if action=="claim" else {"success":True}
+                return {"processed":True,"queue_id":207,"title":headline,"source_url":"https://news.example.org/story"} if action=="claim" else {"success":True}
             with patch.dict(os.environ,{"GITHUB_EVENT_NAME":"workflow_dispatch"}), \
                  patch(__name__+".github_token",return_value="offline-test"), \
                  patch(__name__+".bridge",side_effect=fake_bridge), \
-                 patch(__name__+".licensed_openverse_photo",side_effect=RuntimeError("no licensed photo")), \
-                 patch(__name__+".licensed_commons_download",side_effect=RuntimeError("no licensed photo")), \
+                 patch(__name__+".licensed_event_photo",side_effect=RuntimeError("no event photo")), \
                  patch(__name__+".render_topic_illustration") as illustration, \
                  patch.object(requests,"put") as upload:
                 try:
                     main()
                 except RuntimeError as error:
-                    if "TikTok requires" not in str(error):
+                    if "Real event photo unverified" not in str(error):
                         raise
                 else:
                     raise RuntimeError("TikTok approved a video without licensed photography")
@@ -756,36 +859,15 @@ def main():
         query,category=article_subject(result["title"])
         if not query:
             raise RuntimeError("No safe topic for photographic illustration; editorial review required")
-        # Prefer licensed, genuinely related photos. If unavailable, use explicit
-        # original symbolic art instead of disconnected stock footage.
-        if query=="cyber safety editorial":
-            if PLATFORM=="tiktok":
-                raise RuntimeError("TikTok requires a relevant licensed photograph; symbolic art is not approved")
-            picture=render_topic_illustration(result["title"],category)
-            credit=ORIGINAL_CREDIT
-            file_title="Original symbolic cyber-safety illustration"
-        else:
-            try:
-                picture,credit,file_title=licensed_openverse_photo(query)
-                if not photo_matches_story(result["title"],query,file_title):
-                    raise RuntimeError("Openverse photograph unrelated to headline")
-            except Exception as primary_error:
-                print("Openverse unavailable or unrelated:",type(primary_error).__name__)
-                try:
-                    picture,credit,file_title=licensed_commons_download(query)
-                    if not photo_matches_story(result["title"],query,file_title):
-                        raise RuntimeError("Wikimedia photograph unrelated to headline")
-                except Exception as backup_error:
-                    print("Wikimedia unavailable or unrelated:",type(backup_error).__name__)
-                    if PLATFORM=="tiktok":
-                        raise RuntimeError("TikTok requires a relevant licensed photograph; keep item blocked") from backup_error
-                    picture=render_topic_illustration(result["title"],category)
-                    credit=ORIGINAL_CREDIT
-                    file_title="Original symbolic editorial illustration"
-        if PLATFORM=="tiktok" and not credit.startswith(("openverse_","wikimedia_")):
-            raise RuntimeError("TikTok requires licensed photography; original symbolic art is not approved")
-        if credit!=ORIGINAL_CREDIT and not credit.startswith(("openverse_","wikimedia_")):
-            raise RuntimeError("Visual standard failed: unlicensed external image")
+        # Never use general photo banks for the news hero. If no authenticated
+        # event image is linked to the original report, preserve the queue for review.
+        try:
+            picture,credit,file_title=licensed_event_photo(result["source_url"],result["title"])
+        except Exception as no_photo:
+            raise RuntimeError("Real event photo unverified; block this item without publishing: "+
+                               str(no_photo)[:125]) from no_photo
+        if not credit.startswith("wikimedia_event_"):
+            raise RuntimeError("Visual standard failed: event photo provenance missing")
         if category=="SEGURANÇA" and re.search(r"press|newspaper|cherokee|printing",file_title,re.I):
             raise RuntimeError("Crime headline cannot use unrelated newspaper imagery")
         logo=Image.open(ROOT/"assets/logo-oficial.webp").convert("RGB")
@@ -808,7 +890,7 @@ def main():
         preview_dir.mkdir(exist_ok=True)
         # Checagem de qualidade estrutural: não confundir renderização concluída
         # com conformidade visual. Fotografia ligada à pauta é condição obrigatória.
-        image_verified=(credit==ORIGINAL_CREDIT or credit.startswith(("openverse_","wikimedia_")))
+        image_verified=credit.startswith("wikimedia_event_")
         if len(frames)!=3 or not image_verified:
             raise RuntimeError("Approved visual QA failed: licensed photo or original illustration required")
         for frame in frames:
@@ -824,7 +906,7 @@ def main():
         confirmed=bridge(token,"complete",queue_id=qid,storage_path=result["storage_path"],
                  quality_passed=(len(frames)==3 and image_verified),image_credit=credit)
         print("Rendered and stored approved video for queue",confirmed["queue_id"])
-        print("Openverse-licensed illustration:",file_title)
+        print("Verified event image from the original source:",file_title)
     except Exception as e:
         try: bridge(token,"fail",queue_id=qid)
         except Exception: print("Could not update queue error status.")
