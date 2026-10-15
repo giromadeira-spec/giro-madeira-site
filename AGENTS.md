@@ -31,6 +31,21 @@ Conferir dimensão, logo original, foto licenciada/adequada, tarja de categoria,
 Fonte operacional: [docs/RADARES_INDEPENDENTES.md](docs/RADARES_INDEPENDENTES.md). Toda mudança de radar, intervalo, fila ou agendamento deve identificar explicitamente um dos canais `shorts`, `tiktok`, `feed`, `stories`, `reels`. Nunca propagar configuração de um canal aos demais. Usar a RPC `giro_configurar_radar_independente` para mudar frequência somente no canal solicitado. Compartilhar identidade visual e fontes não autoriza compartilhar estado de consumo, aprovação, tentativas ou publicação. TikTok não depende de sucesso, ID ou vídeo público no YouTube. Publicação exige autorização por canal e revisão final: Shorts foi liberado em 11/10/2026; TikTok teve gate próprio liberado no mesmo dia após correção preventiva das imagens, sem confirmar ainda uma nova publicação real. Feed, Stories e Reels continuam sob hold Meta. A ativação de um canal nunca libera os demais.
 
 
+## Fotografia factual obrigatória — 15/10/2026 (substitui permissões anteriores de imagens temáticas)
+
+A partir deste ajuste, **Shorts, TikTok, Feed, Stories e Reels** não podem usar fotografia genérica de bancos de imagens, Openverse, pesquisa temática do Commons nem arquivo antigo apenas porque a categoria combina com a manchete. Em particular, fotos de viaturas, estradas, políticos, guerras ou escolas **não** representam uma ocorrência específica.
+
+A imagem principal deve ter uma cadeia de evidências auditável:
+
+1. URL HTTPS da **reportagem original** da pauta aprovada (não um resultado de pesquisa similar).
+2. Fotografia explicitamente ligada à **mesma reportagem**, com legenda/alt identificando os detalhes da ocorrência e sem marcador de foto ilustrativa, arquivo, banco de imagens, montagem ou IA.
+3. Permissão individual de uso: nesta primeira implementação, exigir imagem servida pelo Wikimedia Commons, vinculada à matéria e verificada por arquivo como **CC0 ou CC BY** (incluindo crédito e fonte). Foto de portal de notícias, órgão público ou rede social não é automaticamente reutilizável.
+4. Aprovação visual só para fotografia com essas evidências; demais pautas ficam pendentes para avaliação/licenciamento, sem escolher uma imagem de outra ocorrência ou publicar automaticamente. Não fazer promessas falsas sobre a disponibilidade de fotos.
+5. A tarja de imagem principal aprovada diz **FOTO DO ACONTECIMENTO**; artes internas de teste não publicáveis dizem **ARTE EDITORIAL** ou **IMAGEM ILUSTRATIVA**. O Rio Madeira na faixa inferior é apenas assinatura visual regional, nunca prova da ocorrência.
+6. A fonte da notícia e os direitos da foto são duas verificações independentes; registrar ambas, preservar a fila, não repetir publicação, não aumentar cadência nem consumir APIs pagas de IA.
+
+Código principal: `scripts/giro_shorts_auto.py` (Shorts/TikTok, execução GitHub Actions) e `supabase/functions/gerar-arte-noticia-vault/index.ts` (Instagram). A aprovação Instagram está em `supabase/functions/giro-instagram-preparar-independente/index.ts` e só reconhece `original_event_photo`. O fluxo mantém filas independentes e não publica um arquivo já existente por pressuposição de conformidade.
+
 ## Segurança editorial da imagem — correção TikTok 11/10/2026
 
 - Nunca escolher imagem por palavra genérica “notícia”, imprensa, printing press, Cherokee Phoenix ou por fallback de busca desconectado da manchete. Se a pauta não puder ser classificada com confiança, não renderizar nem publicar.
