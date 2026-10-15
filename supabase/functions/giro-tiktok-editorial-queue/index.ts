@@ -227,7 +227,7 @@ Deno.serve(async(req:Request)=>{
    })).filter(c=>
      eligible(c) &&
      !blocked(String(c.titulo),String(c.fonte_nome),String(c.fonte_url)) &&
-     (!!scopeOf({titulo:c.titulo,fonte_nome:c.fonte_nome,fonte_url:c.fonte_url}) || isSports(c))
+     (["brasil","mundo"].includes(String(scopeOf({titulo:c.titulo,fonte_nome:c.fonte_nome,fonte_url:c.fonte_url}))))
    );
    const finishedReports=uniqueFootballReports(options);
    // One football roundup at 22h Porto Velho (23h BRT) only when
