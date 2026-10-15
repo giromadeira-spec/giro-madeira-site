@@ -16,14 +16,88 @@ async function bufferRequest(query:string,variables?:Record<string,unknown>){
  if(!res.ok||json.errors?.length)throw new Error("buffer_api_error_"+String(res.status)+"_"+String(json.errors?.[0]?.extensions?.code||""));
  return json.data;
 }
+
+// Read-only Buffer lookup after a timed-out createPost response. This never
+// claims a queue item, creates a post, clears an uncertain job for retry or
+// touches a legacy YouTube source.
+function matchUncertainPost(job:any,posts:any[],channelId:string){
+ const normalize=(value:unknown)=>String(value||"").replace(/\s+/g," ").trim();
+ const caption=normalize(job.caption),created=Date.parse(job.created_at);
+ if(caption.length<80||!caption.includes("https://")||!Number.isFinite(created))return null;
+ const matches=posts.filter(post=>{
+   const at=Date.parse(post.createdAt);
+   return typeof post.id==="string"&&!!post.id&&post.channelId===channelId
+     &&normalize(post.text)===caption&&Number.isFinite(at)&&Math.abs(at-created)<=120000
+     &&Array.isArray(post.assets)&&post.assets.some((asset:any)=>/^video\//i.test(String(asset.mimeType||"")));
+ });
+ return matches.length===1?matches[0]:null;
+}
+function recoveredPostState(post:any){
+ const status=String(post.status||"").toLowerCase();
+ if(String(post.schedulingType||"").toLowerCase()!=="automatic")return "review_required";
+ if(status==="error")return "review_required";
+ if(status!=="sent")return "queued";
+ try{
+   const u=new URL(String(post.externalLink||""));
+   if(u.protocol==="https:"&&/^(www\.)?tiktok\.com$/.test(u.hostname)
+     &&/^\/@giro_madeira\/video\/\d+\/?$/.test(u.pathname)
+     &&Number.isFinite(Date.parse(post.sentAt)))return "sent";
+ }catch{}
+ return "review_required";
+}
+async function reconcileUncertain(organizationId:string,channelId:string){
+ const {data:jobs,error}=await db.from("giro_buffer_tiktok_jobs")
+   .select("id,source_queue_id,caption,created_at,last_error")
+   .eq("status","uncertain").is("buffer_post_id",null)
+   .gte("created_at",new Date(Date.now()-24*3600000).toISOString())
+   .order("created_at",{ascending:true}).limit(2);
+ if(error)throw Error("uncertain_job_lookup_failed");
+ let checked=0,changed=0;
+ for(const job of jobs||[]){
+   const source=await db.from("giro_social_video_queue").select("id")
+     .eq("id",job.source_queue_id).eq("platform","tiktok").maybeSingle();
+   if(source.error)throw Error("uncertain_source_lookup_failed");
+   if(!source.data)continue;
+   checked++;
+   const start=new Date(Date.parse(job.created_at)-120000).toISOString();
+   const end=new Date(Date.parse(job.created_at)+120000).toISOString();
+   const query="query{posts(first:100,input:{organizationId:"+JSON.stringify(organizationId)+
+     ",filter:{channelIds:["+JSON.stringify(channelId)+"],createdAt:{start:"+JSON.stringify(start)+
+     ",end:"+JSON.stringify(end)+"}},sort:[{field:createdAt,direction:desc}]})"+
+     "{edges{node{id,text,createdAt,channelId,status,schedulingType,externalLink,sentAt,assets{mimeType}}}pageInfo{hasNextPage}}}";
+   const response=await bufferRequest(query);
+   const connection=response?.posts;
+   if(!connection||!Array.isArray(connection.edges)||connection.pageInfo?.hasNextPage!==false)
+     continue; // Incomplete lookup is not evidence of absence and never permits retry.
+   const remote=matchUncertainPost(job,connection.edges.map((edge:any)=>edge.node),channelId);
+   if(!remote)continue;
+   const duplicate=await db.from("giro_buffer_tiktok_jobs").select("id")
+     .eq("buffer_post_id",remote.id).neq("id",job.id).limit(1);
+   if(duplicate.error)throw Error("uncertain_remote_duplicate_check_failed");
+   if(duplicate.data?.length)continue;
+   const state=recoveredPostState(remote),at=new Date().toISOString();
+   const update:any={status:state,buffer_post_id:remote.id,updated_at:at};
+   if(state==="sent"){update.sent_at=remote.sentAt;update.buffer_post_url=remote.externalLink;}
+   if(state==="queued")update.queued_at=at;
+   if(state==="review_required")update.last_error=("existing_post_requires_review; "+String(job.last_error||"")).slice(0,160);
+   const saved=await db.from("giro_buffer_tiktok_jobs").update(update)
+     .eq("id",job.id).eq("source_queue_id",job.source_queue_id)
+     .eq("status","uncertain").is("buffer_post_id",null).select("id").maybeSingle();
+   if(saved.error)throw Error("uncertain_delivery_save_failed");
+   if(saved.data)changed++;
+ }
+ return {checked,changed};
+}
+
 async function reconcile(organizationId:string,channelId:string){
+ const recovered=await reconcileUncertain(organizationId,channelId);
  const threshold=new Date(Date.now()-5*60000).toISOString();
  const {data:pending,error}=await db.from("giro_buffer_tiktok_jobs")
    .select("id,buffer_post_id,created_at,updated_at").eq("status","queued")
    .not("buffer_post_id","is",null).lt("updated_at",threshold).limit(8);
  if(error)throw Error("pending_job_lookup_failed");
- if(!pending?.length)return {checked:0,changed:0};
- let changed=0;
+ if(!pending?.length)return recovered;
+ let changed=recovered.changed;
  for(const item of pending){
    const query="query{post(input:{id:"+JSON.stringify(item.buffer_post_id)+
      "}){id,status,channelId,schedulingType,externalLink,sentAt,error{message}}}";
@@ -57,7 +131,7 @@ async function reconcile(organizationId:string,channelId:string){
        .eq("id",item.id).eq("status","queued");
    }
  }
- return {checked:pending.length,changed};
+ return {checked:pending.length+recovered.checked,changed};
 }
 Deno.serve(async req=>{
  if(req.method!=="POST")return respond({ok:false,error:"method_not_allowed"},405);
