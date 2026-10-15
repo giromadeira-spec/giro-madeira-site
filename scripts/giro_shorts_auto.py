@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Giro Madeira Shorts: zero-paid-API, Wikimedia-licensed illustrative visuals.
-Runs only on GitHub Actions via OIDC. Failure means NO YouTube publication.
-Never uses unlicensed news-site photography or a secret from this repository.
+"""Giro Madeira Shorts/TikTok: only source-linked verified event photography.
+Runs only on GitHub Actions via OIDC. Failure means NO publication.
+Never uses unrelated stock photos, unlicensed publisher media or paid APIs.
 """
 import html, io, json, math, os, random, re, subprocess, sys, tempfile, time, urllib.parse, wave
 from pathlib import Path
@@ -701,6 +701,17 @@ def render_self_test():
     Produces a private 1080x1920 three-scene video to catch layout, encoding,
     official logo and permanent Rio Madeira identity regressions.
     """
+    # Real event provenance is required independently of broad category matching.
+    page=EventPageImages()
+    page.feed('<meta property="og:title" content="Polícia Federal prende suspeitos em Porto Velho">'+
+              '<meta property="og:image:alt" content="Polícia Federal prende suspeitos em Porto Velho">')
+    if not event_caption_matches("PF prende suspeitos em Porto Velho",page.meta["og:image:alt"]):
+        raise RuntimeError("Source-linked event caption incorrectly rejected")
+    if event_caption_matches("PF prende suspeitos em Porto Velho","Viatura de polícia do Rio de Janeiro"):
+        raise RuntimeError("Unrelated event image caption accepted")
+    if event_caption_matches("Ataques russos deixam cidades sem energia na Ucrânia","Globo terrestre visto do espaço"):
+        raise RuntimeError("Generic global photo accepted as event evidence")
+    # No topic-based Openverse/Commons fallback is ever invoked by main().
     # Regression: all three actual TikTok rejected crime titles MUST use police imagery.
     for headline in (
         "Cabo do Exército é preso suspeito de agredir companheira em Porto Velho",
