@@ -8,9 +8,15 @@ const ro={...fresh,score:99,titulo:'Rondônia decreta calamidade por enchente'};
 assert.equal(geographicScope(brazil),'brasil');
 assert.equal(geographicScope({...fresh,titulo:'Naufrágio deixa 139 mortos na África Oriental',fonte_nome:'News Rondônia'}),'mundo');
 assert.deepEqual([ro,world,brazil].sort(comparePriority),[brazil,world,ro]);
-for(const story of [brazil,world,ro])assert.ok(eligible(story));
+for(const story of [brazil,world])assert.ok(eligible(story));
+assert.equal(eligible(ro),false, 'Rondônia-local content must never reach TikTok');
 for(const titulo of ['Cabo é preso após agredir companheira em Porto Velho','Feriado tem sol entre nuvens em Rondônia','Prefeitura prepara festa com shows e Carreta Furacão','Lula diz que pode reduzir impostos nacionais','TSE derruba suspensão do canal Exército do Lula'])
  assert.equal(eligible({...fresh,score:100,urgente:true,titulo,fonte_nome:'News Rondônia'}),false,titulo);
+assert.equal(geographicScope({...fresh,titulo:'PF prende suspeitos em Porto Velho, Rondônia',fonte_nome:'Polícia Federal',fonte_url:'https://www.gov.br/pf/operacao'}),'rondonia');
+assert.equal(eligible({...fresh,titulo:'PF investiga crimes em Porto Velho com seis presos',fonte_nome:'Polícia Federal',urgente:true,score:100}),false);
+assert.equal(geographicScope({...fresh,titulo:'Acidente de trânsito deixa 8 feridos em São Paulo',fonte_nome:'Portal local'}),null,'Other-state local news is not nationally relevant');
+assert.equal(geographicScope({...fresh,titulo:'PRF registra 68 mortes nas rodovias federais durante o feriado nacional',fonte_nome:'News Rondônia'}),'brasil');
+assert.equal(geographicScope({...fresh,titulo:'Ataques russos deixam mais de 600 mil sem energia na Ucrânia',fonte_url:'https://cnnbrasil.com.br/internacional/ataques-russos'}),'mundo');
 assert.equal(eligible({...world,source_published_at:null}),false);
 assert.equal(eligible({...world,source_published_at:new Date(now-25*3600000).toISOString()}),false);
 assert.equal(eligible({...world,source_published_at:new Date(now+3600000).toISOString()}),false);
