@@ -1,0 +1,34 @@
+name: Giro Madeira - testar escopo Brasil e Mundo (sem publicar)
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/giro-video-escopo-nacional.yml'
+      - 'supabase/functions/giro-shorts-editorial-queue/index.ts'
+      - 'supabase/functions/giro-tiktok-editorial-queue/index.ts'
+      - 'supabase/functions/giro-tiktok-editorial-queue/editorial-policy.ts'
+      - 'tests/test_tiktok_editorial.mjs'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  escopo-video:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Testar classificação nacional/mundial e bloqueio local
+        run: node --experimental-strip-types tests/test_tiktok_editorial.mjs
+      - name: Verificar gate independente no Shorts sem publicar
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source=Path('supabase/functions/giro-shorts-editorial-queue/index.ts').read_text()
+          assert 'localRegion.test(t)' in source, 'Local-only headlines not blocked'
+          assert '["brasil","mundo"].includes' in source, 'Shorts national/world filter missing'
+          assert 'const baseSlots=twoDailySlots' in source, 'Wrong video schedule'
+          print('PASS: Shorts restricted to Brazil/world with independent two daily slots')
+          PY
