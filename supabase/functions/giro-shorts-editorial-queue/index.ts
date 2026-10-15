@@ -200,7 +200,7 @@ Deno.serve(async(req:Request)=>{
    // Estrategia de 2 Shorts: 08h e 22h de Porto Velho (09h e 23h BRT).
    // Apenas noticias nacionais/mundiais de alto impacto; sem preencher vaga com esportes ou rotina.
    const twoDailySlots=[{h:9,m:0,scope:"em_alta"},{h:23,m:0,scope:"em_alta"}] as const;
-   const baseSlots=settings.data.daily_goal<=2?twoDailySlots:settings.data.daily_goal<=5?pilotSlots:slots;
+   const baseSlots=twoDailySlots; // Exclusive 08:00/22:00 Porto Velho, no extra slots.
    const {data:queued,error:qerr}=await sb.from("giro_social_video_queue")
      .select("source_id,source_url,title,scheduled_for,topic_scope,football_extra").eq("platform","youtube_shorts").neq("status","expirado")
      .gte("created_at",new Date(start).toISOString()).lt("created_at",new Date(end).toISOString());
@@ -238,12 +238,12 @@ Deno.serve(async(req:Request)=>{
    })).filter(c=>
      (!c.source_published_at || Date.parse(c.source_published_at)>=Date.now()-48*3600000) &&
      !blocked(String(c.titulo),String(c.fonte_nome),String(c.fonte_url)) &&
-     (!!scopeOf({titulo:c.titulo,fonte_nome:c.fonte_nome,fonte_url:c.fonte_url}) || isSports(c))
+     (["brasil","mundo"].includes(String(scopeOf({titulo:c.titulo,fonte_nome:c.fonte_nome,fonte_url:c.fonte_url}))))
    );
    const finishedReports=uniqueFootballReports(options);
    // One football roundup at 22h Porto Velho (23h BRT) only when
    // multiple independent reports confirm final match scores.
-   const extraCount=settings.data.football_bonus_enabled===true
+   const extraCount=false && settings.data.football_bonus_enabled===true
       ?Math.min(1,settings.data.football_bonus_max||0,
           Math.floor(finishedReports.length/Math.max(2,settings.data.football_bonus_min_confirmed||2)))
       :0;
@@ -258,7 +258,7 @@ Deno.serve(async(req:Request)=>{
      const scheduled=new Date(start+(slot.h*60+slot.m)*60000).toISOString();
      if(todayBySlot.has(scheduled))continue;
      // Do not schedule news retrospectively beyond two hours.
-     if(new Date(scheduled).getTime()<Date.now()-2*3600000)continue;
+     if(new Date(scheduled).getTime()<Date.now())continue;
      // Last football slot may be a genuine multi-match roundup rather than an
      // unrelated individual story. 3 verified results -> 3 scenes/3 source links.
      if(slot.footballExtra && slot.h===23 && finishedReports.length>=3){
