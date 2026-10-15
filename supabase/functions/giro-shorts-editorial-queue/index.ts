@@ -4,17 +4,21 @@ const resp=(o:unknown,s=200)=>new Response(JSON.stringify(o),{status:s,headers})
 const normalize=(s:unknown)=>String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"")
  .toLowerCase().replace(/[^a-z0-9 ]+/g," ").replace(/\s+/g," ").trim();
 
+// Exclusive editorial scope for Shorts: national Brazilian and world news.
+// Local reporting is reserved for the independent Instagram radars.
+const localRegion=/\b(rondonia|porto velho|ji parana|ariquemes|vilhena|cacoal|guajara mirim|jaru|rolim de moura|pimenta bueno|candeias do jamari|machadinho do oeste|ouro preto do oeste|buritis|alto paraiso|presidente medici|espigao do oeste|em ro)\b/;
+const nationwideScope=/\b(em todo o brasil|em todo o pais|no pais inteiro|em todo territorio nacional|nacional|nacionais|brasileiros|brasileiras|rodovias federais|brasil|governo federal|congresso nacional|senado federal|supremo tribunal federal|stf|tse|banco central|copom|selic|receita federal|presidente da republica|reforma tributaria|bolsa familia|pix|imposto de renda|policia federal|pf|prf)\b/;
+const foreignScope=/\b(russia|ucrania|israel|ira|gaza|eua|estados unidos|china|mexico|nepal|paquistao|reino unido|africa|india|franca|alemanha|argentina|japao|sudao|libano|arabia saudita|coreia do sul|onu|uniao europeia|otan|guerra mundial)\b/;
 function scopeOf(v:{titulo:string;fonte_nome:string;fonte_url:string}):"brasil"|"mundo"|"rondonia"|null{
- const t=normalize(v.titulo), src=normalize(v.fonte_nome), link=String(v.fonte_url||"").toLowerCase();
- if (/\/mundo\/|\/internacional\/|\/(world|global)\//.test(link) ||
-    /^(deutsche welle|dw brasil|onu news|un news|reuters|bbc mundo|bbc news brasil mundo)$/.test(src))return "mundo";
- if (/\b(rondonia|porto velho|ji parana|ariquemes|vilhena|cacoal|guajara mirim|rio madeira)\b/.test(t) ||
-     /\/ro\/rondonia\/|\.ro\.gov\.br/.test(link) ||
-     /^(rondonia ao vivo|rondoniagora|g1 rondonia|portal jipa|tudo rondonia|sictv|ge rondonia|news rondonia|rondonia dinamica)$/.test(src))
-     return /\b(municipios brasileiros|governo federal|todo o brasil|em todo o pais|no brasil)\b/.test(t) ? "brasil" : "rondonia";
- if(/^(g1 brasil|forbes brasil|senado federal|policia federal|prf|agencia brasil)$/.test(src)
-   || /(g1\.globo\.com\/politica\/|g1\.globo\.com\/economia\/|g1\.globo\.com\/brasil\/|forbes\.com\.br\/)/.test(link)
-   || link.includes("gov.br/pf/") || link.includes("gov.br/prf/"))return "brasil";
+ const t=normalize(v.titulo),src=normalize(v.fonte_nome),link=String(v.fonte_url||"").toLowerCase();
+ if(localRegion.test(t) && !/\b(em todo o brasil|em todo o pais|todo territorio nacional|rodovias federais)\b/.test(t))return "rondonia";
+ if(/\/(mundo|internacional|world|global)\//.test(link) || foreignScope.test(t)
+   || /^(deutsche welle|dw brasil|onu news|un news|reuters|bbc mundo|bbc news brasil mundo)$/.test(src))return "mundo";
+ if(nationwideScope.test(t))return "brasil";
+ if(/\/ro\/rondonia\/|\.ro\.gov\.br/.test(link) ||
+    /^(rondonia ao vivo|rondoniagora|g1 rondonia|portal jipa|tudo rondonia|sictv|ge rondonia|news rondonia|rondonia dinamica)$/.test(src))return "rondonia";
+ if(/^(g1 brasil|forbes brasil|senado federal|agencia brasil)$/.test(src)
+   || /g1\.globo\.com\/(politica|economia|brasil)\//.test(link))return "brasil";
  return null;
 }
 const blocked = (title:string,source:string,url:string) => {
