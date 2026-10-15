@@ -289,6 +289,75 @@ function licensingTopic(title:string,cat:string):string[]{
   return []; // Unknown subjects cannot use generic city photography as the news image.
 }
 function stripPhotoMarkup(v:any){return clean(String(v||"").replace(/<[^>]*>/g," ").replace(/&nbsp;/g," ").replace(/&amp;/g,"&")).slice(0,90);}
+
+function eventWords(text:string):Set<string>{
+  const s=clean(text).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+  const stop=new Set(["sobre","apos","para","pelo","pela","pelos","pelas","entre","quando","noticia",
+    "noticias","foto","imagem","reportagem","brasil","brasileiro","novo","nova","hoje",
+    "ontem","foram","deixa","deixam","durante","mais","onde","esta","dois","tres","quatro","cinco"]);
+  return new Set((s.match(/[a-z0-9]{4,}/g)||[]).filter(w=>!stop.has(w)));
+}
+function eventWordsMatch(headline:string,photoText:string):boolean{
+  const words=eventWords(headline);
+  const matched=[...words].filter(w=>eventWords(photoText).has(w));
+  return matched.length>=2&&matched.length>=Math.min(3,words.size);
+}
+/**
+ * Pauta+foto devem provir da MESMA reportagem. Imagem temática de busca geral,
+ * OG ilustrativo, foto de arquivo e imagem de terceiros sem licença são vetados.
+ * O vínculo editorial é verificado pela legenda; a licença, por arquivo Commons.
+ */
+async function linkedEventPhoto(articleHtml:string,originalImage:string,title:string):Promise<EditorialPhoto|null>{
+  if(!articleHtml||!originalImage)return null;
+  const $=load(articleHtml);
+  if(!eventWordsMatch(title,clean($('meta[property="og:title"]').attr("content")||$('h1').first().text())))return null;
+  let photoUrl:URL;try{photoUrl=new URL(originalImage)}catch{return null}
+  if(photoUrl.protocol!=="https:"||photoUrl.hostname!=="upload.wikimedia.org")return null;
+  let caption=clean($('meta[property="og:image:alt"]').attr("content")||
+                    $('meta[name="twitter:image:alt"]').attr("content"));
+  if(!caption){
+    $('img').each((_:any,el:any)=>{
+      if(caption)return;
+      const raw=clean($(el).attr("src")||$(el).attr("data-src"));
+      if(!raw)return;
+      const same=raw===originalImage||
+        decodeURIComponent(raw.split("/").pop()||"")===decodeURIComponent(photoUrl.pathname.split("/").pop()||"");
+      if(same)caption=clean($(el).closest("figure").find("figcaption").first().text()||$(el).attr("alt"));
+    });
+  }
+  if(!caption||/ilustrativ|meramente|foto de arquivo|imagem de arquivo|stock|shutterstock|freepik|representa[cç][aã]o|montagem|gen[eé]ric|arquivo pessoal/i.test(caption)
+    ||!eventWordsMatch(title,caption))return null;
+  const segments=photoUrl.pathname.split("/").filter(Boolean).map(decodeURIComponent);
+  const filename=segments.includes("thumb")?segments.at(-2):segments.at(-1);
+  if(!filename||! /\.(?:jpe?g|png|webp)$/i.test(filename))return null;
+  try{
+    const api=new URL("https://commons.wikimedia.org/w/api.php");
+    Object.entries({action:"query",titles:"File:"+filename,prop:"imageinfo",
+      iiprop:"url|size|extmetadata",iiurlwidth:"1400",format:"json",formatversion:"2"})
+      .forEach(([key,value])=>api.searchParams.set(key,value));
+    const response=await fetch(api,{signal:AbortSignal.timeout(6500)});
+    if(!response.ok)return null;
+    const data=await response.json();
+    const info=data?.query?.pages?.[0]?.imageinfo?.[0];
+    if(!info||Number(info.width)<1000||Number(info.height)<650)return null;
+    const meta=info.extmetadata||{};
+    const lic=stripPhotoMarkup(meta?.LicenseShortName?.value);
+    const licUrl=String(meta?.LicenseUrl?.value||"");
+    const cc0=/^CC0(?: |$)/i.test(lic)&&/creativecommons\.org\/publicdomain\/zero\//i.test(licUrl);
+    const ccby=/^CC BY(?: |$)/i.test(lic)&&/creativecommons\.org\/licenses\/by\//i.test(licUrl);
+    if(!cc0&&!ccby)return null;
+    const creator=stripPhotoMarkup(meta?.Artist?.value);
+    if(ccby&&creator.length<2)return null;
+    const image=String(info.thumburl||info.url||"");
+    const url=new URL(image);
+    if(url.protocol!=="https:"||!["upload.wikimedia.org","thumb.wikimedia.org"].includes(url.hostname))return null;
+    const dataUri=await imageDataUri(image);
+    if(!dataUri)return null;
+    return {dataUri,creator:creator||"Domínio público",license:lic,
+      source:"https://commons.wikimedia.org/wiki/File:"+encodeURIComponent(filename.replace(/ /g,"_"))};
+  }catch{return null}
+}
+
 async function licensedEditorialPhoto(title:string,category:string):Promise<EditorialPhoto|null>{
   // Article OG photographs are not automatically reusable. Search file-level Wikimedia licenses.
   for(const term of licensingTopic(title,category)){
@@ -481,7 +550,7 @@ function headlineBlockOfficial(lines:string[],x:number,y:number,fs:number,lh:num
   return '<text x="'+x+'" y="'+y+'" font-family="Anton" font-size="'+fs+'" font-weight="900" stroke="#020a12" stroke-opacity=".30" stroke-width="1.5" paint-order="stroke" letter-spacing=".2">' +
     lines.map((l,i)=>'<tspan x="'+x+'" dy="'+(i===0?0:lh)+'" fill="'+(i===1?"#FFCC1C":"#FFFFFF")+'">'+esc(l)+'</tspan>').join('') + '</text>';
 }
-function makeSvg(kind:"feed"|"story",title:string,summary:string,source:string,category:string,bg:string,urgent=false,photoCredit=""){
+function makeSvg(kind:"feed"|"story",title:string,summary:string,source:string,category:string,bg:string,urgent=false,photoCredit="",isEventPhoto=false){
   // Same approved photographic design family as Shorts and TikTok, with
   // channel-specific safe areas. Absolutely no synthetic fallback shield/art.
   const portrait=kind==="story",W=1080,H=portrait?1920:1080;
@@ -511,9 +580,9 @@ function makeSvg(kind:"feed"|"story",title:string,summary:string,source:string,c
     '" fill="#071526">'+esc(cat)+'</text>'+
     '<path d="M'+(pad+tagW+9)+' '+(categoryY+62)+' H'+(W-pad)+
     '" stroke="#ffcc1c" stroke-width="5"/>';
-  const credit='IMAGEM ILUSTRATIVA';
+  const credit=isEventPhoto?'FOTO DO ACONTECIMENTO':'IMAGEM ILUSTRATIVA';
   const labelY=portrait?878:425;
-  const illustrative='<rect x="'+pad+'" y="'+(labelY-28)+'" width="294" height="42" rx="4" fill="#041526" opacity=".91"/>'+
+  const illustrative='<rect x="'+pad+'" y="'+(labelY-28)+'" width="'+(isEventPhoto?360:294)+'" height="42" rx="4" fill="#041526" opacity=".91"/>'+
     '<text x="'+(pad+10)+'" y="'+(labelY+1)+'" font-family="Inter" font-weight="800" font-size="20" fill="#fff">'+credit+'</text>';
   const sourceName=clean(source||"Giro Madeira").slice(0,37);
   const urgentTag=urgent?
@@ -618,14 +687,17 @@ Deno.serve(async(req)=>{
         /opera[cç][aã]o|apreens[aã]o|pris[aã]o|investiga[cç][aã]o|homic/i.test(title+" "+category);
       // QA must obey the same bounded photo search as production; avoid timeout 546.
       const previewStarted=Date.now();
+      const previewArticle=visualSmoke?"":await fetchPage(clean(item.fonte_url));
+      const previewPage=load(previewArticle);
+      const previewOriginal=absUrl(clean(previewPage('meta[property="og:image"]').attr("content")||previewPage('meta[name="twitter:image"]').attr("content")),clean(item.fonte_url));
       const photo=visualSmoke?await licensedRioMadeiraPhoto():await Promise.race([
-          licensedEditorialPhoto(title,category),
+          linkedEventPhoto(previewArticle,previewOriginal,title),
           new Promise<null>(resolve=>setTimeout(()=>resolve(null),12500))
         ]);
       if(!photo)throw new Error("Foto temática licenciada ausente; arte visual não autorizada. Sem fallback.");
       const attribution=photo?(photo.creator+" • "+photo.license):"";
-      const feedSvg=makeSvg("feed",title,visualSmoke?"PRÉVIA DE LAYOUT • NÃO PUBLICAR":clean(item.resumo),visualSmoke?"FOTOGRAFIA CC0":clean(item.fonte_nome)||"Giro Madeira",category,photo.dataUri,visualSmoke?false:item.urgente===true,attribution);
-      const storySvg=makeSvg("story",title,visualSmoke?"PRÉVIA DE LAYOUT • NÃO PUBLICAR":clean(item.resumo),visualSmoke?"FOTOGRAFIA CC0":clean(item.fonte_nome)||"Giro Madeira",category,photo.dataUri,visualSmoke?false:item.urgente===true,attribution);
+      const feedSvg=makeSvg("feed",title,visualSmoke?"PRÉVIA DE LAYOUT • NÃO PUBLICAR":clean(item.resumo),visualSmoke?"FOTOGRAFIA CC0":clean(item.fonte_nome)||"Giro Madeira",category,photo.dataUri,visualSmoke?false:item.urgente===true,attribution,!visualSmoke);
+      const storySvg=makeSvg("story",title,visualSmoke?"PRÉVIA DE LAYOUT • NÃO PUBLICAR":clean(item.resumo),visualSmoke?"FOTOGRAFIA CC0":clean(item.fonte_nome)||"Giro Madeira",category,photo.dataUri,visualSmoke?false:item.urgente===true,attribution,!visualSmoke);
       // QA requests generate only the asked image: avoid a second unused 1080x1920
       // render consuming memory and causing HTTP 503 with long headlines.
       const embed=body?.qa_embed===true;
@@ -635,7 +707,7 @@ Deno.serve(async(req)=>{
       // Authenticated read-only visual QA: no new rows, no uploads, no publishing.
       if(body?.qa_embed===true) return new Response(JSON.stringify({
         success:true,preview_art:true,qa_embed:true,publication_id:item.id,layout_smoke_test:visualSmoke,not_for_publication:visualSmoke,
-        visual_mode:photo?"licensed_editorial_photo":"original_illustration",
+        visual_mode:photo?(!visualSmoke?"original_event_photo":"licensed_editorial_photo"):"original_illustration",
         illustrative_photo_credit:photo?{creator:photo.creator,license:photo.license,source:photo.source}:null,
         rio_photo_qa:rioPhotoQaState,
         qa_format:body?.qa_format==="story"?"story":"feed",
@@ -657,7 +729,7 @@ Deno.serve(async(req)=>{
         feed_bytes:feed.length,story_bytes:story.length,
         feed_size:"1080x1080",story_size:"1080x1920",
         feed_preview_url:feedPreview,story_preview_url:storyPreview,
-        visual_mode:photo?"licensed_editorial_photo":"original_illustration",
+        visual_mode:photo?(!visualSmoke?"original_event_photo":"licensed_editorial_photo"):"original_illustration",
         illustrative_photo_credit:photo?{creator:photo.creator,license:photo.license,source:photo.source}:null,
         source_label_visible:true,external_publisher_logo_used:false,
         owned_giro_brand:feedSvg.includes("@GIRO_MADEIRA")&&storySvg.includes("@GIRO_MADEIRA")}),
@@ -681,10 +753,10 @@ Deno.serve(async(req)=>{
     const generationBudgetMs=38000;
     const remainingGenerationMs=()=>Math.max(0,generationBudgetMs-(Date.now()-generationStarted));
     const withinBudget=()=>remainingGenerationMs()>9000;
-    let pageTitle=clean(item.titulo),desc=clean(item.resumo),imageUrl="",videoRaw="",article="";
+    let pageTitle=clean(item.titulo),desc=clean(item.resumo),imageUrl="",videoRaw="",article="",sourceArticleHtml="";
     if(item.fonte_url){
       try{
-        const html=await fetchPage(String(item.fonte_url)); const $=load(html);
+        const html=await fetchPage(String(item.fonte_url)); sourceArticleHtml=html;const $=load(html);
         pageTitle=clean($('meta[property="og:title"]').attr("content")||$("h1").first().text()||pageTitle);
         desc=clean($('meta[property="og:description"]').attr("content")||$('meta[name="description"]').attr("content")||desc);
         article=articleText($);
@@ -731,15 +803,14 @@ Deno.serve(async(req)=>{
       !/(?:acidente|homic[ií]dio|pris[aã]o|inc[eê]ndio|v[ií]tima|suspeito|morte|opera[cç][aã]o|pol[ií]cia)/i.test(title);
     const photo=!withinBudget()?null:
       await Promise.race([
-        (async()=>await licensedEditorialPhoto(title,category)||
-          (isCityIdentityStory?await licensedRioMadeiraPhoto():null))(),
+        linkedEventPhoto(sourceArticleHtml,imageUrl,title),
         new Promise<null>(resolve=>setTimeout(()=>resolve(null),Math.min(12500,remainingGenerationMs())))
       ]);
     // Preservar a pauta e a legenda mesmo quando não há imagem adequada/licenciada.
     // Nunca publicar fotografia genérica ou afirmar que a arte está aprovada.
     // Never auto-render the abstract shields/background that produced the bad Feed post.
     if(!photo){
-      const draftCaption=`${originalText}\n\nFonte: ${source}\nMatéria original: ${sourceLink}\n\nARTE ILUSTRATIVA PENDENTE DE REVISÃO.\n\n#GiroMadeira #PortoVelho #Rondônia`;
+      const draftCaption=`${originalText}\n\nFonte: ${source}\nMatéria original: ${sourceLink}\n\nFOTO REAL DO ACONTECIMENTO PENDENTE DE VERIFICAÇÃO.\n\n#GiroMadeira #PortoVelho #Rondônia`;
       const pending=await sb.from(publicationTable).update({
         titulo:title,resumo:desc||item.resumo||null,categoria:category,
         legenda:draftCaption,
@@ -747,23 +818,23 @@ Deno.serve(async(req)=>{
         publicar_story:false,publicar_reel:reelRecommended,
         reel_interesse_ro:reelInterestRo,
         media_pipeline_version:channel==="feed"?6:5,visual_approved:false,
-        media_status:"aguardando_arte_tematica",
+        media_status:"aguardando_foto_real",
         status:"pendente",
-        erro:"Aguardando arte temática aprovada; não publicar ou usar foto de outra ocorrência."
+        erro:"Sem fotografia comprovadamente ligada ao acontecimento e com licença reutilizável. Não usar fotos genéricas."
       }).eq("id",id).in("status",["pendente","erro"]);
       if(pending.error)throw pending.error;
       return new Response(JSON.stringify({
         success:true,id,media_ready:false,
         needs_visual_review:true,needs_approved_art:true,
         reel_recommended:reelRecommended,no_publish:true,
-        visual_mode:"no_verified_photo",reason:"Foto temática licenciada não encontrada; pauta e legenda preservadas."
+        visual_mode:"no_verified_event_photo",reason:"Foto real da matéria, com licença verificada, não encontrada; pauta preservada."
       }),{headers:H});
     }
     const attribution=photo.creator+" • "+photo.license;
     const bg=photo.dataUri;
     await prepareBrandLogo(); const font=new Uint8Array();
-    const feed=await render(makeSvg("feed",title,desc,source,category,bg,item.urgente===true,attribution),font);
-    const story=await render(makeSvg("story",title,desc,source,category,bg,item.urgente===true,attribution),font);
+    const feed=await render(makeSvg("feed",title,desc,source,category,bg,item.urgente===true,attribution,true),font);
+    const story=await render(makeSvg("story",title,desc,source,category,bg,item.urgente===true,attribution,true),font);
     const feedPath=`auto/feed/${channel}/${id}-${Date.now()}.png`,storyPath=`auto/story/${channel}/${id}-${Date.now()}.png`;
     const [uf,us]=await Promise.all([
       sb.storage.from("news-images").upload(feedPath,feed,{contentType:"image/png",upsert:false}),
@@ -775,7 +846,7 @@ Deno.serve(async(req)=>{
     // A publisher's embedded video is not automatically licensed for republication.
     // Keep its source URL only; original Reel media is made by the approved worker.
     const vid={source:videoRaw,publicUrl:""};
-    const photoCredit="\nImagem ilustrativa: "+photo.creator+" ("+photo.license+") — "+photo.source;
+    const photoCredit="\nFoto do acontecimento: "+photo.creator+" ("+photo.license+") — "+photo.source;
     const legenda=`${originalText}\n\nFonte: ${source}\nMatéria original: ${sourceLink}${photoCredit}\n\n#GiroMadeira #PortoVelho #Rondônia`;
     const upd:any={
       titulo:title,resumo:desc||item.resumo||null,categoria:category,legenda,
@@ -785,7 +856,7 @@ Deno.serve(async(req)=>{
       status:"pendente",erro:null,story_erro:null,reel_erro:null,media_pipeline_version:channel==="feed"?6:5,media_status:"feed_pronto"
     };
     const up=await sb.from(publicationTable).update(upd).eq("id",id); if(up.error) throw up.error;
-    return new Response(JSON.stringify({success:true,id,feed_image_url:feedUrl,story_image_url:storyUrl,reel_ready:Boolean(item.video_url),reel_recommended:reelRecommended,reel_interesse_ro:reelInterestRo,reel_generated:false,source_image_url:imageUrl||null,visual_mode:"licensed_editorial_photo",illustrative_photo_credit:{creator:photo.creator,license:photo.license,source:photo.source}}),{headers:H});
+    return new Response(JSON.stringify({success:true,id,feed_image_url:feedUrl,story_image_url:storyUrl,reel_ready:Boolean(item.video_url),reel_recommended:reelRecommended,reel_interesse_ro:reelInterestRo,reel_generated:false,source_image_url:imageUrl||null,visual_mode:"original_event_photo",illustrative_photo_credit:{creator:photo.creator,license:photo.license,source:photo.source}}),{headers:H});
   }catch(e){
     return new Response(JSON.stringify({success:false,error:e instanceof Error?e.message:String(e)}),{status:500,headers:H});
   }
