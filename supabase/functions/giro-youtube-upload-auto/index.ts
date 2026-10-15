@@ -95,6 +95,7 @@ Deno.serve(async(req:Request)=>{
     .in("topic_scope",["brasil","mundo"])
     .eq("visual_review_status","approved").eq("editor_approved",true)
     .eq("shorts_render_origin","github_oidc_v1")
+    .like("shorts_image_credit","wikimedia_event_%")
     .eq("storyboard_status","preparado").eq("shorts_render_version",settings.visual_template_version)
     .is("provider_post_id",null).gte("scheduled_for",currentPvhDay).lte("scheduled_for",new Date().toISOString())
     .gte("created_at",new Date(Date.now()-36*3600000).toISOString())
@@ -111,7 +112,7 @@ Deno.serve(async(req:Request)=>{
   const id=row.id;
   if(action==="preview")return respond({success:true,mode:"preview",queue_id:id,
      title:row.title,will_upload:false,privacy_status:"public",target_channel:"@GIROMADEIRA"});
-  if(!(/^(wikimedia_|openverse_)/.test(String(row.shorts_image_credit||"")) || String(row.shorts_image_credit||"")==="arte editorial original Giro Madeira — sem fotografia externa"))
+  if(!/^wikimedia_event_/.test(String(row.shorts_image_credit||"")))
     return respond({success:false,error:"license_attribution_missing"},422);
   if(row.provider_post_id || row.shorts_render_version!==settings.visual_template_version)
     return respond({success:false,error:"already_uploaded_or_wrong_template"},409);
@@ -184,7 +185,7 @@ Deno.serve(async(req:Request)=>{
   try {
     const description=[String(row.caption||"").slice(0,3000),
        row.source_url ? "Fonte: "+String(row.source_url).slice(0,400) : "",
-       row.shorts_image_credit ? "Imagem ilustrativa e crédito: "+String(row.shorts_image_credit).slice(0,400) : "",
+       row.shorts_image_credit ? "Foto do acontecimento e crédito: "+String(row.shorts_image_credit).slice(0,400) : "",
        "#GiroMadeira #Shorts"].filter(Boolean).join("\n\n").slice(0,4800);
     const metadata={snippet:{
        title:String(row.title||"Notícia Giro Madeira").slice(0,100),
