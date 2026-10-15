@@ -3,15 +3,27 @@ export type Story = {titulo:string; fonte_nome?:string; fonte_url:string; score?
 export type Scope = 'brasil'|'mundo'|'rondonia';
 const norm=(s:unknown)=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 const local=/\b(rondonia|porto velho|ji parana|ariquemes|vilhena|cacoal|guajara mirim)\b/;
+// The Shorts/TikTok editorial scope is national/world only.
+// An outlet name or a city in another Brazilian state does NOT by itself
+// establish nationwide impact. Rondônia-local headlines stay outside this lane.
+const roLocal=/\b(rondonia|porto velho|ji parana|ariquemes|vilhena|cacoal|guajara mirim|jaru|rolim de moura|pimenta bueno|candeias do jamari|machadinho do oeste|ouro preto do oeste|buritis|alto paraiso|presidente medici|espigao do oeste|em ro)\b/;
+const nationwide=/\b(em todo o brasil|em todo o pais|no pais inteiro|em todo territorio nacional|nacional|nacionais|brasileiros|brasileiras|rodovias federais|brasil|governo federal|congresso nacional|senado federal|supremo tribunal federal|stf|tse|banco central|copom|selic|receita federal|presidente da republica|reforma tributaria|bolsa familia|pix|imposto de renda|policia federal|pf|prf)\b/;
+const worldTopics=/\b(russia|ucrania|israel|ira|gaza|eua|estados unidos|china|mexico|nepal|paquistao|reino unido|africa|india|franca|alemanha|argentina|japao|sudao|libano|arabia saudita|coreia do sul|onu|uniao europeia|otan|guerra mundial)\b/;
 export function geographicScope(s:Story):Scope|null {
  const t=norm(s.titulo),name=norm(s.fonte_nome),url=norm(s.fonte_url);
- if(/\/(mundo|internacional|world|global)\//.test(url)||/internacional|reuters|bbc mundo|onu news|deutsche welle/.test(name))return 'mundo';
- if(/\b(tse|stf|supremo|congresso nacional|senado federal|governo federal|banco central|selic|lula|bolsonaro|brasil|brasileiros|nacional)\b/.test(t)&&!local.test(t))return 'brasil';
- if(/\b(russia|ucrania|israel|ira|gaza|eua|estados unidos|china|mexico|nepal|paquistao|reino unido|africa|india|franca|alemanha|argentina|japao|sudao|libano|arabia saudita)\b/.test(t)&&!local.test(t))return 'mundo';
- if(local.test(t)||/\/ro\/rondonia\/|\.ro\.gov\.br/.test(url))return 'rondonia';
- if(/\b(rj|sp|rio de janeiro|sao paulo|minas gerais|bahia|pernambuco|brasilia)\b/.test(t))return 'brasil';
- if(/g1 brasil|forbes brasil|agencia brasil|policia federal|senado federal|^prf$/.test(name)||/g1\.globo\.com\/(politica|economia|brasil)/.test(url)||url.includes('gov.br/pf/'))return 'brasil';
- if(/rondonia|rondoniagora|portal jipa|o observador|na hora online/.test(name))return 'rondonia';
+ const isRoMention=roLocal.test(t);
+ const nationalReach=nationwide.test(t);
+ // A local incident involving a federal agency is not automatically a
+ // national headline when its principal subject is explicitly in Rondônia.
+ if(isRoMention&&!/\b(em todo o brasil|em todo o pais|todo territorio nacional|rodovias federais)\b/.test(t))return 'rondonia';
+ if(/\/(mundo|internacional|world|global)\//.test(url)||worldTopics.test(t)
+   ||/internacional|reuters|bbc mundo|onu news|deutsche welle/.test(name))return 'mundo';
+ if(nationalReach)return 'brasil';
+ if(/\/ro\/rondonia\/|\.ro\.gov\.br/.test(url)||/rondonia|rondoniagora|portal jipa|o observador|na hora online/.test(name))return 'rondonia';
+ // Only nationally-oriented desks can supply an otherwise unqualified
+ // national topic; regional/city sections alone are not national proof.
+ if(/g1 brasil|forbes brasil|agencia brasil|senado federal/.test(name)
+   ||/g1\.globo\.com\/(politica|economia|brasil)\//.test(url))return 'brasil';
  return null;
 }
 export function importanceReason(s:Story):string|null {
@@ -30,7 +42,7 @@ export function importanceReason(s:Story):string|null {
 }
 export function eligible(s:Story,now=Date.now()):boolean {
  const published=Date.parse(String(s.source_published_at||''));
- return Number.isFinite(published)&&published<=now+300000&&published>=now-24*3600000&&Number(s.score||0)>=25&&!!geographicScope(s)&&!!importanceReason(s);
+ return Number.isFinite(published)&&published<=now+300000&&published>=now-24*3600000&&Number(s.score||0)>=25&&['brasil','mundo'].includes(String(geographicScope(s)))&&!!importanceReason(s);
 }
 export function comparePriority(a:Story,b:Story):number {
  const priority={brasil:0,mundo:1,rondonia:2};
