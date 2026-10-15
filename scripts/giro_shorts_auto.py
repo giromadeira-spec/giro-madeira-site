@@ -648,6 +648,35 @@ def render_self_test():
         if not photo_matches_story("Ataque em supermercado na Coreia do Sul",
                                    "supermarket aisle","South Korea supermarket aisle"):
             raise RuntimeError("Relevant Korean supermarket photo rejected")
+    if PLATFORM=="tiktok":
+        # Exercise the real claim/fail path: no photo must never become approved art.
+        from unittest.mock import patch
+        for headline in (
+            "Ataques russos deixam cidades sem energia na Ucrânia",
+            "PF faz operação contra crimes de ódio e violência sexual contra crianças na internet",
+        ):
+            calls=[]
+            def fake_bridge(token,action,**kwargs):
+                calls.append(action)
+                return {"processed":True,"queue_id":207,"title":headline} if action=="claim" else {"success":True}
+            with patch.dict(os.environ,{"GITHUB_EVENT_NAME":"workflow_dispatch"}), \
+                 patch(__name__+".github_token",return_value="offline-test"), \
+                 patch(__name__+".bridge",side_effect=fake_bridge), \
+                 patch(__name__+".licensed_openverse_photo",side_effect=RuntimeError("no licensed photo")), \
+                 patch(__name__+".licensed_commons_download",side_effect=RuntimeError("no licensed photo")), \
+                 patch(__name__+".render_topic_illustration") as illustration, \
+                 patch.object(requests,"put") as upload:
+                try:
+                    main()
+                except RuntimeError as error:
+                    if "TikTok requires" not in str(error):
+                        raise
+                else:
+                    raise RuntimeError("TikTok approved a video without licensed photography")
+                if calls!=["claim","fail"]:
+                    raise RuntimeError("Missing photograph did not preserve blocked claim/fail flow")
+                illustration.assert_not_called()
+                upload.assert_not_called()
     if article_subject("PF faz operação contra crimes de ódio e violência sexual contra crianças na internet") != ("cyber safety editorial","SEGURANÇA"):
         raise RuntimeError("Child cybercrime story must use safe symbolic visuals")
     if render_topic_illustration("Ataques russos deixam cidades sem energia na Ucrânia","MUNDO").size!=(W,H):
@@ -730,6 +759,8 @@ def main():
         # Prefer licensed, genuinely related photos. If unavailable, use explicit
         # original symbolic art instead of disconnected stock footage.
         if query=="cyber safety editorial":
+            if PLATFORM=="tiktok":
+                raise RuntimeError("TikTok requires a relevant licensed photograph; symbolic art is not approved")
             picture=render_topic_illustration(result["title"],category)
             credit=ORIGINAL_CREDIT
             file_title="Original symbolic cyber-safety illustration"
@@ -746,9 +777,13 @@ def main():
                         raise RuntimeError("Wikimedia photograph unrelated to headline")
                 except Exception as backup_error:
                     print("Wikimedia unavailable or unrelated:",type(backup_error).__name__)
+                    if PLATFORM=="tiktok":
+                        raise RuntimeError("TikTok requires a relevant licensed photograph; keep item blocked") from backup_error
                     picture=render_topic_illustration(result["title"],category)
                     credit=ORIGINAL_CREDIT
                     file_title="Original symbolic editorial illustration"
+        if PLATFORM=="tiktok" and not credit.startswith(("openverse_","wikimedia_")):
+            raise RuntimeError("TikTok requires licensed photography; original symbolic art is not approved")
         if credit!=ORIGINAL_CREDIT and not credit.startswith(("openverse_","wikimedia_")):
             raise RuntimeError("Visual standard failed: unlicensed external image")
         if category=="SEGURANÇA" and re.search(r"press|newspaper|cherokee|printing",file_title,re.I):
