@@ -92,6 +92,7 @@ Deno.serve(async(req:Request)=>{
   const {data:eligible,error:queueError}=await db.from("giro_social_video_queue")
     .select("id,source_id,platform,title,caption,source_url,video_url,topic_scope,status,editor_approved,visual_review_status,storyboard_status,shorts_render_version,shorts_render_origin,shorts_image_credit,provider_post_id,scheduled_for,created_at")
     .eq("platform","youtube_shorts").eq("status","pronto_para_revisao")
+    .in("topic_scope",["brasil","mundo"])
     .eq("visual_review_status","approved").eq("editor_approved",true)
     .eq("shorts_render_origin","github_oidc_v1")
     .eq("storyboard_status","preparado").eq("shorts_render_version",settings.visual_template_version)
@@ -100,7 +101,13 @@ Deno.serve(async(req:Request)=>{
     .order("scheduled_for",{ascending:true}).limit(2);
   if(queueError)return respond({success:false,error:"queue_lookup_failed"},500);
   if(!eligible?.length)return respond({success:true,processed:0,reason:"no_eligible_v5_shorts"});
-  const row=eligible[0];
+  const localRo=/\b(rondonia|porto velho|ji parana|ariquemes|vilhena|cacoal|guajara mirim|jaru|rolim de moura|pimenta bueno|candeias do jamari|em ro)\b/;
+  const national=/\b(em todo o brasil|em todo o pais|todo territorio nacional|rodovias federais)\b/;
+  const row=eligible.find((v:any)=>{
+     const headline=String(v.title||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+     return !localRo.test(headline)||national.test(headline);
+  });
+  if(!row)return respond({success:true,processed:0,reason:"regional_headline_filtered"});
   const id=row.id;
   if(action==="preview")return respond({success:true,mode:"preview",queue_id:id,
      title:row.title,will_upload:false,privacy_status:"public",target_channel:"@GIROMADEIRA"});
