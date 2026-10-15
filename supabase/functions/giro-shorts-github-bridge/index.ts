@@ -63,7 +63,7 @@ Deno.serve(async req=>{
     if(qe)throw qe;
     for(const item of items||[]){
       const scenes=item.scene_cards;
-      const finite=/(?<![\p{L}])(é|são|foi|foram|está|estão|estava|tem|têm|teve|terá|há|haverá|pode|podem|deve|devem|será|serão|disse|diz|afirma|afirmou|anunciou|determinou|determina|decidiu|investiga|investigam|prendeu|registra|registrou|cai|caiu|subiu|sobe|chega|chegou|fez|faz|marca|marcou|fará|reduziu|aumentou|planeja|planejam|recebeu|recebe|aponta|apontou|deixa|deixou|ocorreu|ocorre|difere|privatizará|ficou|mantém|confirmou|confirma|realizará|realizou|retotalizará|atingiu|atinge|segue|seguem|retoma|retomou|apresenta|apresentou|destaca|destacou|aprova|aprovou|rejeita|rejeitou|começa|começou|atuam|atua|traz|trouxe|anula|anulou|lançou|lança|prevê|previu|define|definiu|aciona|acionou|renova|renovam|renovaram|remove|removem|removeram|liberou|liberaram|garantiu|garantem|bloqueia|bloqueou|paralisa|paralisou|interrompe|interromperá|retorna|retornarão|afeta|afetará|registram|registraram|fica|ficará|indica|indicou|publicou|divulgou|desmentiu|provocou|adiou|retirou|enfrenta|sofreu|alertou|alerta|suspende|suspendeu|revela|revelou|prorroga|prorrogou|expande|amplia|vence|venceu|vencem|venceram|derrota|derrotou|goleia|goleou|golearam|empata|empatou|empataram|perde|perdeu|perderam|eliminou|elimina|eliminaram|classificou|classificaram|avancou|avancaram|terminou|terminaram|vitória|vitoria|informa|informou)(?![\p{L}])/iu;
+      const finite=/(?<![\p{L}])(é|são|foi|foram|está|estão|estava|tem|têm|teve|terá|há|haverá|pode|podem|deve|devem|será|serão|disse|diz|afirma|afirmou|anunciou|determinou|determina|decidiu|investiga|investigam|prendeu|registra|registrou|cai|caiu|subiu|sobe|chega|chegou|fez|faz|marca|marcou|fará|reduziu|aumentou|planeja|planejam|recebeu|recebe|aponta|apontou|deixa|deixou|ocorreu|ocorre|difere|privatizará|ficou|mantém|confirmou|confirma|realizará|realizou|retotalizará|atingiu|atinge|segue|seguem|retoma|retomou|apresenta|apresentou|destaca|destacou|aprova|aprovou|rejeita|rejeitou|começa|começou|atuam|atua|traz|trouxe|anula|anulou|lançou|lança|prevê|previu|define|definiu|aciona|acionou|renova|renovam|renovaram|remove|removem|removeram|liberou|liberaram|garantiu|garantem|bloqueia|bloqueou|paralisa|paralisou|interrompe|interromperá|retorna|retornarão|afeta|afetará|registram|registraram|fica|ficará|indica|indicou|publicou|divulgou|desmentiu|provocou|adiou|retirou|enfrenta|sofreu|alertou|alerta|suspende|suspendeu|revela|revelou|prorroga|prorrogou|expande|amplia|vence|venceu|vencem|venceram|derrota|derrotou|goleia|goleou|golearam|empata|empatou|empataram|perde|perdeu|perderam|eliminou|elimina|eliminaram|classificou|classificaram|avancou|avancaram|terminou|terminaram|vitória|vitoria|informa|informou|soaram|soou|revelou|revelaram|identificou|identificaram|detectou|detectaram)(?![\p{L}])/iu;
       if(!Array.isArray(scenes)||scenes.some(v=>!finite.test(String(v))))continue;
 
       if(!Array.isArray(scenes)||scenes.length!==3 ||
@@ -88,7 +88,27 @@ Deno.serve(async req=>{
         .is("provider_post_id",null).select("id").maybeSingle();
       if(claimError)throw claimError;
       if(!claim)continue;
-      const signed=await db.storage.from("news-videos").createSignedUploadUrl(path);
+      // Retry only a transient signed-URL creation error, never an upload.
+      // Keep the same claim and object path; fail closed on uncertain Storage state.
+      let signed=await db.storage.from("news-videos").createSignedUploadUrl(path);
+      if(signed.error||!signed.data){
+        const raw=String(signed.error?.message||"");
+        const httpStatus=Number((signed.error as any)?.statusCode||(signed.error as any)?.status||0);
+        const transient=[408,429,500,502,503,504].includes(httpStatus)
+          || /(?:^|\\b)(408|429|500|502|503|504)(?:\\b|$)/.test(raw);
+        if(transient){
+          const folder=path.slice(0,path.lastIndexOf("/")+1);
+          const basename=path.slice(path.lastIndexOf("/")+1);
+          const check=await db.storage.from("news-videos").list(folder,{limit:100,search:basename});
+          if(!check.error && Array.isArray(check.data) && !check.data.some(f=>f.name===basename)){
+            const owned=await db.from("giro_social_video_queue")
+              .select("id").eq("id",item.id).eq("status","aguardando_autorizacao")
+              .eq("shorts_render_job_id",jobId).eq("shorts_render_storage_path",path)
+              .is("provider_post_id",null).maybeSingle();
+            if(!owned.error && owned.data) signed=await db.storage.from("news-videos").createSignedUploadUrl(path);
+          }
+        }
+      }
       if(signed.error||!signed.data){
         await db.from("giro_social_video_queue").update({
            status:"falha",shorts_render_error:"signed_upload_creation_failed"
