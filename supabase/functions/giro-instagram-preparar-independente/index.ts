@@ -23,62 +23,7 @@ Deno.serve(async req=>{
     .order("created_at",{ascending:false}).limit(1).maybeSingle();
   if(pe)throw pe;
   if(body.dry_run===true||!cfg.preparation_enabled)return response({success:true,dry_run:body.dry_run===true,channel,no_publish:true,preparation_enabled:cfg.preparation_enabled,pending_id:pending?.id||null,visual_contract:cfg.visual_contract});
-  // Recover an ALREADY RENDERED Reel when the previous validator incorrectly
-  // escaped the .jpg/.mp4 extensions. Do not re-render, re-upload or publish.
-  // Constrain automatic recovery to a verified Brazilian PRF context image:
-  // do not approve generic fire/accident pictures from unrelated localities.
-  if(channel==="reels"&&cfg.visual_contract==="GIRO_EDITORIAL_FOTO_MANCHETE_RIO_V1"){
-   const {data:ready,error:readyError}=await db.from(table)
-     .select("id,titulo,fonte_url,legenda,story_image_url,video_url,publicar_reel,publicar_story,media_pipeline_version,editorial_expires_at,preparation_attempts")
-     .eq("status","pendente").eq("visual_approved",false)
-     .eq("media_status","aguardando_revisao_visual").eq("publicar_reel",true)
-     .is("instagram_reel_media_id",null)
-     .gte("created_at",new Date(Date.now()-30*3600000).toISOString())
-     .order("created_at",{ascending:false}).limit(8);
-   if(readyError)throw readyError;
-   for(const m of ready||[]){
-    const caption=String(m.legenda||"");
-    const credit=caption.split("\n").find((line:string)=>line.startsWith("Imagem ilustrativa: "))||"";
-    const photoLink=(credit.match(/https:\/\/commons\.wikimedia\.org\/wiki\/File:[^\s)]+/)||[])[0]||"";
-    let photoTitle="";
-    try{photoTitle=decodeURIComponent(new URL(photoLink).pathname)}catch{continue}
-    const topicMatched=/\bPRF\b|pol[ií]cia rodovi[aá]ria federal|rodovias federais/i.test(String(m.titulo||""))&&
-      /brazilian[_ -]federal[_ -]highway[_ -]police|policia[_ -]rodoviaria[_ -]federal|pol[ií]cia[_ -]rodovi[aá]ria[_ -]federal/i.test(photoTitle);
-    const creditOK=/\((?:CC BY(?: [234]\.0(?: br)?)?|CC0)\)/i.test(credit);
-    const source=String(m.fonte_url||"");
-    const img=String(m.story_image_url||"");
-    const vid=String(m.video_url||"");
-    const correctPaths=img.startsWith(url+"/storage/v1/object/public/news-images/auto/jpeg/reels/story/")&&
-      /\.jpg$/i.test(img)&&
-      vid.startsWith(url+"/storage/v1/object/public/news-videos/auto/reels/reels/")&&
-      /\.mp4$/i.test(vid);
-    if(!topicMatched||!creditOK||!correctPaths||m.publicar_story===true||
-       Number(m.media_pipeline_version)!==5||Number(m.preparation_attempts)<1||
-       caption.length<330||!caption.includes("Matéria original: "+source)||
-       !caption.includes("Fonte: ")||!caption.includes("Imagem ilustrativa: ")||
-       !source.startsWith("https://")||
-       Date.parse(String(m.editorial_expires_at||""))<=Date.now())continue;
-    // Confirm both exact stored artifacts still resolve with their proper MIME.
-    const mediaResponse=await Promise.allSettled([
-      fetch(img,{method:"HEAD",signal:AbortSignal.timeout(12000)}),
-      fetch(vid,{method:"HEAD",signal:AbortSignal.timeout(12000)})
-    ]);
-    if(mediaResponse.some(x=>x.status!=="fulfilled"||!x.value.ok))continue;
-    const imgType=mediaResponse[0].status==="fulfilled"?(mediaResponse[0].value.headers.get("content-type")||""):"";
-    const vidType=mediaResponse[1].status==="fulfilled"?(mediaResponse[1].value.headers.get("content-type")||""):"";
-    if(!imgType.includes("image/jpeg")||!vidType.includes("video/mp4"))continue;
-    const approved=await db.from(table).update({
-      status:"aprovada",visual_approved:true,media_status:"reel_validado",
-      publicar_story:false,publicar_reel:true,scheduled_at:new Date().toISOString(),erro:null
-    }).eq("id",m.id).eq("status","pendente").eq("visual_approved",false)
-      .eq("media_status","aguardando_revisao_visual").is("instagram_reel_media_id",null)
-      .select("id").maybeSingle();
-    if(approved.error)throw approved.error;
-    if(approved.data)return response({success:true,channel,publication_id:m.id,
-      processed:1,auto_approved:true,auto_qa:"validated_existing_prf_photo_and_mp4",
-      no_publish:true,publication_not_attempted:true});
-   }
-  }
+  // Old PRF illustrative-photo recovery disabled: topic match cannot prove an image depicts the event.
   let item=pending;
   if(!item){
    const claim=await db.rpc("giro_claim_editorial_independente",{p_channel:channel});
@@ -155,7 +100,7 @@ Deno.serve(async req=>{
   try{
     const license=String(photo?.license||"");
     const u=new URL(String(photo?.source||""));
-    verifiedPhoto=result.visual_mode==="licensed_editorial_photo"&&
+    verifiedPhoto=result.visual_mode==="original_event_photo"&&
       (license==="CC0"||/^CC BY(?: |$)/.test(license))&&
       ((u.hostname==="commons.wikimedia.org"&&u.pathname.startsWith("/wiki/File:"))||
        (u.hostname==="www.flickr.com"&&u.pathname.startsWith("/photos/")))&&
@@ -186,7 +131,7 @@ Deno.serve(async req=>{
        .select("id").maybeSingle();
      if(approved.error)throw approved.error;
      autoApproved=!!approved.data;
-     approvalReason=autoApproved?"v6_licensed_photo_official_source_verified":"approval_conflict";
+     approvalReason=autoApproved?"event_photo_official_source_verified":"approval_conflict";
    }else approvalReason="official_source_or_media_contract_not_verified";
   }
   // Reels can be automatically approved ONLY after factual source extraction,
@@ -210,7 +155,7 @@ Deno.serve(async req=>{
      String(m.legenda||"").length>=330&&
      String(m.legenda||"").includes("Fonte: ")&&
      String(m.legenda||"").includes("Matéria original: ")&&
-     String(m.legenda||"").includes("Imagem ilustrativa: ")&&
+     String(m.legenda||"").includes("Foto do acontecimento: ")&&
      String(m.story_image_url||"").startsWith(url+"/storage/v1/object/public/news-images/auto/jpeg/reels/story/")&&
      /\.jpg$/.test(String(m.story_image_url||""))&&
      String(m.video_url||"").startsWith(url+"/storage/v1/object/public/news-videos/auto/reels/reels/")&&
@@ -223,7 +168,7 @@ Deno.serve(async req=>{
        .is("instagram_reel_media_id",null).select("id").maybeSingle();
      if(approved.error)throw approved.error;
      autoApproved=!!approved.data;
-     approvalReason=autoApproved?"reels_licensed_photo_and_mp4_verified":"approval_conflict";
+     approvalReason=autoApproved?"reels_event_photo_and_mp4_verified":"approval_conflict";
    }else approvalReason="reels_editorial_media_contract_not_verified";
   }
   if(!autoApproved){
