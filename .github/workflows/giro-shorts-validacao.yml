@@ -23,6 +23,7 @@ jobs:
           import ast
           from pathlib import Path
           from PIL import Image, ImageDraw
+          import re
           p=Path("scripts/giro_shorts_auto.py")
           source=p.read_text(encoding="utf-8")
           ast.parse(source)
@@ -37,8 +38,20 @@ jobs:
           main=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=="main")
           assert not any(isinstance(n,ast.Call) and isinstance(n.func,ast.Name) and n.func.id=="render_text_only_background" for n in ast.walk(main)), "Generic fallback must NOT publish"
           assert "aircraft airplane" in source, "Aircraft subject mapping missing"
-          assert "Visual standard failed: unlicensed or non-photographic hero" in source, "Photographic QA gate missing"
+          assert "Visual standard failed: unlicensed external image" in source, "External image license gate missing"
+          assert 'ORIGINAL_CREDIT="arte editorial original Giro Madeira — sem fotografia externa"' in source
+          assert 'credit==ORIGINAL_CREDIT' in source, "Original art not validated"
+          fn_topic=next((n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=="render_topic_illustration"),None)
+          assert fn_topic is not None, "Topic-specific visual fallback missing"
+          scope["clean"]=lambda s: re.sub(r"\\s+"," ",str(s or "")).strip()
+          scope["re"]=re
+          exec(compile(ast.Module(body=[fn_topic],type_ignores=[]),str(p),"exec"),scope)
+          child_protection=scope["render_topic_illustration"]("PF combate crimes contra crianças na internet","SEGURANÇA")
+          electrical_grid=scope["render_topic_illustration"]("Ataques deixam Ucrânia sem energia","MUNDO")
+          assert child_protection.size==(1080,1920) and electrical_grid.size==(1080,1920)
+          assert child_protection.tobytes()!=picture.tobytes(), "Child-safety scene not topical"
+          assert electrical_grid.tobytes()!=child_protection.tobytes(), "Distinct headlines got same visual"
           assert "len(frames)==3" in source, "Three-scene verification missing"
           assert "picture,credit,file_title=licensed_commons_download(query)" in source
-          print("PASS: production rejects generic background; QA-only test image remains isolated; no upload invoked")
+          print("PASS: licensed photographs prioritized; relevant labeled original art verified when necessary; no upload invoked")
           PY
