@@ -34,14 +34,18 @@ Deno.serve(async(req:Request)=>{
   if(action==="status")return response({success:true,transcoder:"independent_30fps",channel:"giro_madeira"});
   if(action==="claim"){
     const {data:sources,error:e}=await db.from("giro_social_video_queue")
-      .select("id,title,video_url,source_id,scheduled_for,shorts_rendered_at,shorts_render_origin,storyboard_status,editor_approved,visual_review_status,provider_privacy_status,provider_post_id,shorts_image_credit")
+      .select("id,title,topic_scope,video_url,source_id,scheduled_for,shorts_rendered_at,shorts_render_origin,storyboard_status,editor_approved,visual_review_status,provider_privacy_status,provider_post_id,shorts_image_credit")
       .eq("platform","tiktok").eq("status","pronto_para_revisao")
+      .in("topic_scope",["brasil","mundo"])
       .eq("editor_approved",true).eq("visual_review_status","approved")
       .eq("shorts_render_origin","tiktok_github_oidc_v1").eq("storyboard_status","preparado")
       .gte("shorts_rendered_at",new Date(Date.now()-18*3600000).toISOString())
       .order("scheduled_for",{ascending:false}).limit(16);
     if(e)return response({success:false,error:"source_lookup_failed"},503);
     for(const row of sources||[]){
+       const headline=String(row.title||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+       const localRo=/\b(rondonia|porto velho|ji parana|ariquemes|vilhena|cacoal|guajara mirim|jaru|rolim de moura|pimenta bueno|candeias do jamari|em ro)\b/;
+       if(localRo.test(headline)&&!/\b(em todo o brasil|em todo o pais|todo territorio nacional|rodovias federais)\b/.test(headline))continue;
       const original=String(row.video_url||"");
       if(!original.startsWith(supa+"/storage/v1/object/public/news-videos/shorts/")||!original.endsWith(".mp4"))
         continue;
