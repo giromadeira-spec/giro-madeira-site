@@ -156,7 +156,7 @@ Deno.serve(async req=>{
   const meta=(files||[]).find(o=>o.name===path.slice(path.lastIndexOf("/")+1));
   const size=Number(meta?.metadata?.size||0);
   if(!meta||size<100000||size>30*1024*1024)return response({success:false,error:"rendered_file_missing_or_invalid_size"},422);
-  if(!(String(reqBody.image_credit||"")==="arte editorial original Giro Madeira — sem fotografia externa" || /^(?:image_\S|wikimedia_|openverse_|public_domain_)/.test(String(reqBody.image_credit||""))))
+  if(!/^wikimedia_event_/.test(String(reqBody.image_credit||"")))
     return response({success:false,error:"image_credit_not_verified"},422);
   if(reqBody.quality_passed!==true)return response({success:false,error:"render_qa_not_passed"},422);
   const videoUrl=url+"/storage/v1/object/public/news-videos/"+path;
