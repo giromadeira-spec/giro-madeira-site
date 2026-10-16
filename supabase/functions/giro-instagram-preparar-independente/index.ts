@@ -119,6 +119,8 @@ Deno.serve(async req=>{
      Number(m.media_pipeline_version)===6&&Date.parse(String(m.editorial_expires_at||""))>Date.now()&&
      String(m.legenda||"").length>=400&&
      String(m.legenda||"").includes("Fonte: ")&&String(m.legenda||"").includes("Matéria original: ")&&
+      String(m.legenda||"").includes("Foto do acontecimento: ")&&
+      !String(m.legenda||"").includes("Imagem ilustrativa: ")&&
      String(m.feed_image_url||"").startsWith(url+"/storage/v1/object/public/news-images/auto/jpeg/feed/feed/")&&
      String(m.feed_image_url||"").endsWith(".jpg")&&
      String(m.story_image_url||"").startsWith(url+"/storage/v1/object/public/news-images/auto/jpeg/feed/story/")&&
@@ -172,7 +174,7 @@ Deno.serve(async req=>{
    }else approvalReason="reels_editorial_media_contract_not_verified";
   }
   if(!autoApproved){
-   const status=result.needs_approved_art?"aguardando_arte_tematica":
+   const status=result.needs_approved_art?"aguardando_verificacao_foto_e_licenca":
      channel==="reels"&&!videoReady?"aguardando_reel":"aguardando_revisao_visual";
    const saved=await db.from(table).update({
      status:"pendente",media_status:status,media_pipeline_version:channel==="feed"?6:5,
