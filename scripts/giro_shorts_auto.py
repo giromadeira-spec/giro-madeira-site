@@ -692,12 +692,13 @@ def make_music(out,duration):
         f.writeframes(buf)
 
 def render_frames(frames,out,music):
+    fps=30 if PLATFORM=="shorts" else 15  # TikTok managed by its independent pipeline.
     concat=[]
     for idx,frame in enumerate(frames):
         segment=out.parent/("scene"+str(idx)+".mp4")
-        subprocess.run(["ffmpeg","-hide_banner","-loglevel","error","-y","-loop","1","-framerate","15","-i",str(frame),
+        subprocess.run(["ffmpeg","-hide_banner","-loglevel","error","-y","-loop","1","-framerate",str(fps),"-i",str(frame),
          "-t","9","-vf","fade=t=in:st=0:d=0.3,fade=t=out:st=8.65:d=0.35",
-         "-r","15","-c:v","libx264","-preset","veryfast","-crf","26","-pix_fmt","yuv420p","-an",str(segment)],
+         "-r",str(fps),"-c:v","libx264","-preset","veryfast","-crf","26","-pix_fmt","yuv420p","-an",str(segment)],
          check=True,timeout=130)
         concat.append(segment)
     listing=out.parent/"frames.txt"
@@ -708,10 +709,14 @@ def render_frames(frames,out,music):
     if not (100000<out.stat().st_size<30*1024*1024):raise RuntimeError("Output out of bounds")
     # Validate actual encode parameters, not only extension.
     proc=subprocess.run(["ffprobe","-v","error","-select_streams","v:0","-show_entries",
-        "stream=width,height,codec_name","-of","json",str(out)],capture_output=True,text=True,check=True)
+        "stream=width,height,codec_name,avg_frame_rate","-of","json",str(out)],capture_output=True,text=True,check=True)
     stream=json.loads(proc.stdout)["streams"][0]
     if stream.get("codec_name")!="h264" or stream["width"]!=1080 or stream["height"]!=1920:
         raise RuntimeError("Output video dimensions or codec invalid")
+    if PLATFORM=="shorts":
+        from fractions import Fraction
+        if Fraction(str(stream.get("avg_frame_rate") or "0/1")) != Fraction(30,1):
+            raise RuntimeError("Shorts output is not 30 fps")
 
 def render_self_test():
     """Offline QA: no OIDC, no Supabase, no YouTube and no network requests.
@@ -781,7 +786,7 @@ def render_self_test():
         if not photo_matches_story("Ataque em supermercado na Coreia do Sul",
                                    "supermarket aisle","South Korea supermarket aisle"):
             raise RuntimeError("Relevant Korean supermarket photo rejected")
-    if PLATFORM=="tiktok":
+    if PLATFORM in ("shorts","tiktok"):
         # Exercise the real claim/fail path: no photo must never become approved art.
         from unittest.mock import patch
         for headline in (
@@ -888,25 +893,19 @@ def main():
         query,category=article_subject(result["title"])
         if not query:
             raise RuntimeError("No safe news-specific illustration or verified event photo")
-        # Priority 1: photo OF this event, with individually verified reuse permission.
-        # Fallback: original non-photographic infographic, explicitly labelled.
-        # Never pass a generic category photo off as documentary evidence.
+        # Production requires an actual event photograph with individually verified reuse rights.
+        # QA-only illustrations never qualify as documentary evidence or publication approval.
         try:
             picture,credit,file_title=licensed_event_photo(result["source_url"],result["title"])
         except Exception as no_photo:
             if PLATFORM == "tiktok":
                 raise RuntimeError("Real event photo unverified; TikTok remains blocked: "+
                                    str(no_photo)[:125]) from no_photo
-            print("Actual-event licensed photo unavailable; creating labelled original visual:",
-                  type(no_photo).__name__)
-            picture=render_topic_illustration(result["title"],category)
-            credit="original_editorial_labeled_"+category.lower()
-            file_title="Arte temática original — não é fotografia do acontecimento"
-        image_verified=credit.startswith(("wikimedia_event_","original_editorial_labeled_"))
-        if PLATFORM == "tiktok":
-            image_verified=credit.startswith("wikimedia_event_")
+            raise RuntimeError("Real event photo unverified; Shorts remains blocked: "+
+                               str(no_photo)[:125]) from no_photo
+        image_verified=credit.startswith("wikimedia_event_")
         if not image_verified:
-            raise RuntimeError("Visual standard failed: invalid photo or original art credit")
+            raise RuntimeError("Visual standard failed: verified event photograph required")
         if category=="SEGURANÇA" and re.search(r"press|newspaper|cherokee|printing",file_title,re.I):
             raise RuntimeError("Crime headline cannot use unrelated newspaper imagery")
         logo=Image.open(ROOT/"assets/logo-oficial.webp").convert("RGB")
@@ -929,11 +928,9 @@ def main():
         preview_dir.mkdir(exist_ok=True)
         # Checagem de qualidade estrutural: não confundir renderização concluída
         # com conformidade visual. Fotografia ligada à pauta é condição obrigatória.
-        image_verified=credit.startswith(("wikimedia_event_","original_editorial_labeled_"))
-        if PLATFORM == "tiktok":
-            image_verified=credit.startswith("wikimedia_event_")
+        image_verified=credit.startswith("wikimedia_event_")
         if len(frames)!=3 or not image_verified:
-            raise RuntimeError("Approved visual QA failed: licensed photo or original illustration required")
+            raise RuntimeError("Approved visual QA failed: licensed event photograph required")
         for frame in frames:
             with Image.open(frame) as review:
                 if review.size!=(1080,1920) or review.mode!="RGB":
