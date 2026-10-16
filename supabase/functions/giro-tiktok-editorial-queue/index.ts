@@ -175,16 +175,8 @@ Deno.serve(async(req:Request)=>{
      .lt("scheduled_for",expirationCutoff)
      .select("id");
    if(expireError)throw expireError;
-   // Only an unpublished rendering failure before its scheduled slot may be replaced.
-   // Historical failures remain untouched; published IDs are never overwritten.
-   const {error:releaseError}=await sb.from("giro_social_video_queue")
-     .update({status:"expirado",
-       last_error:"Falha antes do horario; slot livre para outra pauta, sem segundo post.",
-       updated_at:new Date().toISOString()})
-     .eq("platform","tiktok").eq("status","falha")
-     .is("provider_post_id",null)
-     .gte("scheduled_for",new Date().toISOString());
-   if(releaseError)throw releaseError;
+   // A render failure and a null provider ID do not prove absence of delivery.
+   // Preserve failed slots until Buffer reconciliation and reviewed replacement.
    const start=startOfBRTDay(),end=start+86400000;
    // Porto Velho editorial targets: 07h police, 10h politics, 13h police,
    // 17h30 Rondônia / public safety alerts, 20h30 major national or local news.
@@ -320,4 +312,5 @@ Deno.serve(async(req:Request)=>{
    return resp({success:false,error:"shorts_editorial_queue_error"},500);
  }
 });
+
 
