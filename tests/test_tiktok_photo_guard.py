@@ -57,9 +57,15 @@ class TikTokPhotoGuard(unittest.TestCase):
     def test_verified_event_photo_keeps_normal_path(self):
         self.assertEqual(self.pipeline(),(False,["claim","complete"],0,1))
 
-    def test_other_channel_behavior_is_preserved(self):
-        self.assertEqual(self.pipeline(platform="youtube_shorts",missing=True),
-                         (False,["claim","complete"],1,1))
+    def test_shared_renderer_respects_current_shorts_photo_policy(self):
+        # Shorts now independently requires event photos too (3842e370).
+        # This QA must not expect or restore its removed illustration fallback.
+        self.assertEqual(self.pipeline(platform="shorts",missing=True),
+                         (True,["claim","fail"],0,0))
+        self.assertEqual(self.pipeline(platform="shorts"),
+                         (False,["claim","complete"],0,1))
+        self.assertEqual(self.pipeline(platform="shorts",credit="original_editorial_labeled_mundo"),
+                         (True,["claim","fail"],0,0))
 
     def test_deployed_source_gates_reject_original_art(self):
         for path in ("scripts/buffer/giro-buffer-tiktok-worker.ts",
