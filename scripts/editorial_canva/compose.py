@@ -61,6 +61,7 @@ def frame(record,scene,photo,river,logo,height,preview):
     if d.textlength(category,font=font(27))>400:raise ValueError('category_overflow')
     d.text((x+18,y+9),category,font=font(27),fill=WHITE if record.get('urgent') is True else NAVY)
     local=record.get('location','LOCAL DO FATO').upper()
+    d.rectangle((580,58,1022,144) if height==1080 else (480,220,920,306),fill=NAVY)
     wrapped(d,local,(600 if height==1080 else 495,70 if height==1080 else 232),400,24,2,YELLOW,True)
     text_y=600 if height==1080 else 1110
     lines,f,point=fitted_lines(d,scene['headline'],width,68 if height==1080 else 82,3)
