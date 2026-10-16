@@ -11,7 +11,7 @@
       "width": 1080,
       "height": 1080,
       "pages": 5,
-      "autofill_configured": false
+      "autofill_configured": true
     },
     "master": {
       "design_id": "DAHYMKfoY6M",
@@ -20,7 +20,7 @@
       "width": 1080,
       "height": 1920,
       "pages": 5,
-      "autofill_configured": false
+      "autofill_configured": true
     },
     "stories": {
       "design_id": "DAHYMNEihXM",
@@ -29,7 +29,7 @@
       "width": 1080,
       "height": 1920,
       "pages": 5,
-      "autofill_configured": false
+      "autofill_configured": true
     },
     "reels": {
       "design_id": "DAHYMB7lg84",
@@ -38,7 +38,7 @@
       "width": 1080,
       "height": 1920,
       "pages": 5,
-      "autofill_configured": false
+      "autofill_configured": true
     },
     "tiktok": {
       "design_id": "DAHYMIzMDmI",
@@ -47,7 +47,7 @@
       "width": 1080,
       "height": 1920,
       "pages": 5,
-      "autofill_configured": false
+      "autofill_configured": true
     },
     "shorts": {
       "design_id": "DAHYMH4dDaM",
@@ -56,7 +56,9 @@
       "width": 1080,
       "height": 1920,
       "pages": 5,
-      "autofill_configured": false
+      "autofill_configured": true
     }
-  }
+  },
+  "autofill_execution": "blocked_by_canva_account_plan",
+  "free_rendering": "local_compositor_available"
 }

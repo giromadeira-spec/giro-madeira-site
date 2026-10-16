@@ -1,7 +1,8 @@
 # Canva editorial handoff — isolated review tools
 
-This package adds no scheduler, cloud function, database migration or publishing
-endpoint. It does not change the current renderers or production workflows.
+This package adds no scheduler, cloud function or publishing endpoint. It
+does not change the existing production renderer or workflows. It adds a private
+metadata-only review schema, disconnected from production queues.
 Template IDs and verified Canva links are in `template-registry.json`.
 
 ## What is ready
@@ -76,11 +77,13 @@ Existing queue mapping: Feed/Reels/Stories use their respective
 with `platform=tiktok`, preserving separate item IDs, media and consumption.
 The packet is a review plan, not an accepted database insert payload.
 
-## Still requires configuration
+## Canva account limitation and remaining configuration
 
-- Canva Data Autofill field labels/schema on working copies. Current models
-  are editable, but not configured as automatic fill templates. Do not assume
-  that object names in PPTX create Canva Autofill fields.
+- Autofill fields were saved and their schemas were read back for all six
+  designs: 272 named fields in total. `autofill-schemas.json` records the actual
+  returned schemas. Execution was tested once in a copy and rejected because
+  the connected account plan does not include Autofill. No upgrade was made.
+  `compose.py` provides the tested free local alternative.
 - Separate Canva API authorization for a server worker if unattended export is
   chosen. The ChatGPT connector session is not a token for GitHub Actions.
 - MP4 import through the available upload endpoint failed with HTTP 400,
@@ -93,3 +96,34 @@ The packet is a review plan, not an accepted database insert payload.
 
 Schedule contract: Shorts and TikTok use 08:00 and 22:00 in
 `America/Porto_Velho` (12:00 and 02:00 UTC). No new schedule was installed.
+
+## Local composition and private staging
+
+`compose.py` accepts a JSON manifest, local photo, regional strip and official
+logo. It renders Feed, Story or five vertical scenes without Canva Autofill,
+OpenAI, a network request or publication. Normal mode requires complete
+source/photo evidence and a matching photo SHA256. `--template-preview` requires
+`reference_only=true`, visibly labels the asset as a test and never authorizes
+publication. Caption and headline overflow fail instead of truncating.
+
+`stage_review.py` validates the actual file and emits an idempotent insert into
+`giro_editorial_review.assets`, a private metadata-only table with RLS, no public
+access, no custom triggers, no production queue references, and a constraint
+that publish_allowed must stay false. It stores the artifact reference and its
+hash, not the video bytes. Existing files remain in their authorized location.
+It does not make private artifact references accessible to an unattended worker.
+
+Default writes a reviewable SQL file only. `--execute` is available for an
+operator with psql and existing PG connection settings. The validated session
+used the authenticated Supabase connection to stage a reference item and repeat
+the same insert: one row was preserved, no duplicate appeared.
+
+Migration applied via Supabase and tracked with its returned version:
+`20261016170638_giro_isolated_editorial_review_staging.sql`. An INFO advisor notes
+RLS with no user policy; that is intentional because user access is revoked and
+only service-side review is allowed. No policy granting public access was added.
+
+The Canva fields are configured; paid Autofill execution, Canva timeline/video
+export and unattended access to exported media are still unavailable or
+unconfigured. A production publication importer is deliberately not enabled.
+No manual task in this package should be described as scheduled automation.

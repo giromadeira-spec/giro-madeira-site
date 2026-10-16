@@ -36,11 +36,16 @@ def render(frames_dir,channel,output):
     for f in frames:
         with Image.open(f) as im:
             if im.size!=(1080,1920):raise ValueError('Expected 1080x1920 Canva exports')
+            im.verify()
     output=Path(output).resolve();output.parent.mkdir(parents=True,exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='giro-canva-preview-') as tmp:
         tmp=Path(tmp)
         for i,(frame,duration) in enumerate(zip(frames,durations)):
-            subprocess.run(['ffmpeg','-hide_banner','-loglevel','error','-y','-loop','1','-framerate','30','-i',str(frame),'-t',str(duration),'-vf',f'fade=t=in:st=0:d=0.18,fade=t=out:st={duration-.18}:d=0.18','-c:v','libx264','-preset','veryfast','-threads','2','-crf','24','-pix_fmt','yuv420p','-an',str(tmp/f'scene-{i}.mp4')],check=True,timeout=120)
+            # Normalize to lossless RGB BMP before looping. Some FFmpeg builds
+            # misparse repeated photographic PNG IDAT chunks during image loops.
+            normalized=tmp/f'frame-{i}.bmp'
+            with Image.open(frame) as im:im.convert('RGB').save(normalized)
+            subprocess.run(['ffmpeg','-hide_banner','-loglevel','error','-y','-f','image2','-loop','1','-framerate','30','-i',str(normalized),'-t',str(duration),'-vf',f'fade=t=in:st=0:d=0.18,fade=t=out:st={duration-.18}:d=0.18','-c:v','libx264','-preset','veryfast','-threads','2','-crf','24','-pix_fmt','yuv420p','-an',str(tmp/f'scene-{i}.mp4')],check=True,timeout=120)
         (tmp/'concat.txt').write_text(''.join(f"file 'scene-{i}.mp4'\n" for i in range(5)))
         soundtrack(tmp/'original.wav',sum(durations))
         subprocess.run(['ffmpeg','-hide_banner','-loglevel','error','-y','-f','concat','-safe','0','-i',str(tmp/'concat.txt'),'-i',str(tmp/'original.wav'),'-map','0:v:0','-map','1:a:0','-c:v','copy','-c:a','aac','-b:a','96k','-movflags','+faststart','-shortest',str(output)],check=True,timeout=40)
