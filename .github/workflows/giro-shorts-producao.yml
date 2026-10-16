@@ -7,11 +7,11 @@ on:
       - scripts/giro_shorts_auto.py
       - .github/workflows/giro-shorts-producao.yml
   schedule:
-    # Preparacao antecipada: 07h e 21h America/Porto_Velho (11h e 01h UTC).
-    # Publicacao independente SOMENTE as 08h e 22h locais pelo cron Supabase.
-    # Sem recuperacoes retroativas, retentativas agendadas ou posts extras.
-    - cron: '0 11 * * *'
-    - cron: '0 1 * * *'
+    # Preparo 07h/21h PV; segunda checagem 07h35/21h35 caso a primeira
+    # tentativa nao tenha produzido video. Nao cria slots nem posts extras.
+    # Publicacao SOMENTE 08h e 22h PV pelo cron Supabase.
+    - cron: '0,35 11 * * *'
+    - cron: '0,35 1 * * *'
   workflow_dispatch:
 
 permissions:
