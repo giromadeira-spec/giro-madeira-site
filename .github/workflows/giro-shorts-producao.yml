@@ -7,18 +7,11 @@ on:
       - scripts/giro_shorts_auto.py
       - .github/workflows/giro-shorts-producao.yml
   schedule:
-    # Porto Velho UTC-4: 08h e 22h (12h e 02h UTC).
-    # Preparacao antecipada 07h/21h locais e recuperacao 08h/22h.
-    # Horarios de upload pretendidos: 08h/22h, sujeitos a aprovacao editorial.
+    # Preparacao antecipada: 07h e 21h America/Porto_Velho (11h e 01h UTC).
+    # Publicacao independente SOMENTE as 08h e 22h locais pelo cron Supabase.
+    # Sem recuperacoes retroativas, retentativas agendadas ou posts extras.
     - cron: '0 11 * * *'
-    - cron: '0 12 * * *'
     - cron: '0 1 * * *'
-    - cron: '0 2 * * *'
-    # Retentativas sem duplicacao para slots que ficaram aguardando renderizacao.
-    - cron: '30 11 * * *'
-    - cron: '30 12 * * *'
-    - cron: '30 1 * * *'
-    - cron: '30 2 * * *'
   workflow_dispatch:
 
 permissions:
@@ -92,7 +85,7 @@ jobs:
           retention-days: 2
 
   gerar-short:
-    if: github.event_name != 'push' && github.repository == 'giromadeira-spec/giro-madeira-site' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'schedule' && github.repository == 'giromadeira-spec/giro-madeira-site' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 18
     steps:
