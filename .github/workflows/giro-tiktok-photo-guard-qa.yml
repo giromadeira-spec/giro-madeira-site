@@ -1,0 +1,25 @@
+name: Giro Madeira - TikTok photo guard QA (no publication)
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/giro_shorts_auto.py'
+      - 'scripts/buffer/giro-buffer-tiktok-worker.ts'
+      - 'supabase/functions/giro-tiktok-*/**'
+      - 'tests/test_tiktok_photo_guard.py'
+      - '.github/workflows/giro-tiktok-photo-guard-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  photo-guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install "Pillow>=11,<13" "requests>=2.32,<3"
+      - name: Reject non-photographic TikTok media offline
+        run: python tests/test_tiktok_photo_guard.py
