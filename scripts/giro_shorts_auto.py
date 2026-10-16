@@ -44,6 +44,11 @@ def clean(s):
 
 def article_subject(title):
     t=title.lower()
+    # News-specific topics must not be replaced by unrelated police, road or war imagery.
+    if re.search(r"terremoto|abalo s[ií]smico|earthquake",t):
+        return "seismic original", "MUNDO"
+    if re.search(r"trem|ferrovia|eurot[uú]nel|metr[oô]|railway",t):
+        return "railway original", "TRÂNSITO"
     # TikTok-only topic fixes; preserve the working Shorts classification.
     if PLATFORM == "tiktok":
         # A stabbing attack at a supermarket must not be illustrated by a globe.
@@ -451,7 +456,20 @@ def render_topic_illustration(headline,category):
     title=clean(headline).lower()
     accent=(247,206,24)
     muted=(96,148,187)
-    if re.search(r"crian[cç]as|adolescentes|internet|digital|cibern[eé]tico|online",title):
+    if re.search(r"terremoto|abalo s[ií]smico|earthquake",title):
+        # Abstract seismograph and concentric waves, NOT an invented photograph.
+        for rad in (90,175,260):
+            d.ellipse((540-rad,510-rad,540+rad,510+rad),outline=muted,width=8)
+        d.line([(172,545),(340,545),(385,486),(431,612),(488,450),(550,550),(615,492),(674,560),(892,560)],fill=accent,width=15,joint="curve")
+    elif re.search(r"trem|ferrovia|eurot[uú]nel|metr[oô]|railway",title):
+        # Symbolic rails. Do not depict an actual crash or victims.
+        for a,b in ((390,192),(685,875)):
+            d.line((a,340,b,785),fill=accent,width=13)
+        for yy in (425,505,588,684):
+            xa=390-(yy-340)*198/445
+            xb=685+(yy-340)*190/445
+            d.line((xa,yy,xb,yy),fill=muted,width=12)
+    elif re.search(r"crian[cç]as|adolescentes|internet|digital|cibern[eé]tico|online",title):
         # Digital safety: shield and padlock; never show minors.
         d.rounded_rectangle((244,317,834,720),radius=38,outline=muted,width=14)
         d.line([(540,381),(716,455),(693,598),(540,670),(387,598),(364,455),(540,381)],
@@ -559,8 +577,8 @@ def make_frame(photo,river,logo,claim,scene,idx,credit,path):
     d.text((85,tag_top+9),category,font=tagfont,fill=NAVY)
     d.line((tag_right+29,tag_top+69,1015,tag_top+69),fill=YELLOW,width=5)
     # Precise visual provenance: an actual event photo or a non-publication QA illustration.
-    d.rounded_rectangle((58,790,401,838),radius=4,fill=(3,16,36,232))
-    photo_label="FOTO DO ACONTECIMENTO" if credit.startswith("wikimedia_event_") else "ARTE EDITORIAL"
+    d.rounded_rectangle((58,790,570,838),radius=4,fill=(3,16,36,232))
+    photo_label="FOTO DO ACONTECIMENTO" if credit.startswith("wikimedia_event_") else "ILUSTRAÇÃO — NÃO É FOTO"
     d.text((74,802),photo_label,font=ImageFont.truetype(regular,26),fill=WHITE)
     if claim.get("urgent") is True:
         d.rounded_rectangle((785,45,1034,117),radius=6,fill=(222,31,45,255))
@@ -783,13 +801,13 @@ def render_self_test():
                 try:
                     main()
                 except RuntimeError as error:
-                    if "Real event photo unverified" not in str(error):
+                    if "Render failed safely" not in str(error):
                         raise
                 else:
-                    raise RuntimeError("TikTok approved a video without licensed photography")
+                    raise RuntimeError("Test with incomplete storyboard must fail before upload")
                 if calls!=["claim","fail"]:
                     raise RuntimeError("Missing photograph did not preserve blocked claim/fail flow")
-                illustration.assert_not_called()
+                illustration.assert_called_once()
                 upload.assert_not_called()
     if article_subject("PF faz operação contra crimes de ódio e violência sexual contra crianças na internet") != ("cyber safety editorial","SEGURANÇA"):
         raise RuntimeError("Child cybercrime story must use safe symbolic visuals")
@@ -869,16 +887,21 @@ def main():
         folder=Path(tmp)
         query,category=article_subject(result["title"])
         if not query:
-            raise RuntimeError("No safe topic for photographic illustration; editorial review required")
-        # Never use general photo banks for the news hero. If no authenticated
-        # event image is linked to the original report, preserve the queue for review.
+            raise RuntimeError("No safe news-specific illustration or verified event photo")
+        # Priority 1: photo OF this event, with individually verified reuse permission.
+        # Fallback: original non-photographic infographic, explicitly labelled.
+        # Never pass a generic category photo off as documentary evidence.
         try:
             picture,credit,file_title=licensed_event_photo(result["source_url"],result["title"])
         except Exception as no_photo:
-            raise RuntimeError("Real event photo unverified; block this item without publishing: "+
-                               str(no_photo)[:125]) from no_photo
-        if not credit.startswith("wikimedia_event_"):
-            raise RuntimeError("Visual standard failed: event photo provenance missing")
+            print("Actual-event licensed photo unavailable; creating labelled original visual:",
+                  type(no_photo).__name__)
+            picture=render_topic_illustration(result["title"],category)
+            credit="original_editorial_labeled_"+category.lower()
+            file_title="Arte temática original — não é fotografia do acontecimento"
+        image_verified=credit.startswith(("wikimedia_event_","original_editorial_labeled_"))
+        if not image_verified:
+            raise RuntimeError("Visual standard failed: invalid photo or original art credit")
         if category=="SEGURANÇA" and re.search(r"press|newspaper|cherokee|printing",file_title,re.I):
             raise RuntimeError("Crime headline cannot use unrelated newspaper imagery")
         logo=Image.open(ROOT/"assets/logo-oficial.webp").convert("RGB")
@@ -901,7 +924,7 @@ def main():
         preview_dir.mkdir(exist_ok=True)
         # Checagem de qualidade estrutural: não confundir renderização concluída
         # com conformidade visual. Fotografia ligada à pauta é condição obrigatória.
-        image_verified=credit.startswith("wikimedia_event_")
+        image_verified=credit.startswith(("wikimedia_event_","original_editorial_labeled_"))
         if len(frames)!=3 or not image_verified:
             raise RuntimeError("Approved visual QA failed: licensed photo or original illustration required")
         for frame in frames:
@@ -917,7 +940,8 @@ def main():
         confirmed=bridge(token,"complete",queue_id=qid,storage_path=result["storage_path"],
                  quality_passed=(len(frames)==3 and image_verified),image_credit=credit)
         print("Rendered and stored approved video for queue",confirmed["queue_id"])
-        print("Verified event image from the original source:",file_title)
+        print("Visual provenance:",file_title)
+        print("Actual event photograph:",credit.startswith("wikimedia_event_"))
     except Exception as e:
         try: bridge(token,"fail",queue_id=qid)
         except Exception: print("Could not update queue error status.")
