@@ -62,6 +62,42 @@ function articleText($:any){
   }
   return (structured.length>best.join(" ").length?structured:best.join("\n")).slice(0,6500);
 }
+// Locate a possible event image INSIDE the original article, never by stock search.
+// This is provenance discovery only: no copyright/visual approval follows from it.
+function articleSourcePhoto($:any,articleUrl:string,title:string):string{
+  const choices:Array<{url:string,score:number}>=[];
+  const banned=/\/(?:logo|logotipo|brasao|favicon|avatar|banner|placeholder|default-image|sem-foto)(?:[-_.\/?]|$)/i;
+  const rejectCaption=/imagem ilustrativa|foto ilustrativa|foto de arquivo|imagem de arquivo|stock photo|shutterstock|freepik|foto meramente/i;
+  const add=(raw:any,caption:any,weight:number)=>{
+    const normalized=clean(raw);if(!normalized||normalized.startsWith("data:"))return;
+    const value=absUrl(normalized,articleUrl);
+    let u:URL;try{u=new URL(value)}catch{return}
+    if(u.protocol!=="https:"||banned.test(u.pathname)||!/\.(?:jpe?g|png|webp)(?:\/|$)/i.test(u.pathname))return;
+    const description=clean(caption);
+    if(rejectCaption.test(description))return;
+    const topical=description&&eventWordsMatch(title,description);
+    const score=weight+(topical?10:0)+(u.hostname==="upload.wikimedia.org"&&topical?3:0);
+    if(!choices.some(x=>x.url===value))choices.push({url:value,score});
+  };
+  // Captioned photos belonging to the article are stronger candidates than
+  // the global OpenGraph image, which is often the publisher's logo.
+  $("article figure, main article figure, .entry-content figure, .article-content figure, .noticia-corpo figure").slice(0,20).each((_:any,el:any)=>{
+    const figure=$(el),im=figure.find("img").first();
+    add(im.attr("data-src")||im.attr("data-lazy-src")||im.attr("src"),
+      figure.find("figcaption").first().text()||im.attr("alt"),6);
+  });
+  $("article img, .entry-content img, .article-content img, .noticia-corpo img").slice(0,25).each((_:any,el:any)=>{
+    const im=$(el);
+    add(im.attr("data-src")||im.attr("data-lazy-src")||im.attr("src"),im.attr("alt")||im.attr("title"),3);
+  });
+  add($('meta[property="og:image"]').attr("content"),
+      $('meta[property="og:image:alt"]').attr("content"),1);
+  add($('meta[name="twitter:image"]').attr("content"),
+      $('meta[name="twitter:image:alt"]').attr("content"),1);
+  choices.sort((a,b)=>b.score-a.score);
+  return choices[0]?.url||"";
+}
+
 function editorialAllowed(title:string,source:string,sourceUrl:string){
  const t=clean(title).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
  const src=(source+" "+sourceUrl).toLowerCase();
@@ -761,7 +797,7 @@ Deno.serve(async(req)=>{
         desc=clean($('meta[property="og:description"]').attr("content")||$('meta[name="description"]').attr("content")||desc);
         article=articleText($);
          if(!desc&&article)desc=clean(article.slice(0,350));
-        imageUrl=absUrl(clean($('meta[property="og:image"]').attr("content")||$('meta[name="twitter:image"]').attr("content")||$("article img").first().attr("src")||""),String(item.fonte_url));
+        imageUrl=articleSourcePhoto($,String(item.fonte_url),clean(item.titulo||pageTitle));
         videoRaw=absUrl(clean($('meta[property="og:video:secure_url"]').attr("content")||$('meta[property="og:video"]').attr("content")||$("video source").first().attr("src")||""),String(item.fonte_url));
       }catch{}
     }
@@ -818,9 +854,9 @@ Deno.serve(async(req)=>{
         publicar_story:false,publicar_reel:reelRecommended,
         reel_interesse_ro:reelInterestRo,
         media_pipeline_version:channel==="feed"?6:5,visual_approved:false,
-        media_status:"aguardando_foto_real",
+        media_status:"aguardando_verificacao_foto_e_licenca",
         status:"pendente",
-        erro:"Sem fotografia comprovadamente ligada ao acontecimento e com licença reutilizável. Não usar fotos genéricas."
+        erro:imageUrl?"Foto candidata encontrada na reportagem; autenticidade e licença de adaptação pendentes. Não publicar.":"Sem foto da reportagem com relação ao fato e licença reutilizável verificadas. Não usar fotos genéricas."
       }).eq("id",id).in("status",["pendente","erro"]);
       if(pending.error)throw pending.error;
       return new Response(JSON.stringify({
