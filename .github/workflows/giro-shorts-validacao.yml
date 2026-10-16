@@ -40,7 +40,9 @@ jobs:
           assert "aircraft airplane" in source, "Aircraft subject mapping missing"
           assert "No source-linked photograph with a verifiable reuse license" in source, "Original-event license gate missing"
           assert 'ORIGINAL_CREDIT="arte editorial original Giro Madeira — sem fotografia externa"' in source
-          assert 'image_verified=credit.startswith(("wikimedia_event_","original_editorial_labeled_"))' in source, "Original artwork must have explicit provenance"
+          assert 'image_verified=credit.startswith("wikimedia_event_")' in source, "Only verified event photos may pass"
+          assert 'image_verified=credit.startswith(("wikimedia_event_","original_editorial_labeled_"))' not in source, "Original artwork must NOT be verified as event photo"
+          assert not any(isinstance(n,ast.Call) and isinstance(n.func,ast.Name) and n.func.id=="render_topic_illustration" for n in ast.walk(main)), "Topic illustrations must NOT be used in production"
           fn_topic=next((n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=="render_topic_illustration"),None)
           assert fn_topic is not None, "Topic-specific visual fallback missing"
           scope["clean"]=lambda s: re.sub(r"\\s+"," ",str(s or "")).strip()
@@ -53,5 +55,5 @@ jobs:
           assert electrical_grid.tobytes()!=child_protection.tobytes(), "Distinct headlines got same visual"
           assert "len(frames)==3" in source, "Three-scene verification missing"
           assert 'picture,credit,file_title=licensed_event_photo(result["source_url"],result["title"])' in source
-          print("PASS: licensed photographs prioritized; relevant labeled original art verified when necessary; no upload invoked")
+          print("PASS: only licensed event photographs qualify; original illustrations remain QA-only; no upload invoked")
           PY
