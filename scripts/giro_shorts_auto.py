@@ -807,7 +807,7 @@ def render_self_test():
                     raise RuntimeError("Test with incomplete storyboard must fail before upload")
                 if calls!=["claim","fail"]:
                     raise RuntimeError("Missing photograph did not preserve blocked claim/fail flow")
-                illustration.assert_called_once()
+                illustration.assert_not_called()
                 upload.assert_not_called()
     if article_subject("PF faz operação contra crimes de ódio e violência sexual contra crianças na internet") != ("cyber safety editorial","SEGURANÇA"):
         raise RuntimeError("Child cybercrime story must use safe symbolic visuals")
@@ -894,12 +894,17 @@ def main():
         try:
             picture,credit,file_title=licensed_event_photo(result["source_url"],result["title"])
         except Exception as no_photo:
+            if PLATFORM == "tiktok":
+                raise RuntimeError("Real event photo unverified; TikTok remains blocked: "+
+                                   str(no_photo)[:125]) from no_photo
             print("Actual-event licensed photo unavailable; creating labelled original visual:",
                   type(no_photo).__name__)
             picture=render_topic_illustration(result["title"],category)
             credit="original_editorial_labeled_"+category.lower()
             file_title="Arte temática original — não é fotografia do acontecimento"
         image_verified=credit.startswith(("wikimedia_event_","original_editorial_labeled_"))
+        if PLATFORM == "tiktok":
+            image_verified=credit.startswith("wikimedia_event_")
         if not image_verified:
             raise RuntimeError("Visual standard failed: invalid photo or original art credit")
         if category=="SEGURANÇA" and re.search(r"press|newspaper|cherokee|printing",file_title,re.I):
@@ -925,6 +930,8 @@ def main():
         # Checagem de qualidade estrutural: não confundir renderização concluída
         # com conformidade visual. Fotografia ligada à pauta é condição obrigatória.
         image_verified=credit.startswith(("wikimedia_event_","original_editorial_labeled_"))
+        if PLATFORM == "tiktok":
+            image_verified=credit.startswith("wikimedia_event_")
         if len(frames)!=3 or not image_verified:
             raise RuntimeError("Approved visual QA failed: licensed photo or original illustration required")
         for frame in frames:
@@ -952,5 +959,6 @@ if __name__=="__main__":
         render_self_test()
     else:
         main()
+
 
 
