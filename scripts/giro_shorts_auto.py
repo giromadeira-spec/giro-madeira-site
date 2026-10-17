@@ -775,6 +775,17 @@ def render_frames(frames,out,music):
         from fractions import Fraction
         if Fraction(str(stream.get("avg_frame_rate") or "0/1")) != Fraction(30,1):
             raise RuntimeError("Shorts output is not 30 fps")
+        # Confirm the Shorts MP4 includes playable AAC audio and the full story.
+        # This applies only to Shorts; the independent TikTok pipeline is unchanged.
+        probe=subprocess.run(["ffprobe","-v","error","-show_entries",
+            "format=duration:stream=codec_type,codec_name","-of","json",str(out)],
+            capture_output=True,text=True,check=True)
+        metadata=json.loads(probe.stdout)
+        duration=float((metadata.get("format") or {}).get("duration") or 0)
+        has_aac=any(p.get("codec_type")=="audio" and p.get("codec_name")=="aac"
+                    for p in metadata.get("streams",[]))
+        if not has_aac or not 25.0<=duration<=28.5:
+            raise RuntimeError("Shorts output missing AAC audio or complete 27-second duration")
 
 def render_self_test():
     """Offline QA: no OIDC, no Supabase, no YouTube and no network requests.
