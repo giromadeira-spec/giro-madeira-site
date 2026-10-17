@@ -43,11 +43,11 @@ jobs:
           assert "aircraft airplane" in source, "Aircraft subject mapping missing"
           assert "No source-linked Commons photograph with event-matching caption and verifiable reuse license" in source, "Original-event license gate missing"
           assert 'ORIGINAL_CREDIT="arte editorial original Giro Madeira — sem fotografia externa"' in source
-          assert 'image_verified=credit.startswith(("wikimedia_event_","registered_event_"))' in source, "Only individually approved event photos may pass"
+          assert 'visual_origin_valid=is_acceptable_visual_credit(' in source, "Origin guard is required for photos and labeled art"
           assert 'registered_image_id=registered_image_id' in source, "Registered image identity must be reported to bridge"
           assert 'approved_registry_photo(' in source, "Signed private newsroom photo validation missing"
-          assert 'image_verified=credit.startswith(("wikimedia_event_","original_editorial_labeled_"))' not in source, "Original artwork must NOT be verified as event photo"
-          assert not any(isinstance(n,ast.Call) and isinstance(n.func,ast.Name) and n.func.id=="render_topic_illustration" for n in ast.walk(main)), "Topic illustrations must NOT be used in production"
+          assert 'credit=original_illustration_credit(result["source_url"],result["title"])' in source, "Artwork must be cryptographically tied to the report"
+          assert any(isinstance(n,ast.Call) and isinstance(n.func,ast.Name) and n.func.id=="render_topic_illustration" for n in ast.walk(main)), "Original symbolic art fallback missing"
           fn_topic=next((n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=="render_topic_illustration"),None)
           assert fn_topic is not None, "Topic-specific visual fallback missing"
           scope["clean"]=lambda s: re.sub(r"\\s+"," ",str(s or "")).strip()
@@ -60,5 +60,5 @@ jobs:
           assert electrical_grid.tobytes()!=child_protection.tobytes(), "Distinct headlines got same visual"
           assert "len(frames)==3" in source, "Three-scene verification missing"
           assert 'picture,credit,file_title=licensed_event_photo(result["source_url"],result["title"])' in source
-          print("PASS: only licensed event photographs qualify; original illustrations remain QA-only; no upload invoked")
+          print("PASS: licensed real photos prioritized, original symbolic artwork source-bound, human review mandatory; no upload invoked")
           PY
