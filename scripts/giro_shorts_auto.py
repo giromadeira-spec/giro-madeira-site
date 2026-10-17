@@ -117,25 +117,73 @@ def event_caption_matches(headline,caption):
     return len(overlaps)>=2 and len(overlaps)>=min(3,len(terms))
 
 class EventPageImages(HTMLParser):
+    """Collect article photos, including lazy galleries and their own captions."""
     def __init__(self):
         super().__init__()
         self.meta={}
         self.images=[]
+        self._figures=[]
+
+    def _add_image(self,raw,alt):
+        if not raw or len(raw)>2048 or len(self.images)>180:
+            return
+        entry=(html.unescape(raw.strip()),clean(html.unescape(alt or "")))
+        if self._figures:
+            self._figures[-1]["images"].append(entry)
+        else:
+            self.images.append(entry)
+
     def handle_starttag(self,tag,attrs):
         attrs=dict(attrs)
         if tag=="meta":
             key=(attrs.get("property") or attrs.get("name") or "").lower().strip()
-            if key and attrs.get("content"):self.meta[key]=attrs["content"]
-        if tag=="img":
-            src=attrs.get("src") or attrs.get("data-src") or ""
-            if src:self.images.append((src,attrs.get("alt") or ""))
+            if key and attrs.get("content"):
+                self.meta[key]=attrs["content"]
+        if tag=="figure":
+            self._figures.append({"images":[],"caption":[],"depth":0})
+        if tag=="figcaption" and self._figures:
+            self._figures[-1]["depth"]=1
+        elif self._figures and self._figures[-1]["depth"]:
+            self._figures[-1]["depth"]+=1
+        if tag in ("img","source"):
+            alt=attrs.get("alt") or attrs.get("title") or ""
+            for key in ("src","data-src","data-original","data-lazy-src",
+                        "data-full-src","data-image"):
+                self._add_image(attrs.get(key),alt)
+            for key in ("srcset","data-srcset"):
+                for item in (attrs.get(key) or "").split(",")[:8]:
+                    self._add_image(item.strip().split(" ")[0],alt)
+        elif tag=="a" and self._figures:
+            # Galleries sometimes link a larger Commons image than the thumbnail.
+            link=attrs.get("href") or ""
+            if urllib.parse.urlsplit(link).hostname=="upload.wikimedia.org":
+                self._add_image(link,attrs.get("title") or "")
+
+    def handle_data(self,data):
+        if self._figures and self._figures[-1]["depth"]:
+            self._figures[-1]["caption"].append(data)
+
+    def handle_endtag(self,tag):
+        if not self._figures:
+            return
+        item=self._figures[-1]
+        if tag=="figure":
+            item=self._figures.pop()
+            caption=clean(" ".join(item["caption"]))
+            for raw,alt in item["images"]:
+                description=clean(" ".join(part for part in (alt,caption) if part))
+                if self._figures:
+                    self._figures[-1]["images"].append((raw,description))
+                else:
+                    self.images.append((raw,description))
+        elif item["depth"]:
+            item["depth"]-=1
+
 
 def licensed_event_photo(source_url,headline):
-    """Use ONLY the original story's image, described as the same event and CC-licensed.
-
-    An OG image alone only means editorial association, not an authentic event photo.
-    The source page must identify its specific content; individual Wikimedia licensing
-    is checked separately. Unverified or illustrative photos are rejected.
+    """Use only Commons photographs linked by this story, with factual captions and
+    individually verified CC0 / CC-BY rights. Never infer a license from a portal.
+    A nonreusable first image must not hide a later eligible gallery photograph.
     """
     parsed=urllib.parse.urlsplit(source_url)
     host=(parsed.hostname or "").lower()
@@ -151,8 +199,6 @@ def licensed_event_photo(source_url,headline):
     title=page.meta.get("og:title","")
     if not event_caption_matches(headline,title):
         raise RuntimeError("Source page title does not match news headline")
-    # Check both the social preview and article-embedded images. A portal's
-    # og:image may be its logo, while the article credits a distinct Commons photo.
     candidates=[]
     preview=page.meta.get("og:image","") or page.meta.get("twitter:image","")
     preview_alt=page.meta.get("og:image:alt","") or page.meta.get("twitter:image:alt","")
@@ -160,51 +206,59 @@ def licensed_event_photo(source_url,headline):
         candidates.append((urllib.parse.urljoin(response.url,preview),preview_alt))
     for raw,description in page.images:
         candidates.append((urllib.parse.urljoin(response.url,raw),description))
-    img=None
+
+    checked_files=set()
+    checked_count=0
     for candidate,description in candidates:
-        parsed_image=urllib.parse.urlsplit(candidate)
-        if parsed_image.scheme!="https" or parsed_image.hostname!="upload.wikimedia.org":
+        image_url=urllib.parse.urlsplit(candidate)
+        if image_url.scheme!="https" or image_url.hostname!="upload.wikimedia.org":
             continue
         if re.search(r"ilustrativ|meramente|foto de arquivo|imagem de arquivo|stock|shutterstock|freepik|representa[cç][aã]o|montagem|gen[eé]ric|arquivo pessoal",description,re.I):
             continue
         if not description or not event_caption_matches(headline,description):
             continue
-        img=candidate
-        break
-    if not img:
-        raise RuntimeError("No source-linked Commons photograph with event-matching caption and verifiable reuse license")
-    image_url=urllib.parse.urlsplit(img)
-    parts=[urllib.parse.unquote(x) for x in image_url.path.split("/") if x]
-    filename=(parts[-2] if "thumb" in parts and len(parts)>2 else parts[-1]) if parts else ""
-    if not re.search(r"\.(jpe?g|png|webp)$",filename,re.I):
-        raise RuntimeError("Original news image is not an identified Wikimedia photo")
-    api=requests.get("https://commons.wikimedia.org/w/api.php",params={
-        "action":"query","titles":"File:"+filename,"prop":"imageinfo",
-        "iiprop":"url|size|extmetadata","iiurlwidth":"1600",
-        "format":"json","formatversion":"2"
-    },headers=HEADERS,timeout=20)
-    api.raise_for_status()
-    pages=api.json().get("query",{}).get("pages",[])
-    for p in pages:
-        info=(p.get("imageinfo") or [None])[0]
-        if not info:continue
-        meta=info.get("extmetadata") or {}
-        lic=clean(html.unescape(re.sub("<[^>]*>"," ",str((meta.get("LicenseShortName") or {}).get("value","")))))
-        license_url=str((meta.get("LicenseUrl") or {}).get("value",""))
-        cc0=bool(re.search(r"\bCC0\b",lic,re.I) and "creativecommons.org/publicdomain/zero/" in license_url)
-        ccby=bool(re.fullmatch(r"CC[ -]*BY[ -]*(?:2\.0|2\.5|3\.0|4\.0)",lic,re.I) and
-            license_url.startswith("https://creativecommons.org/licenses/by/"))
-        if not (cc0 or ccby):continue
-        if int(info.get("width",0))<900 or int(info.get("height",0))<650:continue
-        artist=clean(html.unescape(re.sub("<[^>]*>"," ",str((meta.get("Artist") or {}).get("value","")))))
-        if ccby and not artist:continue
-        pic=str(info.get("thumburl") or info.get("url") or "")
-        if urllib.parse.urlsplit(pic).hostname not in ("upload.wikimedia.org","thumb.wikimedia.org"):continue
-        actual=fetch_picture(pic)
-        landing="https://commons.wikimedia.org/wiki/File:"+urllib.parse.quote(filename.replace(" ","_"),safe="()-_.")
-        credit=("wikimedia_event_"+filename[:55]+" — "+artist[:65]+" — "+lic+" — "+landing)[:445]
-        return actual,credit,filename
-    raise RuntimeError("The linked photograph has no verifiable reusable Commons license")
+        parts=[urllib.parse.unquote(x) for x in image_url.path.split("/") if x]
+        filename=(parts[-2] if "thumb" in parts and len(parts)>2 else parts[-1]) if parts else ""
+        if not re.search(r"\.(jpe?g|png|webp)$",filename,re.I):
+            continue
+        if filename in checked_files:
+            continue
+        checked_files.add(filename)
+        checked_count+=1
+        if checked_count>10:
+            break  # Bound network work; never relax licensing to fill a slot.
+        api=requests.get("https://commons.wikimedia.org/w/api.php",params={
+            "action":"query","titles":"File:"+filename,"prop":"imageinfo",
+            "iiprop":"url|size|extmetadata","iiurlwidth":"1600",
+            "format":"json","formatversion":"2"
+        },headers=HEADERS,timeout=20)
+        api.raise_for_status()
+        pages=api.json().get("query",{}).get("pages",[])
+        for p in pages:
+            info=(p.get("imageinfo") or [None])[0]
+            if not info:
+                continue
+            meta=info.get("extmetadata") or {}
+            lic=clean(html.unescape(re.sub("<[^>]*>"," ",str((meta.get("LicenseShortName") or {}).get("value","")))))
+            license_url=str((meta.get("LicenseUrl") or {}).get("value",""))
+            cc0=bool(re.search(r"\bCC0\b",lic,re.I) and "creativecommons.org/publicdomain/zero/" in license_url)
+            ccby=bool(re.fullmatch(r"CC[ -]*BY[ -]*(?:2\.0|2\.5|3\.0|4\.0)",lic,re.I) and
+                license_url.startswith("https://creativecommons.org/licenses/by/"))
+            if not (cc0 or ccby):
+                continue
+            if int(info.get("width",0))<900 or int(info.get("height",0))<650:
+                continue
+            artist=clean(html.unescape(re.sub("<[^>]*>"," ",str((meta.get("Artist") or {}).get("value","")))))
+            if ccby and not artist:
+                continue
+            pic=str(info.get("thumburl") or info.get("url") or "")
+            if urllib.parse.urlsplit(pic).hostname not in ("upload.wikimedia.org","thumb.wikimedia.org"):
+                continue
+            actual=fetch_picture(pic)
+            landing="https://commons.wikimedia.org/wiki/File:"+urllib.parse.quote(filename.replace(" ","_"),safe="()-_.")
+            credit=("wikimedia_event_"+filename[:55]+" — "+artist[:65]+" — "+lic+" — "+landing)[:445]
+            return actual,credit,filename
+    raise RuntimeError("No source-linked Commons photograph with event-matching caption and verifiable reuse license")
 
 def licensed_commons_photo(topic):
     # Wikimedia Commons is not a blanket license: verify each file's metadata.
