@@ -7,6 +7,11 @@ const SVC=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"";
 const BUFFER_KEY=Deno.env.get("BUFFER_API_KEY")||"";
 const respond=(obj:unknown,status=200)=>new Response(JSON.stringify(obj),{status,headers:{"Content-Type":"application/json","Cache-Control":"no-store"}});
 const db=createClient(SUPA,SVC,{auth:{persistSession:false,autoRefreshToken:false}});
+const originalArtCredit=async(url:string,title:string)=>{
+ const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(url+"\n"+title));
+ return "original_editorial_labeled_v2_"+
+  Array.from(new Uint8Array(digest)).map(x=>x.toString(16).padStart(2,"0")).join("").slice(0,24);
+};
 async function bufferRequest(query:string,variables?:Record<string,unknown>){
  const res=await fetch("https://api.buffer.com",{
   method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+BUFFER_KEY},
@@ -469,12 +474,24 @@ Deno.serve(async req=>{
     return respond({ok:false,processed:0,error:"public_video_not_reachable_or_wrong_type"},422);
    }
    const source=await db.from("giro_social_video_queue")
-      .select("source_url,shorts_image_credit").eq("id",job.source_queue_id).eq("platform","tiktok").maybeSingle();
-   if(source.error || !source.data || !/^https:\/\//.test(String(source.data.source_url||"")) || !/^wikimedia_event_/.test(String(source.data.shorts_image_credit||""))){
-     await db.from("giro_buffer_tiktok_jobs").update({status:"review_required",last_error:"source_or_image_attribution_missing",updated_at:new Date().toISOString()}).eq("id",jobId).eq("status","claimed");
-     return respond({ok:false,processed:0,error:"source_or_image_attribution_missing"},422);
+      .select("source_url,title,shorts_image_credit,editor_approved,visual_review_status,status,shorts_render_origin,storyboard_status")
+      .eq("id",job.source_queue_id).eq("platform","tiktok").maybeSingle();
+   const article=source.data;
+   const credit=String(article?.shorts_image_credit||"");
+   const illustrated=/^original_editorial_labeled_v2_[0-9a-f]{24}$/.test(credit);
+   const matchesOrigin=/^wikimedia_event_/.test(credit) ||
+      (illustrated && credit===await originalArtCredit(String(article?.source_url||""),String(article?.title||"")));
+   if(source.error || !article || !/^https:\/\//.test(String(article.source_url||"")) ||
+       article.status!=="pronto_para_revisao" || article.shorts_render_origin!=="tiktok_github_oidc_v1" ||
+       article.storyboard_status!=="preparado" || article.editor_approved!==true ||
+       article.visual_review_status!=="approved" || !matchesOrigin){
+     await db.from("giro_buffer_tiktok_jobs").update({status:"review_required",last_error:"editorial_review_or_visual_origin_missing",updated_at:new Date().toISOString()}).eq("id",jobId).eq("status","claimed");
+     return respond({ok:false,processed:0,error:"editorial_review_or_visual_origin_missing"},422);
    }
-   const caption=String(job.caption)+"\n\nFonte: "+source.data.source_url+"\nFoto do acontecimento: "+source.data.shorts_image_credit;
+   const visualDisclosure=illustrated
+      ? "ILUSTRAÇÃO EDITORIAL ORIGINAL — representação gráfica, NÃO É FOTO DO ACONTECIMENTO"
+      : "Foto vinculada à notícia e crédito: "+credit;
+   const caption=String(job.caption)+"\n\nFonte: "+article.source_url+"\n"+visualDisclosure;
    const savedCaption=await db.from("giro_buffer_tiktok_jobs").update({caption}).eq("id",jobId).eq("status","claimed");
    if(savedCaption.error)return respond({ok:false,processed:0,error:"caption_save_failed_do_not_send"},500);
    const gql="mutation CreatePost($input:CreatePostInput!){createPost(input:$input){... on PostActionSuccess{post{id,dueAt,status}} ... on MutationError{message}}}";
