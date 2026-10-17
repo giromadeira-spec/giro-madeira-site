@@ -268,6 +268,29 @@ def licensed_event_photo(source_url,headline):
             return actual,credit,filename
     raise RuntimeError("No source-linked Commons photograph with event-matching caption and verifiable reuse license")
 
+def approved_registry_photo(item,source_url,headline):
+    """Read a signed PRIVATE photo offered by the OIDC-verified Supabase bridge.
+
+    The bridge checks approval, evidence, rights scope, article identity and expiry;
+    it independently checks the same record again before accepting completed media.
+    """
+    if not isinstance(item,dict) or not isinstance(item.get("id"),int) or item["id"]<1:
+        raise RuntimeError("Missing approved newsroom image ID")
+    if item.get("article_url")!=source_url or item.get("headline")!=headline:
+        raise RuntimeError("Newsroom image does not match exact source article")
+    credit=str(item.get("image_credit") or "")
+    if not credit.startswith("registered_event_"+str(item["id"])+" — ") or len(credit)>445:
+        raise RuntimeError("Newsroom attribution was not issued by approved registry")
+    pic=str(item.get("image_url") or "")
+    parsed=urllib.parse.urlsplit(pic)
+    expected="/storage/v1/object/sign/giro-imagens-autorizadas/approved/"
+    if (parsed.scheme!="https" or parsed.hostname!="dsihvbdhocbqscaypraw.supabase.co" or
+        not parsed.path.startswith(expected) or not parsed.query or
+        parsed.username or parsed.password or ".." in parsed.path or "\\" in pic):
+        raise RuntimeError("Only signed private newsroom images are permitted")
+    return fetch_picture(pic),credit,"Giro Madeira arquivo autorizado #"+str(item["id"])
+
+
 def licensed_commons_photo(topic):
     # Wikimedia Commons is not a blanket license: verify each file's metadata.
     url="https://commons.wikimedia.org/w/api.php"
@@ -972,15 +995,25 @@ def main():
             raise RuntimeError("No safe news-specific illustration or verified event photo")
         # Production requires an actual event photograph with individually verified reuse rights.
         # QA-only illustrations never qualify as documentary evidence or publication approval.
+        registered_image_id=0
         try:
+            # First choice: per-file licensed photo linked by the original report.
             picture,credit,file_title=licensed_event_photo(result["source_url"],result["title"])
         except Exception as no_photo:
-            if PLATFORM == "tiktok":
+            # Secondary source: documented, human-approved photo stored privately.
+            # TikTok remains on its independent, untouched publication pipeline.
+            registered=result.get("registered_image") if PLATFORM=="shorts" else None
+            if registered:
+                picture,credit,file_title=approved_registry_photo(
+                    registered,result["source_url"],result["title"])
+                registered_image_id=registered["id"]
+            elif PLATFORM == "tiktok":
                 raise RuntimeError("Real event photo unverified; TikTok remains blocked: "+
                                    str(no_photo)[:125]) from no_photo
-            raise RuntimeError("Real event photo unverified; Shorts remains blocked: "+
-                               str(no_photo)[:125]) from no_photo
-        image_verified=credit.startswith("wikimedia_event_")
+            else:
+                raise RuntimeError("Real event photo unverified; Shorts remains blocked: "+
+                                   str(no_photo)[:125]) from no_photo
+        image_verified=credit.startswith(("wikimedia_event_","registered_event_"))
         if not image_verified:
             raise RuntimeError("Visual standard failed: verified event photograph required")
         if category=="SEGURANÇA" and re.search(r"press|newspaper|cherokee|printing",file_title,re.I):
@@ -1005,7 +1038,7 @@ def main():
         preview_dir.mkdir(exist_ok=True)
         # Checagem de qualidade estrutural: não confundir renderização concluída
         # com conformidade visual. Fotografia ligada à pauta é condição obrigatória.
-        image_verified=credit.startswith("wikimedia_event_")
+        image_verified=credit.startswith(("wikimedia_event_","registered_event_"))
         if len(frames)!=3 or not image_verified:
             raise RuntimeError("Approved visual QA failed: licensed event photograph required")
         for frame in frames:
@@ -1019,7 +1052,8 @@ def main():
         if response.status_code not in (200,201):
             raise RuntimeError("Supabase signed upload failed with HTTP "+str(response.status_code))
         confirmed=bridge(token,"complete",queue_id=qid,storage_path=result["storage_path"],
-                 quality_passed=(len(frames)==3 and image_verified),image_credit=credit)
+                 quality_passed=(len(frames)==3 and image_verified),image_credit=credit,
+                 registered_image_id=registered_image_id)
         print("Rendered and stored approved video for queue",confirmed["queue_id"])
         print("Visual provenance:",file_title)
         print("Actual event photograph:",credit.startswith("wikimedia_event_"))
