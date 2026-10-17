@@ -151,25 +151,29 @@ def licensed_event_photo(source_url,headline):
     title=page.meta.get("og:title","")
     if not event_caption_matches(headline,title):
         raise RuntimeError("Source page title does not match news headline")
-    img=page.meta.get("og:image","") or page.meta.get("twitter:image","")
+    # Check both the social preview and article-embedded images. A portal's
+    # og:image may be its logo, while the article credits a distinct Commons photo.
+    candidates=[]
+    preview=page.meta.get("og:image","") or page.meta.get("twitter:image","")
+    preview_alt=page.meta.get("og:image:alt","") or page.meta.get("twitter:image:alt","")
+    if preview:
+        candidates.append((urllib.parse.urljoin(response.url,preview),preview_alt))
+    for raw,description in page.images:
+        candidates.append((urllib.parse.urljoin(response.url,raw),description))
+    img=None
+    for candidate,description in candidates:
+        parsed_image=urllib.parse.urlsplit(candidate)
+        if parsed_image.scheme!="https" or parsed_image.hostname!="upload.wikimedia.org":
+            continue
+        if re.search(r"ilustrativ|meramente|foto de arquivo|imagem de arquivo|stock|shutterstock|freepik|representa[cç][aã]o|montagem|gen[eé]ric|arquivo pessoal",description,re.I):
+            continue
+        if not description or not event_caption_matches(headline,description):
+            continue
+        img=candidate
+        break
     if not img:
-        raise RuntimeError("No picture is attributed to the original news article")
-    img=urllib.parse.urljoin(response.url,img)
+        raise RuntimeError("No source-linked Commons photograph with event-matching caption and verifiable reuse license")
     image_url=urllib.parse.urlsplit(img)
-    # Commons photo explicitly supplied by the article; never substitute a search hit.
-    if image_url.scheme!="https" or image_url.hostname!="upload.wikimedia.org":
-        raise RuntimeError("No source-linked photograph with a verifiable reuse license")
-    alt=(page.meta.get("og:image:alt") or page.meta.get("twitter:image:alt") or "")
-    if not alt:
-        for raw,description in page.images:
-            resolved=urllib.parse.urljoin(response.url,raw)
-            if resolved==img or urllib.parse.unquote(resolved.split("/")[-1])==urllib.parse.unquote(img.split("/")[-1]):
-                alt=description
-                break
-    if re.search(r"ilustrativ|meramente|foto de arquivo|imagem de arquivo|stock|shutterstock|freepik|representa[cç][aã]o|montagem|gen[eé]ric|arquivo pessoal",alt,re.I):
-        raise RuntimeError("The photo is illustrative or archival, not evidence of this event")
-    if not alt or not event_caption_matches(headline,alt):
-        raise RuntimeError("Original photo caption does not identify the reported occurrence")
     parts=[urllib.parse.unquote(x) for x in image_url.path.split("/") if x]
     filename=(parts[-2] if "thumb" in parts and len(parts)>2 else parts[-1]) if parts else ""
     if not re.search(r"\.(jpe?g|png|webp)$",filename,re.I):
