@@ -906,7 +906,7 @@ def render_self_test():
                                    "supermarket aisle","South Korea supermarket aisle"):
             raise RuntimeError("Relevant Korean supermarket photo rejected")
     if PLATFORM in ("shorts","tiktok"):
-        # Exercise the real claim/fail path: no photo must never become approved art.
+        # Incomplete newsroom storyboards fail safely even if original art is available.
         from unittest.mock import patch
         for headline in (
             "Ataques russos deixam cidades sem energia na Ucrânia",
@@ -930,8 +930,8 @@ def render_self_test():
                 else:
                     raise RuntimeError("Test with incomplete storyboard must fail before upload")
                 if calls!=["claim","fail"]:
-                    raise RuntimeError("Missing photograph did not preserve blocked claim/fail flow")
-                illustration.assert_not_called()
+                    raise RuntimeError("Incomplete storyboard incorrectly advanced to publication")
+                illustration.assert_called_once()
                 upload.assert_not_called()
     if article_subject("PF faz operação contra crimes de ódio e violência sexual contra crianças na internet") != ("cyber safety editorial","SEGURANÇA"):
         raise RuntimeError("Child cybercrime story must use safe symbolic visuals")
