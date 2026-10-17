@@ -1,10 +1,12 @@
-"""Offline regressions: no network, real credentials, upload or publication."""
+"""Offline regression tests for licensed photos and clearly labeled symbolic artwork.
+No credentials, actual news claims, publication, Buffer or social uploads.
+"""
 import importlib.util
 import os
 from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock,patch
 from PIL import Image
 
 ROOT=Path(__file__).resolve().parents[1]
@@ -15,11 +17,14 @@ spec.loader.exec_module(r)
 class TikTokPhotoGuard(unittest.TestCase):
     def pipeline(self,platform="tiktok",credit="wikimedia_event_test",missing=False):
         calls=[]
+        complete_payload=[]
         claim={"processed":True,"queue_id":999,"title":"Terremoto deixa feridos na Rússia",
-               "source_url":"https://example.test/report","scenes":[{}, {}, {}],
+               "source_url":"https://example.test/report","scenes":["Cena 1","Cena 2","Cena 3"],
                "upload_url":"https://offline.invalid/upload","storage_path":"test.mp4"}
         def bridge(token,action,**kwargs):
             calls.append(action)
+            if action=="complete":
+                complete_payload.append(kwargs)
             return claim if action=="claim" else {"queue_id":999}
         def frame(photo,river,logo,item,scene,index,credit,path):
             Image.new("RGB",(1080,1920)).save(path)
@@ -27,7 +32,7 @@ class TikTokPhotoGuard(unittest.TestCase):
             video.write_bytes(b"OFFLINE TEST ONLY")
         photo=Mock(side_effect=RuntimeError("no verified photo")) if missing else Mock(
             return_value=(Image.new("RGB",(1080,1920)),credit,"verified event"))
-        with tempfile.TemporaryDirectory() as tmp, patch.object(r,"PLATFORM",platform), \
+        with tempfile.TemporaryDirectory() as tmp,patch.object(r,"PLATFORM",platform), \
              patch.object(r,"ROOT",Path(tmp)), \
              patch.object(r,"github_token",return_value="offline"), \
              patch.object(r,"bridge",side_effect=bridge), \
@@ -35,47 +40,84 @@ class TikTokPhotoGuard(unittest.TestCase):
              patch.object(r,"render_topic_illustration",return_value=Image.new("RGB",(1080,1920))) as art, \
              patch.object(r,"licensed_local_madeira_photo",side_effect=RuntimeError("offline")), \
              patch.object(r,"make_frame",side_effect=frame), \
-             patch.object(r,"make_music"), patch.object(r,"render_frames",side_effect=render), \
+             patch.object(r,"make_music"),patch.object(r,"render_frames",side_effect=render), \
              patch.object(r.requests,"put",return_value=Mock(status_code=201)) as upload, \
              patch.dict(os.environ,{"GITHUB_EVENT_NAME":"schedule"}):
-            assets=Path(tmp)/"assets"
-            assets.mkdir()
-            Image.new("RGB",(100,100)).save(assets/"logo-oficial.webp")
-            failed=False
-            try:r.main()
-            except RuntimeError:failed=True
-            return failed,calls,art.call_count,upload.call_count
+            folder=Path(tmp)/"assets"
+            folder.mkdir()
+            Image.new("RGB",(100,100)).save(folder/"logo-oficial.webp")
+            try:
+                r.main()
+                failed=False
+            except RuntimeError:
+                failed=True
+        return failed,calls,art.call_count,upload.call_count,complete_payload
 
-    def test_missing_photo_blocks_before_art_upload_complete(self):
-        self.assertEqual(self.pipeline(missing=True),(True,["claim","fail"],0,0))
+    def test_missing_photo_creates_original_labeled_art(self):
+        for channel in ("shorts","tiktok"):
+            with self.subTest(channel=channel):
+                failed,calls,art,upload,completes=self.pipeline(platform=channel,missing=True)
+                self.assertFalse(failed)
+                self.assertEqual(calls,["claim","complete"])
+                self.assertEqual(art,1)
+                self.assertEqual(upload,1)
+                self.assertEqual(len(completes),1)
+                self.assertEqual(completes[0]["visual_kind"],"illustration")
+                self.assertTrue(completes[0]["image_credit"].startswith("original_editorial_labeled_v2_"))
+                self.assertEqual(completes[0]["image_credit"],r.original_illustration_credit(
+                    "https://example.test/report","Terremoto deixa feridos na Rússia"))
+                self.assertTrue(completes[0]["quality_passed"])
 
-    def test_invalid_credit_cannot_be_approved(self):
+    def test_invalid_fake_photo_credit_is_not_accepted(self):
         for credit in ("original_editorial_labeled_mundo","openverse_test","wikimedia_archive_test",""):
             with self.subTest(credit=credit):
-                self.assertEqual(self.pipeline(credit=credit),(True,["claim","fail"],0,0))
+                failed,calls,art,upload,completes=self.pipeline(credit=credit)
+                self.assertTrue(failed)
+                self.assertEqual(calls,["claim","fail"])
+                self.assertEqual(art,0)
+                self.assertEqual(upload,0)
+                self.assertEqual(completes,[])
 
-    def test_verified_event_photo_keeps_normal_path(self):
-        self.assertEqual(self.pipeline(),(False,["claim","complete"],0,1))
+    def test_verified_photo_keeps_normal_path(self):
+        for channel in ("shorts","tiktok"):
+            failed,calls,art,upload,completes=self.pipeline(platform=channel)
+            self.assertFalse(failed)
+            self.assertEqual(calls,["claim","complete"])
+            self.assertEqual(art,0)
+            self.assertEqual(upload,1)
+            self.assertEqual(completes[0]["visual_kind"],"event_photo")
 
-    def test_shared_renderer_respects_current_shorts_photo_policy(self):
-        # Shorts now independently requires event photos too (3842e370).
-        # This QA must not expect or restore its removed illustration fallback.
-        self.assertEqual(self.pipeline(platform="shorts",missing=True),
-                         (True,["claim","fail"],0,0))
-        self.assertEqual(self.pipeline(platform="shorts"),
-                         (False,["claim","complete"],0,1))
-        self.assertEqual(self.pipeline(platform="shorts",credit="original_editorial_labeled_mundo"),
-                         (True,["claim","fail"],0,0))
+    def test_illustration_credit_is_bound_to_exact_story(self):
+        source="https://example.test/report"
+        headline="Terremoto deixa feridos na Rússia"
+        credit=r.original_illustration_credit(source,headline)
+        self.assertTrue(r.is_acceptable_visual_credit(credit,source,headline))
+        self.assertFalse(r.is_acceptable_visual_credit(credit,source,headline+" ontem"))
+        self.assertFalse(r.is_acceptable_visual_credit(credit,source+"?version=2",headline))
 
-    def test_deployed_source_gates_reject_original_art(self):
-        for path in ("scripts/buffer/giro-buffer-tiktok-worker.ts",
-                     "supabase/functions/giro-tiktok-github-bridge/index.ts",
-                     "supabase/functions/giro-tiktok-30fps-bridge/index.ts"):
-            source=(ROOT/path).read_text()
-            self.assertNotIn("original_editorial_labeled_",source,path)
-            self.assertIn("wikimedia_event_",source,path)
-        queue=(ROOT/"supabase/functions/giro-tiktok-editorial-queue/index.ts").read_text()
-        self.assertNotIn("releaseError",queue)
-        self.assertIn('until Buffer reconciliation',queue)
+    def test_tiktok_art_never_bypasses_human_review(self):
+        bridge=(ROOT/"supabase/functions/giro-tiktok-github-bridge/index.ts").read_text()
+        converter=(ROOT/"supabase/functions/giro-tiktok-30fps-bridge/index.ts").read_text()
+        worker=(ROOT/"scripts/buffer/giro-buffer-tiktok-worker.ts").read_text()
+        self.assertIn('editor_approved:!isIllustration',bridge)
+        self.assertIn('visual_review_status:isIllustration?"pending":"approved"',bridge)
+        self.assertIn('ready_to_publish:!isIllustration',bridge)
+        self.assertIn('.eq("editor_approved",true)',converter)
+        self.assertIn('.eq("visual_review_status","approved")',converter)
+        self.assertIn('editorial_review_or_visual_origin_missing',worker)
+        self.assertIn('visualDisclosure=illustrated',worker)
+        self.assertIn('originalArtCredit(',worker)
+        self.assertIn('until Buffer reconciliation',(ROOT/"supabase/functions/giro-tiktok-editorial-queue/index.ts").read_text())
 
-if __name__=="__main__":unittest.main()
+    def test_shorts_art_also_needs_editor_approval(self):
+        bridge=(ROOT/"supabase/functions/giro-shorts-github-bridge/index.ts").read_text()
+        uploader=(ROOT/"supabase/functions/giro-youtube-upload-auto/index.ts").read_text()
+        self.assertIn("illustration_not_bound_to_article",bridge)
+        self.assertIn("editor_approved:false",bridge)
+        self.assertIn("ready_to_publish:false",bridge)
+        self.assertIn('.eq("editor_approved",true)',uploader)
+        self.assertIn('.eq("visual_review_status","approved")',uploader)
+        self.assertIn("ILUSTRAÇÃO EDITORIAL ORIGINAL",uploader)
+
+if __name__=="__main__":
+    unittest.main()
