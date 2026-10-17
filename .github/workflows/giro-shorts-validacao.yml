@@ -43,7 +43,9 @@ jobs:
           assert "aircraft airplane" in source, "Aircraft subject mapping missing"
           assert "No source-linked Commons photograph with event-matching caption and verifiable reuse license" in source, "Original-event license gate missing"
           assert 'ORIGINAL_CREDIT="arte editorial original Giro Madeira — sem fotografia externa"' in source
-          assert 'image_verified=credit.startswith("wikimedia_event_")' in source, "Only verified event photos may pass"
+          assert 'image_verified=credit.startswith(("wikimedia_event_","registered_event_"))' in source, "Only individually approved event photos may pass"
+          assert 'registered_image_id=registered_image_id' in source, "Registered image identity must be reported to bridge"
+          assert 'approved_registry_photo(' in source, "Signed private newsroom photo validation missing"
           assert 'image_verified=credit.startswith(("wikimedia_event_","original_editorial_labeled_"))' not in source, "Original artwork must NOT be verified as event photo"
           assert not any(isinstance(n,ast.Call) and isinstance(n.func,ast.Name) and n.func.id=="render_topic_illustration" for n in ast.walk(main)), "Topic illustrations must NOT be used in production"
           fn_topic=next((n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=="render_topic_illustration"),None)
