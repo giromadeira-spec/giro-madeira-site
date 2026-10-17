@@ -126,7 +126,7 @@ Deno.serve(async(req:Request)=>{
       asset.commercial_use_allowed===true && !!asset.reviewer && !!asset.reviewed_at &&
       !!asset.evidence_url && !!asset.evidence_description && !!asset.copyright_owner &&
       ["cc0","cc_by","permission_written","owned"].includes(String(asset.license_kind||"")) &&
-      /^approved\\/[a-zA-Z0-9_./-]+\\.(?:jpg|jpeg|png|webp)$/.test(String(asset.storage_path||"")) &&
+      /^approved\/[a-zA-Z0-9_./-]+\.(?:jpg|jpeg|png|webp)$/.test(String(asset.storage_path||"")) &&
       (!asset.valid_until || Date.parse(String(asset.valid_until))>Date.now()) &&
       credit===("registered_event_"+archiveId+" — "+String(asset.credit_line||"")).slice(0,445);
     if(archiveError||!valid)
