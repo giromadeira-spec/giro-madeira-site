@@ -883,24 +883,46 @@ Deno.serve(async(req)=>{
     // Nunca publicar fotografia genérica ou afirmar que a arte está aprovada.
     // Never auto-render the abstract shields/background that produced the bad Feed post.
     if(!photo){
-      const draftCaption=`${originalText}\n\nFonte: ${source}\nMatéria original: ${sourceLink}\n\nFOTO REAL DO ACONTECIMENTO PENDENTE DE VERIFICAÇÃO.\n\n#GiroMadeira #PortoVelho #Rondônia`;
+      // No reusable event photo: render original, visibly labeled abstract
+      // newspaper art. No third-party imagery, depicted people or fake footage.
+      // Rendering the draft does NOT authorize any public Meta post.
+      await prepareBrandLogo();const font=new Uint8Array();
+      const graphic="original_editorial_illustration";
+      const feed=await render(makeSvg("feed",title,desc,source,category,graphic,item.urgente===true,"",false),font);
+      const story=await render(makeSvg("story",title,desc,source,category,graphic,item.urgente===true,"",false),font);
+      const stamp=Date.now();
+      const feedPath="auto/feed/"+channel+"/"+id+"-"+stamp+"-original.png";
+      const storyPath="auto/story/"+channel+"/"+id+"-"+stamp+"-original.png";
+      const [uf,us]=await Promise.all([
+        sb.storage.from("news-images").upload(feedPath,feed,{contentType:"image/png",upsert:false}),
+        sb.storage.from("news-images").upload(storyPath,story,{contentType:"image/png",upsert:false})
+      ]);
+      if(uf.error)throw uf.error;
+      if(us.error)throw us.error;
+      const feedUrl=sb.storage.from("news-images").getPublicUrl(feedPath).data.publicUrl;
+      const storyUrl=sb.storage.from("news-images").getPublicUrl(storyPath).data.publicUrl;
+      const draftCaption=originalText+"\n\nFonte: "+source+"\nMatéria original: "+sourceLink+
+        "\n\nILUSTRAÇÃO EDITORIAL ORIGINAL — representação gráfica simbólica, NÃO É FOTO DO ACONTECIMENTO."+
+        "\n\n#GiroMadeira #PortoVelho #Rondônia";
       const pending=await sb.from(publicationTable).update({
         titulo:title,resumo:desc||item.resumo||null,categoria:category,
-        legenda:draftCaption,
+        legenda:draftCaption,image_url:feedUrl,feed_image_url:feedUrl,story_image_url:storyUrl,
         source_image_url:imageUrl||null,source_video_url:videoRaw||null,
         publicar_story:false,publicar_reel:reelRecommended,
-        reel_interesse_ro:reelInterestRo,
+        reel_interesse_ro:reelInterestRo,video_url:item.video_url||null,
         media_pipeline_version:channel==="feed"?6:5,visual_approved:false,
-        media_status:"aguardando_verificacao_foto_e_licenca",
-        status:"pendente",
-        erro:imageUrl?"Foto candidata encontrada na reportagem; autenticidade e licença de adaptação pendentes. Não publicar.":"Sem foto da reportagem com relação ao fato e licença reutilizável verificadas. Não usar fotos genéricas."
-      }).eq("id",id).in("status",["pendente","erro"]);
+        media_status:"ilustracao_original_aguardando_revisao",
+        status:"pendente",erro:null
+      }).eq("id",id).in("status",["pendente","erro"]).eq("visual_approved",false);
       if(pending.error)throw pending.error;
       return new Response(JSON.stringify({
-        success:true,id,media_ready:false,
-        needs_visual_review:true,needs_approved_art:true,
-        reel_recommended:reelRecommended,no_publish:true,
-        visual_mode:"no_verified_event_photo",reason:"Foto real da matéria, com licença verificada, não encontrada; pauta preservada."
+        success:true,id,feed_image_url:feedUrl,story_image_url:storyUrl,
+        reel_ready:Boolean(item.video_url),reel_recommended:reelRecommended,
+        reel_interesse_ro:reelInterestRo,reel_generated:false,
+        source_image_url:imageUrl||null,visual_mode:"original_illustration",
+        illustrative_photo_credit:null,needs_approved_art:false,
+        awaiting_visual_approval:true,no_publish:true,
+        reason:"Arte original abstrata criada, identificada e aguardando revisão antes de publicar."
       }),{headers:H});
     }
     const attribution=photo.creator+" • "+photo.license;
