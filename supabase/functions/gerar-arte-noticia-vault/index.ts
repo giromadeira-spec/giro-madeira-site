@@ -689,7 +689,7 @@ async function render(svg:string,_font:Uint8Array){
  if(b.length<10000||b.length>16000000)throw new Error("render_worker_invalid_png");
  return b;
 }
-async function maybeCopyVideo(sb:any,raw:string,id:number){
+async function maybeCopyVideo(sb:any,raw:string,id:number,channel='legacy'){
   if(!raw) return {source:"",publicUrl:""};
   try{
     const u=new URL(raw); const ctl=new AbortController(); const to=setTimeout(()=>ctl.abort(),20000);
