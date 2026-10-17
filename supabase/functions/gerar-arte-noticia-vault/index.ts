@@ -586,11 +586,48 @@ function headlineBlockOfficial(lines:string[],x:number,y:number,fs:number,lh:num
   return '<text x="'+x+'" y="'+y+'" font-family="Anton" font-size="'+fs+'" font-weight="900" stroke="#020a12" stroke-opacity=".30" stroke-width="1.5" paint-order="stroke" letter-spacing=".2">' +
     lines.map((l,i)=>'<tspan x="'+x+'" dy="'+(i===0?0:lh)+'" fill="'+(i===1?"#FFCC1C":"#FFFFFF")+'">'+esc(l)+'</tspan>').join('') + '</text>';
 }
+function originalGraphicHero(W:number,H:number,title:string,category:string){
+  // Original SVG vector motifs, not a photo, reenactment or reconstruction of an event.
+  const t=(title+" "+category).normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+  const cx=540,cy=Math.round(H*.26);
+  let motif="";
+  if(/furacao|tempestade|chuva|vento|inundac|enchente|clima|alerta meteorolog/.test(t)){
+    motif='<g fill="none" stroke="#ffcc1c" stroke-width="21" stroke-linecap="round">'+
+      '<path d="M175 '+(cy-44)+' Q375 '+(cy-205)+' 585 '+(cy-72)+' Q745 '+(cy+42)+' 882 '+(cy-137)+'"/>'+
+      '<path d="M178 '+(cy+67)+' Q425 '+(cy-45)+' 623 '+(cy+67)+' Q785 '+(cy+158)+' 908 '+(cy+32)+'"/>'+
+      '</g><g stroke="#85b7d0" stroke-width="9"><path d="M265 '+(cy+154)+' L236 '+(cy+214)+' M490 '+(cy+140)+' L465 '+(cy+200)+' M728 '+(cy+147)+' L705 '+(cy+203)+'"/></g>';
+  }else if(/acidente|transito|rodovia|trem|colisao|transporte/.test(t)){
+    motif='<g fill="none" stroke="#ffcc1c" stroke-width="19">'+
+      '<path d="M425 '+(cy-210)+' L225 '+(cy+225)+' M655 '+(cy-210)+' L855 '+(cy+225)+'"/>'+
+      '<path d="M540 '+(cy-186)+' L540 '+(cy-106)+' M540 '+(cy-42)+' L540 '+(cy+39)+' M540 '+(cy+108)+' L540 '+(cy+196)+'"/></g>';
+  }else if(/prisao|preso|policia|investigac|operacao|seguranca|crime|homicidio/.test(t)){
+    motif='<path d="M540 '+(cy-245)+' L815 '+(cy-120)+' L772 '+(cy+132)+' Q717 '+(cy+226)+' 540 '+(cy+278)+' Q365 '+(cy+224)+' 309 '+(cy+132)+' L266 '+(cy-120)+' Z" fill="none" stroke="#ffcc1c" stroke-width="20"/>'+
+      '<path d="M420 '+cy+' L505 '+(cy+73)+' L670 '+(cy-87)+'" fill="none" stroke="#80b6d2" stroke-width="26" stroke-linecap="round"/>';
+  }else if(/saude|hospital|vacina|medic|dengue/.test(t)){
+    motif='<rect x="457" y="'+(cy-233)+'" width="166" height="470" rx="22" fill="#ffcc1c"/>'+
+      '<rect x="306" y="'+(cy-84)+'" width="468" height="170" rx="22" fill="#ffcc1c"/>';
+  }else if(/economia|dinheiro|imposto|preco|inflacao|mercado|banco/.test(t)){
+    motif='<g fill="#ffcc1c"><rect x="266" y="'+(cy+23)+'" width="116" height="192" rx="10"/>'+
+      '<rect x="460" y="'+(cy-75)+'" width="116" height="290" rx="10"/>'+
+      '<rect x="654" y="'+(cy-187)+'" width="116" height="402" rx="10"/></g>';
+  }else{
+    motif='<g fill="none" stroke="#ffcc1c" stroke-width="15">'+
+      '<circle cx="'+cx+'" cy="'+cy+'" r="212"/><circle cx="'+cx+'" cy="'+cy+'" r="133"/>'+
+      '<path d="M310 '+(cy+195)+' L770 '+(cy-195)+' M310 '+(cy-195)+' L770 '+(cy+195)+'"/></g>';
+  }
+  return '<defs><linearGradient id="giroOriginalHeroBg" x1="0" y1="0" x2="1" y2="1">'+
+    '<stop stop-color="#071627"/><stop offset=".52" stop-color="#17344f"/><stop offset="1" stop-color="#051321"/></linearGradient></defs>'+
+    '<rect width="'+W+'" height="'+H+'" fill="url(#giroOriginalHeroBg)"/>'+
+    '<circle cx="540" cy="'+cy+'" r="345" fill="#174f69" opacity=".32"/>'+
+    '<circle cx="540" cy="'+cy+'" r="300" fill="none" stroke="#b8d7e6" stroke-opacity=".18" stroke-width="6"/>'+
+    '<g>'+motif+'</g>';
+}
 function makeSvg(kind:"feed"|"story",title:string,summary:string,source:string,category:string,bg:string,urgent=false,photoCredit="",isEventPhoto=false){
-  // Same approved photographic design family as Shorts and TikTok, with
-  // channel-specific safe areas. Absolutely no synthetic fallback shield/art.
+  // Photo remains the first choice. The only fallback is a visibly labeled
+  // original abstract vector composition: never a synthetic event photograph.
   const portrait=kind==="story",W=1080,H=portrait?1920:1080;
-  if(!bg.startsWith("data:image/"))throw new Error("visual_contract_photo_hero_required");
+  const originalArt=bg==="original_editorial_illustration";
+  if(!originalArt&&!bg.startsWith("data:image/"))throw new Error("visual_contract_media_required");
   const pad=portrait?66:58;
   const categoryY=portrait?930:482,titleY=portrait?1090:626,maxBaseline=portrait?1550:918;
   const layout=fitHeadline(title,W-2*pad,portrait?7:7,portrait?80:68,portrait?43:37,
@@ -602,7 +639,7 @@ function makeSvg(kind:"feed"|"story",title:string,summary:string,source:string,c
   const tagW=Math.min(735,Math.max(220,cat.length*(portrait?23:19)+90));
   const footerY=portrait?1842:1038;
   const brand=brandHeader(portrait?56:51,portrait?55:42,portrait?1.02:.86);
-  const photo='<image href="'+bg+'" x="0" y="0" width="'+W+'" height="'+H+'" preserveAspectRatio="xMidYMid slice"/>';
+  const photo=originalArt?originalGraphicHero(W,H,title,category):'<image href="'+bg+'" x="0" y="0" width="'+W+'" height="'+H+'" preserveAspectRatio="xMidYMid slice"/>';
   const gradient='<defs><linearGradient id="newsShade" x1="0" y1="0" x2="0" y2="1">'+
     '<stop offset="0" stop-color="#04101c" stop-opacity=".55"/>'+
     '<stop offset=".20" stop-color="#04101c" stop-opacity=".08"/>'+
@@ -616,9 +653,9 @@ function makeSvg(kind:"feed"|"story",title:string,summary:string,source:string,c
     '" fill="#071526">'+esc(cat)+'</text>'+
     '<path d="M'+(pad+tagW+9)+' '+(categoryY+62)+' H'+(W-pad)+
     '" stroke="#ffcc1c" stroke-width="5"/>';
-  const credit=isEventPhoto?'FOTO DO ACONTECIMENTO':'IMAGEM ILUSTRATIVA';
+  const credit=isEventPhoto?"FOTO DO ACONTECIMENTO":"ILUSTRAÇÃO EDITORIAL — NÃO É FOTO";
   const labelY=portrait?878:425;
-  const illustrative='<rect x="'+pad+'" y="'+(labelY-28)+'" width="'+(isEventPhoto?360:294)+'" height="42" rx="4" fill="#041526" opacity=".91"/>'+
+  const illustrative='<rect x="'+pad+'" y="'+(labelY-28)+'" width="'+(isEventPhoto?360:510)+'" height="42" rx="4" fill="#041526" opacity=".91"/>'+
     '<text x="'+(pad+10)+'" y="'+(labelY+1)+'" font-family="Inter" font-weight="800" font-size="20" fill="#fff">'+credit+'</text>';
   const sourceName=clean(source||"Giro Madeira").slice(0,37);
   const urgentTag=urgent?
