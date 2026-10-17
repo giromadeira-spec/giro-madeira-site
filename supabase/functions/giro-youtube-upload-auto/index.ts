@@ -12,6 +12,12 @@ const digest=async(s:string)=>new Uint8Array(await crypto.subtle.digest("SHA-256
 const decode64=(s:string)=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
 const expectedChannel="UCvzAtpCtcIef5Tfw31RcknQ";
 
+const originalArtCredit=async(articleUrl:string,headline:string)=>{
+  const digest=await crypto.subtle.digest("SHA-256",
+    new TextEncoder().encode(articleUrl+"\n"+headline));
+  return "original_editorial_labeled_v2_"+
+    Array.from(new Uint8Array(digest)).map(x=>x.toString(16).padStart(2,"0")).join("").slice(0,24);
+};
 Deno.serve(async(req:Request)=>{
   if(req.method!=="POST") return respond({success:false,error:"method_not_allowed"},405);
   const supabaseUrl=Deno.env.get("SUPABASE_URL")||"";
@@ -95,7 +101,7 @@ Deno.serve(async(req:Request)=>{
     .in("topic_scope",["brasil","mundo"])
     .eq("visual_review_status","approved").eq("editor_approved",true)
     .eq("shorts_render_origin","github_oidc_v1")
-    .or("shorts_image_credit.like.wikimedia_event_%,shorts_image_credit.like.registered_event_%")
+    .or("shorts_image_credit.like.wikimedia_event_%,shorts_image_credit.like.registered_event_%,shorts_image_credit.like.original_editorial_labeled_v2_%")
     .eq("storyboard_status","preparado").eq("shorts_render_version",settings.visual_template_version)
     .is("provider_post_id",null).gte("scheduled_for",currentPvhDay).lte("scheduled_for",new Date().toISOString())
     .gte("created_at",new Date(Date.now()-36*3600000).toISOString())
@@ -131,6 +137,11 @@ Deno.serve(async(req:Request)=>{
       credit===("registered_event_"+archiveId+" — "+String(asset.credit_line||"")).slice(0,445);
     if(archiveError||!valid)
       return respond({success:false,error:"registered_photo_rights_not_verified_at_publication"},422);
+  }else if(/^original_editorial_labeled_v2_[0-9a-f]{24}$/.test(credit)){
+    // Renderer generated only abstract geometry; never present it as a photograph.
+    // This record STILL requires editor_approved and visual_review_status=approved.
+    if(credit!==await originalArtCredit(String(row.source_url||""),String(row.title||"")))
+      return respond({success:false,error:"illustration_provenance_mismatch"},422);
   }else if(!/^wikimedia_event_/.test(credit)){
     return respond({success:false,error:"license_attribution_missing"},422);
   }
@@ -205,7 +216,9 @@ Deno.serve(async(req:Request)=>{
   try {
     const description=[String(row.caption||"").slice(0,3000),
        row.source_url ? "Fonte: "+String(row.source_url).slice(0,400) : "",
-       row.shorts_image_credit ? "Foto do acontecimento e crédito: "+String(row.shorts_image_credit).slice(0,400) : "",
+       /^original_editorial_labeled_v2_/.test(String(row.shorts_image_credit||""))
+         ? "ILUSTRAÇÃO EDITORIAL ORIGINAL — representação gráfica simbólica, NÃO É FOTO DO ACONTECIMENTO. Fonte: "+String(row.source_url||"").slice(0,240)
+         : row.shorts_image_credit ? "Foto vinculada à notícia e crédito: "+String(row.shorts_image_credit).slice(0,400) : "",
        "#GiroMadeira #Shorts"].filter(Boolean).join("\n\n").slice(0,4800);
     const metadata={snippet:{
        title:String(row.title||"Notícia Giro Madeira").slice(0,100),
