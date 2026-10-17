@@ -37,11 +37,14 @@ Deno.serve(async req=>{
   if(body.dry_run===true||blocked)return response({success:true,channel,dry_run:body.dry_run===true,no_publish:true,publication_enabled:cfg.data.publication_enabled,gate:gate.data,integrity_hold:meta.data.integrity_hold,rollout_stage:meta.data.rollout_stage});
   const table='giro_publicacoes_'+channel;
   const found=await db.from(table).select('*').eq('status','aprovada').eq('visual_approved',true).gte('media_pipeline_version',channel==='feed'?6:5)
-   .is(ids[channel],null).or('legenda.like.%Foto do acontecimento:%,legenda.like.%ILUSTRAÇÃO EDITORIAL ORIGINAL%').or('scheduled_at.is.null,scheduled_at.lte.'+new Date().toISOString())
+   .is(ids[channel],null).or('legenda.like.%Foto do acontecimento:%,legenda.like.%ILUSTRAÇÃO EDITORIAL ORIGINAL%')
+    .gte('created_at',new Date(Date.now()-36*3600000).toISOString())
+    .gt('editorial_expires_at',new Date().toISOString())
+    .or('scheduled_at.is.null,scheduled_at.lte.'+new Date().toISOString())
    .order('urgente',{ascending:false}).order('created_at',{ascending:true}).limit(1).maybeSingle();
   if(found.error)throw found.error;
   const item=found.data;
-  if(!item)return response({success:true,channel,processed:0});
+  if(!item)return response({success:true,channel,processed:0,no_publish:true,reason:"no_fresh_verified_media_eligible"});
   if(Date.parse(item.editorial_expires_at||'')<Date.now()||Date.parse(item.created_at)<Date.now()-36*3600000){
    await db.from(table).update({status:'descartada',erro:'editorial_expired'}).eq('id',item.id).eq('status','aprovada');
    return response({success:true,channel,no_publish:true,reason:'editorial_expired'});
