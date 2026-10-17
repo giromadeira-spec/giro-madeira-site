@@ -1,0 +1,49 @@
+name: Giro Madeira - banco de imagens (teste seguro)
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/giro-shorts-github-bridge/index.ts'
+      - 'supabase/functions/giro-youtube-upload-auto/index.ts'
+      - 'scripts/giro_shorts_auto.py'
+      - 'tests/test_giro_event_images.py'
+      - '.github/workflows/giro-imagens-autorizadas-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Validar sintaxe e tipos das funções Supabase sem deploy
+        run: |
+          deno check supabase/functions/giro-shorts-github-bridge/index.ts
+          deno check supabase/functions/giro-youtube-upload-auto/index.ts
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validar renderizador e licença com imagens simuladas (sem API social)
+        run: |
+          python -m pip install --disable-pip-version-check 'Pillow>=11,<13' 'requests>=2.31,<3'
+          python -m py_compile scripts/giro_shorts_auto.py
+          python -m unittest discover -s tests -p 'test_giro_event_images.py' -v
+      - name: Garantir que mídias do banco não contornam revisão editorial
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          bridge=Path('supabase/functions/giro-shorts-github-bridge/index.ts').read_text()
+          uploader=Path('supabase/functions/giro-youtube-upload-auto/index.ts').read_text()
+          assert 'registryReady(registered)' in bridge
+          assert 'registryCredit(registered)!==imageCredit' in bridge
+          assert 'editor_approved:false' in bridge
+          assert 'ready_to_publish:false' in bridge
+          assert 'registered_photo_rights_not_verified_at_publication' in uploader
+          assert '.eq("editor_approved",true)' in uploader
+          assert '.eq("visual_review_status","approved")' in uploader
+          print('PASS: registered photos require documented rights and human editorial approval')
+          PY
