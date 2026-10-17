@@ -680,14 +680,18 @@ def make_frame(photo,river,logo,claim,scene,idx,credit,path):
     d.text((85,tag_top+9),category,font=tagfont,fill=NAVY)
     d.line((tag_right+29,tag_top+69,1015,tag_top+69),fill=YELLOW,width=5)
     # Precise visual provenance: an actual event photo or a non-publication QA illustration.
-    d.rounded_rectangle((58,790,570,838),radius=4,fill=(3,16,36,232))
     if credit.startswith(("wikimedia_event_","registered_event_")):
         photo_label="FOTO DA NOTÍCIA — LICENCIADA"
     elif credit.startswith("original_editorial_labeled_v2_"):
         photo_label="ILUSTRAÇÃO EDITORIAL — NÃO É FOTO"
     else:
         raise RuntimeError("Unrecognized visual origin: cannot label news media")
-    d.text((74,802),photo_label,font=ImageFont.truetype(regular,26),fill=WHITE)
+    provenance_font=ImageFont.truetype(regular,25)
+    provenance_width=d.textbbox((0,0),photo_label,font=provenance_font)[2]
+    if provenance_width>925:
+        raise RuntimeError("Visual provenance label too wide for news frame")
+    d.rounded_rectangle((58,790,95+provenance_width,838),radius=4,fill=(3,16,36,232))
+    d.text((74,802),photo_label,font=provenance_font,fill=WHITE)
     if claim.get("urgent") is True:
         d.rounded_rectangle((785,45,1034,117),radius=6,fill=(222,31,45,255))
         d.text((800,55),"URGENTE",font=ImageFont.truetype(heavy,43),fill=WHITE)
@@ -971,7 +975,8 @@ def render_self_test():
         for idx,scene in enumerate(scenes):
             name=folder/("qa-frame-%d.png"%idx)
             make_frame(backdrop,river,brand,claim,scene,idx,
-                       "arte original ilustrativa, sem foto externa",name)
+                       original_illustration_credit("https://example.org/qa",
+                            claim["title"]),name)
             check=Image.open(name)
             if check.size!=(1080,1920):raise RuntimeError("QA frame dimensions incorrect")
             images.append(name)
