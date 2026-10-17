@@ -21,6 +21,12 @@ const registryReady=(a:any)=>!!a && a.approval_status==="approved" &&
   (!a.valid_until || Date.parse(String(a.valid_until))>Date.now());
 const registryCredit=(a:any)=>("registered_event_"+String(a.id)+" — "+String(a.credit_line||"")).slice(0,445);
 
+const originalArtCredit=async(articleUrl:string,headline:string)=>{
+  const digest=await crypto.subtle.digest("SHA-256",
+    new TextEncoder().encode(articleUrl+"\n"+headline));
+  return "original_editorial_labeled_v2_"+
+    Array.from(new Uint8Array(digest)).map(x=>x.toString(16).padStart(2,"0")).join("").slice(0,24);
+};
 Deno.serve(async req=>{
  if(req.method!=="POST")return response({success:false,error:"method_not_allowed"},405);
  const authorization=req.headers.get("Authorization")||"";
@@ -190,7 +196,14 @@ Deno.serve(async req=>{
   const size=Number(meta?.metadata?.size||0);
   if(!meta||size<100000||size>30*1024*1024)return response({success:false,error:"rendered_file_missing_or_invalid_size"},422);
   const imageCredit=String(reqBody.image_credit||"");
-  if(!/^wikimedia_event_/.test(imageCredit)){
+  const illustrated=/^original_editorial_labeled_v2_[0-9a-f]{24}$/.test(imageCredit);
+  if((illustrated && reqBody.visual_kind!=="illustration") ||
+     (!illustrated && reqBody.visual_kind!=="event_photo"))
+     return response({success:false,error:"visual_kind_mismatch"},422);
+  if(illustrated){
+    if(imageCredit!==await originalArtCredit(String(row.source_url||""),String(row.title||"")))
+      return response({success:false,error:"illustration_not_bound_to_article"},422);
+  }else if(!/^wikimedia_event_/.test(imageCredit)){
     const approvedImageId=Number(reqBody.registered_image_id||0);
     if(!/^registered_event_/.test(imageCredit) || !Number.isSafeInteger(approvedImageId) || approvedImageId<1)
       return response({success:false,error:"image_credit_not_verified"},422);
