@@ -69,7 +69,9 @@ jobs:
                  "urgent":False}
           folder=Path("shorts-test-preview");folder.mkdir(exist_ok=True)
           module.make_frame(photo,module.render_clean_madeira_illustration(),logo,claim,
-                   "IMAGEM REGIONAL CC0 — TESTE SEM PUBLICAÇÃO",0,credit,folder/"auto-qa-photo-cover.png")
+                   "IMAGEM REGIONAL CC0 — TESTE SEM PUBLICAÇÃO",0,
+                   module.original_illustration_credit("https://example.org/qa",claim["title"]),
+                   folder/"auto-qa-photo-cover.png")
           with Image.open(folder/"auto-qa-photo-cover.png") as im:
               assert im.size==(1080,1920)
           print("PASS: Foto CC0 licenciada de Porto Velho usada em capa 1080x1920; sem envio à plataforma")
