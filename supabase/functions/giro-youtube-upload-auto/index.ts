@@ -95,7 +95,7 @@ Deno.serve(async(req:Request)=>{
     .in("topic_scope",["brasil","mundo"])
     .eq("visual_review_status","approved").eq("editor_approved",true)
     .eq("shorts_render_origin","github_oidc_v1")
-    .like("shorts_image_credit","wikimedia_event_%")
+    .or("shorts_image_credit.like.wikimedia_event_%,shorts_image_credit.like.registered_event_%")
     .eq("storyboard_status","preparado").eq("shorts_render_version",settings.visual_template_version)
     .is("provider_post_id",null).gte("scheduled_for",currentPvhDay).lte("scheduled_for",new Date().toISOString())
     .gte("created_at",new Date(Date.now()-36*3600000).toISOString())
@@ -112,8 +112,28 @@ Deno.serve(async(req:Request)=>{
   const id=row.id;
   if(action==="preview")return respond({success:true,mode:"preview",queue_id:id,
      title:row.title,will_upload:false,privacy_status:"public",target_channel:"@GIROMADEIRA"});
-  if(!/^wikimedia_event_/.test(String(row.shorts_image_credit||"")))
+  const credit=String(row.shorts_image_credit||"");
+  if(/^registered_event_/.test(credit)){
+    const archiveId=Number(credit.match(/^registered_event_([0-9]+) — /)?.[1]||0);
+    if(!Number.isSafeInteger(archiveId)||archiveId<1)
+      return respond({success:false,error:"registered_photo_identifier_invalid"},422);
+    const {data:asset,error:archiveError}=await db.from("giro_imagens_autorizadas")
+      .select("id,article_url,headline,approval_status,photo_matches_event,rights_verified,social_use_allowed,adaptation_allowed,commercial_use_allowed,license_kind,evidence_url,evidence_description,reviewed_at,reviewer,copyright_owner,credit_line,storage_path,valid_until")
+      .eq("id",archiveId).eq("article_url",String(row.source_url||""))
+      .eq("headline",String(row.title||"")).maybeSingle();
+    const valid=!!asset && asset.approval_status==="approved" && asset.photo_matches_event===true &&
+      asset.rights_verified===true && asset.social_use_allowed===true && asset.adaptation_allowed===true &&
+      asset.commercial_use_allowed===true && !!asset.reviewer && !!asset.reviewed_at &&
+      !!asset.evidence_url && !!asset.evidence_description && !!asset.copyright_owner &&
+      ["cc0","cc_by","permission_written","owned"].includes(String(asset.license_kind||"")) &&
+      /^approved\\/[a-zA-Z0-9_./-]+\\.(?:jpg|jpeg|png|webp)$/.test(String(asset.storage_path||"")) &&
+      (!asset.valid_until || Date.parse(String(asset.valid_until))>Date.now()) &&
+      credit===("registered_event_"+archiveId+" — "+String(asset.credit_line||"")).slice(0,445);
+    if(archiveError||!valid)
+      return respond({success:false,error:"registered_photo_rights_not_verified_at_publication"},422);
+  }else if(!/^wikimedia_event_/.test(credit)){
     return respond({success:false,error:"license_attribution_missing"},422);
+  }
   if(row.provider_post_id || row.shorts_render_version!==settings.visual_template_version)
     return respond({success:false,error:"already_uploaded_or_wrong_template"},409);
   const url=String(row.video_url||"");
