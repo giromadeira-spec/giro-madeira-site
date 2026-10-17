@@ -110,6 +110,29 @@ class EventPhotoTests(unittest.TestCase):
         self.assertIn("CC0",credit)
         self.assertEqual(photo.size,(1200,900))
 
+    def test_registry_fallback_requires_private_signed_url_and_exact_story(self):
+        from urllib.parse import quote
+        registered={"id":17,"article_url":ARTICLE,"headline":HEADLINE,
+            "image_credit":"registered_event_17 — Fotógrafa autorizada — uso redes",
+            "image_url":"https://dsihvbdhocbqscaypraw.supabase.co/storage/v1/object/sign/giro-imagens-autorizadas/approved/news-17.jpg?token=signed-test"}
+        with patch.object(giro,"fetch_picture",return_value=Image.new("RGB",(1080,900))) as get:
+            im,credit,title=giro.approved_registry_photo(registered,ARTICLE,HEADLINE)
+        self.assertEqual(im.size,(1080,900))
+        self.assertTrue(credit.startswith("registered_event_17"))
+        self.assertIn("#17",title)
+        self.assertEqual(get.call_count,1)
+        with patch.object(giro,"fetch_picture") as get:
+            wrong=dict(registered,image_url="https://www.pinterest.com/pin/123?token=x")
+            with self.assertRaisesRegex(RuntimeError,"Only signed private newsroom images"):
+                giro.approved_registry_photo(wrong,ARTICLE,HEADLINE)
+            wrong=dict(registered,headline="Outra notícia diferente")
+            with self.assertRaisesRegex(RuntimeError,"does not match exact source article"):
+                giro.approved_registry_photo(wrong,ARTICLE,HEADLINE)
+            wrong=dict(registered,image_credit="registered_event_25 — Fake")
+            with self.assertRaisesRegex(RuntimeError,"attribution"):
+                giro.approved_registry_photo(wrong,ARTICLE,HEADLINE)
+        get.assert_not_called()
+
     def test_does_not_trust_publisher_image_without_individual_license(self):
         page="""<meta property="og:title" content="Operação Aurora prende suspeitos em Porto Velho">
         <figure><img src="https://portal.exemplo.org/police.jpg">
