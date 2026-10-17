@@ -5,6 +5,10 @@ on:
     paths:
       - 'supabase/functions/giro-shorts-github-bridge/index.ts'
       - 'supabase/functions/giro-youtube-upload-auto/index.ts'
+      - 'supabase/functions/giro-tiktok-github-bridge/index.ts'
+      - 'supabase/functions/giro-tiktok-30fps-bridge/index.ts'
+      - 'scripts/buffer/giro-buffer-tiktok-worker.ts'
+      - 'tests/test_tiktok_photo_guard.py'
       - 'scripts/giro_shorts_auto.py'
       - 'tests/test_giro_event_images.py'
       - '.github/workflows/giro-imagens-autorizadas-qa.yml'
@@ -24,6 +28,9 @@ jobs:
         run: |
           deno check supabase/functions/giro-shorts-github-bridge/index.ts
           deno check supabase/functions/giro-youtube-upload-auto/index.ts
+          deno check supabase/functions/giro-tiktok-github-bridge/index.ts
+          deno check supabase/functions/giro-tiktok-30fps-bridge/index.ts
+          deno check scripts/buffer/giro-buffer-tiktok-worker.ts
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -32,6 +39,7 @@ jobs:
           python -m pip install --disable-pip-version-check 'Pillow>=11,<13' 'requests>=2.31,<3'
           python -m py_compile scripts/giro_shorts_auto.py
           python -m unittest discover -s tests -p 'test_giro_event_images.py' -v
+          python -m unittest discover -s tests -p 'test_tiktok_photo_guard.py' -v
       - name: Garantir que mídias do banco não contornam revisão editorial
         run: |
           python - <<'PY'
@@ -45,5 +53,13 @@ jobs:
           assert 'registered_photo_rights_not_verified_at_publication' in uploader
           assert '.eq("editor_approved",true)' in uploader
           assert '.eq("visual_review_status","approved")' in uploader
+          tiktok=Path('supabase/functions/giro-tiktok-github-bridge/index.ts').read_text()
+          assert 'editor_approved:!isIllustration' in tiktok
+          assert 'visual_review_status:isIllustration?"pending":"approved"' in tiktok
+          assert 'ready_to_publish:!isIllustration' in tiktok
+          assert 'illustration_source_mismatch' in tiktok
+          assert 'originalArtCredit' in bridge
+          assert 'originalArtCredit' in uploader
+          assert 'illustration_provenance_mismatch' in uploader
           print('PASS: registered photos require documented rights and human editorial approval')
           PY
