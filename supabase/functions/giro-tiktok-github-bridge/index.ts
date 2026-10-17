@@ -9,6 +9,12 @@ const jwks = createRemoteJWKSet(new URL("https://token.actions.githubusercontent
 const response=(obj:unknown,status=200)=>new Response(JSON.stringify(obj),{
   status,headers:{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"}
 });
+const originalArtCredit=async(articleUrl:string,headline:string)=>{
+  const digest=await crypto.subtle.digest("SHA-256",
+    new TextEncoder().encode(articleUrl+"\n"+headline));
+  return "original_editorial_labeled_v2_"+
+    Array.from(new Uint8Array(digest)).map(x=>x.toString(16).padStart(2,"0")).join("").slice(0,24);
+};
 Deno.serve(async req=>{
  if(req.method!=="POST")return response({success:false,error:"method_not_allowed"},405);
  const authorization=req.headers.get("Authorization")||"";
@@ -119,7 +125,7 @@ Deno.serve(async req=>{
   const id=Number(reqBody.queue_id||0);
   if(!Number.isSafeInteger(id)||id<1)return response({success:false,error:"invalid_queue_id"},400);
   const {data:row,error:re}=await db.from("giro_social_video_queue")
-    .select("id,status,shorts_render_job_id,shorts_render_storage_path,shorts_render_version,provider_post_id")
+    .select("id,status,shorts_render_job_id,shorts_render_storage_path,shorts_render_version,provider_post_id,source_url,title")
     .eq("id",id).eq("platform","tiktok").maybeSingle();
   if(re)throw re;
   if(!row||row.shorts_render_job_id!==jobId || row.status!=="aguardando_autorizacao"||
@@ -140,13 +146,22 @@ Deno.serve(async req=>{
   const meta=(files||[]).find(o=>o.name===path.slice(path.lastIndexOf("/")+1));
   const size=Number(meta?.metadata?.size||0);
   if(!meta||size<100000||size>30*1024*1024)return response({success:false,error:"rendered_file_missing_or_invalid_size"},422);
-  if(!/^wikimedia_event_/.test(String(reqBody.image_credit||"")))
+  const credit=String(reqBody.image_credit||"");
+  const isIllustration=/^original_editorial_labeled_v2_[0-9a-f]{24}$/.test(credit);
+  if((isIllustration && reqBody.visual_kind!=="illustration") ||
+     (!isIllustration && reqBody.visual_kind!=="event_photo"))
+    return response({success:false,error:"visual_kind_mismatch"},422);
+  if(isIllustration){
+    if(credit!==await originalArtCredit(String(row.source_url||""),String(row.title||"")))
+      return response({success:false,error:"illustration_source_mismatch"},422);
+  }else if(!/^wikimedia_event_/.test(credit)){
     return response({success:false,error:"image_credit_not_verified"},422);
+  }
   if(reqBody.quality_passed!==true)return response({success:false,error:"render_qa_not_passed"},422);
   const videoUrl=url+"/storage/v1/object/public/news-videos/"+path;
   const patch={
     video_url:videoUrl,
-    status:"pronto_para_revisao",visual_review_status:"approved",editor_approved:true,
+    status:"pronto_para_revisao",visual_review_status:isIllustration?"pending":"approved",editor_approved:!isIllustration,
     shorts_render_version:settings.visual_template_version,
     shorts_render_origin:"tiktok_github_oidc_v1",
     shorts_image_credit:String(reqBody.image_credit).slice(0,450),
@@ -158,7 +173,7 @@ Deno.serve(async req=>{
    .is("provider_post_id",null).select("id").maybeSingle();
   if(ue)throw ue;
   if(!updated)return response({success:false,error:"render_completion_conflict"},409);
-  return response({success:true,processed:1,queue_id:id,ready_to_publish:true});
+  return response({success:true,processed:1,queue_id:id,ready_to_publish:!isIllustration});
  }catch(e){
   console.error("github shorts bridge:",e instanceof Error?e.name:"unknown");
   return response({success:false,error:"bridge_operation_failed"},500);
