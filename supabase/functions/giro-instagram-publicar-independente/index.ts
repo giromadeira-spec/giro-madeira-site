@@ -37,7 +37,7 @@ Deno.serve(async req=>{
   if(body.dry_run===true||blocked)return response({success:true,channel,dry_run:body.dry_run===true,no_publish:true,publication_enabled:cfg.data.publication_enabled,gate:gate.data,integrity_hold:meta.data.integrity_hold,rollout_stage:meta.data.rollout_stage});
   const table='giro_publicacoes_'+channel;
   const found=await db.from(table).select('*').eq('status','aprovada').eq('visual_approved',true).gte('media_pipeline_version',channel==='feed'?6:5)
-   .is(ids[channel],null).like('legenda','%Foto do acontecimento:%').or('scheduled_at.is.null,scheduled_at.lte.'+new Date().toISOString())
+   .is(ids[channel],null).or('legenda.like.%Foto do acontecimento:%,legenda.like.%ILUSTRAÇÃO EDITORIAL ORIGINAL%').or('scheduled_at.is.null,scheduled_at.lte.'+new Date().toISOString())
    .order('urgente',{ascending:false}).order('created_at',{ascending:true}).limit(1).maybeSingle();
   if(found.error)throw found.error;
   const item=found.data;
@@ -46,19 +46,25 @@ Deno.serve(async req=>{
    await db.from(table).update({status:'descartada',erro:'editorial_expired'}).eq('id',item.id).eq('status','aprovada');
    return response({success:true,channel,no_publish:true,reason:'editorial_expired'});
   }
-  // Never auto-release unreviewed Reel imagery or media.
+  // Original art is an explicitly separate, human-reviewed publication mode.
+  // Media_status must be set by an authorized editorial review; this worker
+  // NEVER changes an unreviewed draft to approved.
+  const originalArt=String(item.legenda||'').includes('ILUSTRAÇÃO EDITORIAL ORIGINAL');
+  const photoProof=String(item.legenda||'').includes('Foto do acontecimento: ');
+  const artReviewed=originalArt &&
+    item.media_status===(channel==='feed'?'feed_ilustracao_revisada':
+                          channel==='reels'?'reel_ilustracao_revisada':'stories_ilustracao_revisada');
+  const photoReviewed=photoProof && !originalArt &&
+    (channel!=='feed'||item.media_status==='feed_foto_verificada');
+  if(!artReviewed&&!photoReviewed)
+    return response({success:true,channel,no_publish:true,reason:'media_provenance_or_human_review_missing'});
   if(channel==='reels'&&(
     item.publicar_reel!==true||item.publicar_story===true||
     !String(item.story_image_url||'').startsWith(url+'/storage/v1/object/public/news-images/')||
     !String(item.video_url||'').endsWith('.mp4')||
     !String(item.legenda||'').includes('Fonte: ')||
-    !String(item.legenda||'').includes('Matéria original: ')||
-    !String(item.legenda||'').includes('Foto do acontecimento: ')
+    !String(item.legenda||'').includes('Matéria original: ')
   ))return response({success:true,channel,no_publish:true,reason:'reel_editorial_contract_failed'});
-  if(!String(item.legenda||'').includes('Foto do acontecimento: '))return response({success:true,channel,no_publish:true,reason:'event_photo_provenance_required'});
-  if(channel==='feed'&&item.media_status!=='feed_foto_verificada'){
-   return response({success:true,channel,no_publish:true,reason:'v6_verified_photo_required'});
-  }
   const duplicate=await db.from('giro_madeira_publicacoes').select('id').eq('fonte_url',item.fonte_url).not(ids[channel],'is',null).limit(1);
   if(duplicate.error)throw duplicate.error;
   if(duplicate.data?.length){await db.from(table).update({status:'descartada',erro:'legacy_already_published'}).eq('id',item.id);return response({success:true,channel,no_publish:true,reason:'already_published'});}
