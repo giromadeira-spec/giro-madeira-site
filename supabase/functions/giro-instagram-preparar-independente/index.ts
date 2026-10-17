@@ -15,9 +15,12 @@ Deno.serve(async req=>{
   const {data:cfg,error:ce}=await db.from("giro_channel_settings").select("*").eq("channel",channel).single();
   if(ce)throw ce;
   const {data:pending,error:pe}=await db.from(table).select("*")
-    .eq("status","pendente").eq("visual_approved",false).lt("preparation_attempts",2)
+    // Allow one extra, safe art-generation attempt after the original-art upgrade.
+    // Previously blocked items remain drafts and still require editorial approval.
+    .eq("status","pendente").eq("visual_approved",false).lt("preparation_attempts",3)
     .or("preparation_retry_at.is.null,preparation_retry_at.lte."+new Date().toISOString())
     .gte("created_at",new Date(Date.now()-36*3600000).toISOString())
+    .gt("editorial_expires_at",new Date().toISOString())
     // New, fresh stories first. Repeatedly failing old sources must not starve the queue.
     .order("preparation_attempts",{ascending:true}).order("urgente",{ascending:false})
     .order("created_at",{ascending:false}).limit(1).maybeSingle();
