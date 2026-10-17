@@ -156,7 +156,11 @@ class EventPageImages(HTMLParser):
         elif tag=="a" and self._figures:
             # Galleries sometimes link a larger Commons image than the thumbnail.
             link=attrs.get("href") or ""
-            if urllib.parse.urlsplit(link).hostname=="upload.wikimedia.org":
+            linked=urllib.parse.urlsplit(link)
+            if (linked.scheme=="https" and
+                (linked.hostname=="upload.wikimedia.org" or
+                 (linked.hostname=="commons.wikimedia.org" and
+                  linked.path.startswith("/wiki/File:")))):
                 self._add_image(link,attrs.get("title") or "")
 
     def handle_data(self,data):
@@ -211,7 +215,9 @@ def licensed_event_photo(source_url,headline):
     checked_count=0
     for candidate,description in candidates:
         image_url=urllib.parse.urlsplit(candidate)
-        if image_url.scheme!="https" or image_url.hostname!="upload.wikimedia.org":
+        linked_commons=(image_url.hostname=="commons.wikimedia.org" and
+                        image_url.path.startswith("/wiki/File:"))
+        if image_url.scheme!="https" or not (image_url.hostname=="upload.wikimedia.org" or linked_commons):
             continue
         if re.search(r"ilustrativ|meramente|foto de arquivo|imagem de arquivo|stock|shutterstock|freepik|representa[cç][aã]o|montagem|gen[eé]ric|arquivo pessoal",description,re.I):
             continue
@@ -219,6 +225,8 @@ def licensed_event_photo(source_url,headline):
             continue
         parts=[urllib.parse.unquote(x) for x in image_url.path.split("/") if x]
         filename=(parts[-2] if "thumb" in parts and len(parts)>2 else parts[-1]) if parts else ""
+        if linked_commons:
+            filename=urllib.parse.unquote(image_url.path.split("/wiki/File:",1)[1]).replace("_"," ")
         if not re.search(r"\.(jpe?g|png|webp)$",filename,re.I):
             continue
         if filename in checked_files:
