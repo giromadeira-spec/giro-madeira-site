@@ -3,7 +3,7 @@
 Runs only on GitHub Actions via OIDC. Failure means NO publication.
 Never uses unrelated stock photos, unlicensed publisher media or paid APIs.
 """
-import html, io, json, math, os, random, re, subprocess, sys, tempfile, time, urllib.parse, wave
+import hashlib, html, io, json, math, os, random, re, subprocess, sys, tempfile, time, urllib.parse, wave
 from pathlib import Path
 from html.parser import HTMLParser
 import unicodedata
@@ -522,6 +522,20 @@ def licensed_local_madeira_photo():
     return image,"wikimedia_"+creator+" — CC0 — "+landing,"Porto Velho / Rio Madeira (CC0)"
 
 
+def original_illustration_credit(source_url,headline):
+    """Deterministic claim provenance, not a license for third-party photographs."""
+    if not (str(source_url).startswith("https://") and str(headline).strip()):
+        raise RuntimeError("Cannot issue editorial illustration credit without verified story reference")
+    signature=hashlib.sha256((source_url+"\n"+headline).encode("utf-8")).hexdigest()[:24]
+    return "original_editorial_labeled_v2_"+signature
+
+
+def is_acceptable_visual_credit(credit,source_url,headline):
+    """Never treat an illustration as a documentary photograph."""
+    return (str(credit).startswith(("wikimedia_event_","registered_event_")) or
+            credit==original_illustration_credit(source_url,headline))
+
+
 def render_text_only_background(category):
     """Original abstract editorial background; no third-party imagery or simulated real events."""
     image=Image.new("RGB",(W,H),NAVY)
@@ -667,7 +681,12 @@ def make_frame(photo,river,logo,claim,scene,idx,credit,path):
     d.line((tag_right+29,tag_top+69,1015,tag_top+69),fill=YELLOW,width=5)
     # Precise visual provenance: an actual event photo or a non-publication QA illustration.
     d.rounded_rectangle((58,790,570,838),radius=4,fill=(3,16,36,232))
-    photo_label="FOTO DO ACONTECIMENTO" if credit.startswith("wikimedia_event_") else "ILUSTRAÇÃO — NÃO É FOTO"
+    if credit.startswith(("wikimedia_event_","registered_event_")):
+        photo_label="FOTO DA NOTÍCIA — LICENCIADA"
+    elif credit.startswith("original_editorial_labeled_v2_"):
+        photo_label="ILUSTRAÇÃO EDITORIAL — NÃO É FOTO"
+    else:
+        raise RuntimeError("Unrecognized visual origin: cannot label news media")
     d.text((74,802),photo_label,font=ImageFont.truetype(regular,26),fill=WHITE)
     if claim.get("urgent") is True:
         d.rounded_rectangle((785,45,1034,117),radius=6,fill=(222,31,45,255))
@@ -991,31 +1010,29 @@ def main():
       with tempfile.TemporaryDirectory(prefix="giro-shorts-") as tmp:
         folder=Path(tmp)
         query,category=article_subject(result["title"])
-        if not query:
-            raise RuntimeError("No safe news-specific illustration or verified event photo")
-        # Production requires an actual event photograph with individually verified reuse rights.
-        # QA-only illustrations never qualify as documentary evidence or publication approval.
+        if not result.get("title") or not result.get("source_url"):
+            raise RuntimeError("Verified news title and original source required")
+        # Editorial choice: real event photo -> approved private photo -> original
+        # *symbolic* artwork. All art is visibly labeled and never a fake event photo.
         registered_image_id=0
         try:
-            # First choice: per-file licensed photo linked by the original report.
             picture,credit,file_title=licensed_event_photo(result["source_url"],result["title"])
         except Exception as no_photo:
-            # Secondary source: documented, human-approved photo stored privately.
-            # TikTok remains on its independent, untouched publication pipeline.
             registered=result.get("registered_image") if PLATFORM=="shorts" else None
             if registered:
                 picture,credit,file_title=approved_registry_photo(
                     registered,result["source_url"],result["title"])
                 registered_image_id=registered["id"]
-            elif PLATFORM == "tiktok":
-                raise RuntimeError("Real event photo unverified; TikTok remains blocked: "+
-                                   str(no_photo)[:125]) from no_photo
             else:
-                raise RuntimeError("Real event photo unverified; Shorts remains blocked: "+
-                                   str(no_photo)[:125]) from no_photo
-        image_verified=credit.startswith(("wikimedia_event_","registered_event_"))
-        if not image_verified:
-            raise RuntimeError("Visual standard failed: verified event photograph required")
+                picture=render_topic_illustration(result["title"],category)
+                credit=original_illustration_credit(result["source_url"],result["title"])
+                file_title="ARTE GRÁFICA EDITORIAL ORIGINAL — NÃO É FOTO DO FATO"
+                print("No reusable event photo; creating clearly labeled symbolic art:",
+                      type(no_photo).__name__)
+        visual_origin_valid=is_acceptable_visual_credit(
+            credit,result["source_url"],result["title"])
+        if not visual_origin_valid:
+            raise RuntimeError("Visual origin verification failed")
         if category=="SEGURANÇA" and re.search(r"press|newspaper|cherokee|printing",file_title,re.I):
             raise RuntimeError("Crime headline cannot use unrelated newspaper imagery")
         logo=Image.open(ROOT/"assets/logo-oficial.webp").convert("RGB")
@@ -1038,9 +1055,10 @@ def main():
         preview_dir.mkdir(exist_ok=True)
         # Checagem de qualidade estrutural: não confundir renderização concluída
         # com conformidade visual. Fotografia ligada à pauta é condição obrigatória.
-        image_verified=credit.startswith(("wikimedia_event_","registered_event_"))
-        if len(frames)!=3 or not image_verified:
-            raise RuntimeError("Approved visual QA failed: licensed event photograph required")
+        visual_origin_valid=is_acceptable_visual_credit(
+            credit,result["source_url"],result["title"])
+        if len(frames)!=3 or not visual_origin_valid:
+            raise RuntimeError("Visual QA failed: event photo or source-bound labeled artwork required")
         for frame in frames:
             with Image.open(frame) as review:
                 if review.size!=(1080,1920) or review.mode!="RGB":
@@ -1052,11 +1070,12 @@ def main():
         if response.status_code not in (200,201):
             raise RuntimeError("Supabase signed upload failed with HTTP "+str(response.status_code))
         confirmed=bridge(token,"complete",queue_id=qid,storage_path=result["storage_path"],
-                 quality_passed=(len(frames)==3 and image_verified),image_credit=credit,
+                 quality_passed=(len(frames)==3 and visual_origin_valid),image_credit=credit,
+                 visual_kind=("illustration" if credit.startswith("original_editorial_labeled_v2_") else "event_photo"),
                  registered_image_id=registered_image_id)
         print("Rendered and stored approved video for queue",confirmed["queue_id"])
         print("Visual provenance:",file_title)
-        print("Actual event photograph:",credit.startswith("wikimedia_event_"))
+        print("Original labeled illustration:",credit.startswith("original_editorial_labeled_v2_"))
     except Exception as e:
         try: bridge(token,"fail",queue_id=qid)
         except Exception: print("Could not update queue error status.")
