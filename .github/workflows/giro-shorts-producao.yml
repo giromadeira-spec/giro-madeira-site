@@ -7,11 +7,12 @@ on:
       - scripts/giro_shorts_auto.py
       - .github/workflows/giro-shorts-producao.yml
   schedule:
-    # Preparo 07h/21h PV; segunda checagem 07h35/21h35 caso a primeira
-    # tentativa nao tenha produzido video. Nao cria slots nem posts extras.
+    # Preparo 06h30/20h30 PV (90 minutos antes); nova checagem
+    # 07h15/21h15 PV. Supabase permite reclamar itens ate 2h antes.
+    # Somente preparar, sem criar slots adicionais ou republicar falhas.
     # Publicacao SOMENTE 08h e 22h PV pelo cron Supabase.
-    - cron: '0,35 11 * * *'
-    - cron: '0,35 1 * * *'
+    - cron: '30 0,10 * * *'
+    - cron: '15 1,11 * * *'
   workflow_dispatch:
 
 permissions:
