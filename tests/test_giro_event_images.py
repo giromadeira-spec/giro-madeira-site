@@ -88,6 +88,28 @@ class EventPhotoTests(unittest.TestCase):
         self.assertIn("Autora Exemplo",credit)
         self.assertEqual(photo.size,(1200,900))
 
+    def test_credited_commons_file_link_inside_figure_is_checked(self):
+        page="""<meta property="og:title" content="Operação Aurora prende suspeitos em Porto Velho">
+        <figure><img src="https://portal.exemplo.org/media/foto.jpg">
+        <figcaption>Operação Aurora prende suspeitos em Porto Velho.
+        <a href="https://commons.wikimedia.org/wiki/File:Aurora_evento.jpg">Crédito no Commons</a>
+        </figcaption></figure>"""
+        filenames=[]
+        def fake_get(url,*,params=None,**kwargs):
+            if url==ARTICLE:
+                return FakeResponse(html_page=page)
+            self.assertEqual(url,"https://commons.wikimedia.org/w/api.php")
+            filenames.append(params["titles"])
+            return FakeResponse(payload=commons_payload("Aurora_evento.jpg","CC0 1.0",
+                "https://creativecommons.org/publicdomain/zero/1.0/",""))
+        with patch.object(giro.requests,"get",side_effect=fake_get), \
+             patch.object(giro,"fetch_picture",return_value=Image.new("RGB",(1200,900))):
+            photo,credit,filename=giro.licensed_event_photo(ARTICLE,HEADLINE)
+        self.assertEqual(filenames,["File:Aurora evento.jpg"])
+        self.assertEqual(filename,"Aurora evento.jpg")
+        self.assertIn("CC0",credit)
+        self.assertEqual(photo.size,(1200,900))
+
     def test_does_not_trust_publisher_image_without_individual_license(self):
         page="""<meta property="og:title" content="Operação Aurora prende suspeitos em Porto Velho">
         <figure><img src="https://portal.exemplo.org/police.jpg">
