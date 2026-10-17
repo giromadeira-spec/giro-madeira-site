@@ -1,0 +1,52 @@
+name: Giro Madeira - ilustrações originais (sem publicar)
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/gerar-arte-noticia-vault/index.ts'
+      - 'supabase/functions/giro-instagram-publicar-independente/index.ts'
+      - 'supabase/functions/giro-instagram-preparar-independente/index.ts'
+      - '.github/workflows/giro-artes-originais-qa.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Verificar sintaxe e tipos de arte e publicação, sem conectar redes
+        run: |
+          deno check supabase/functions/gerar-arte-noticia-vault/index.ts
+          deno check supabase/functions/giro-instagram-publicar-independente/index.ts
+          deno check supabase/functions/giro-instagram-preparar-independente/index.ts
+      - name: Confirmar arte claramente ilustrativa e revisão humana obrigatória
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          gen=Path('supabase/functions/gerar-arte-noticia-vault/index.ts').read_text()
+          publish=Path('supabase/functions/giro-instagram-publicar-independente/index.ts').read_text()
+          prep=Path('supabase/functions/giro-instagram-preparar-independente/index.ts').read_text()
+          assert 'function originalGraphicHero(' in gen
+          assert 'const originalArt=bg==="original_editorial_illustration"' in gen
+          assert 'originalArt?originalGraphicHero(' in gen
+          assert 'ILUSTRAÇÃO EDITORIAL — NÃO É FOTO' in gen
+          assert 'ILUSTRAÇÃO EDITORIAL ORIGINAL — representação gráfica simbólica, NÃO É FOTO DO ACONTECIMENTO.' in gen
+          assert 'media_status:"ilustracao_original_aguardando_revisao"' in gen
+          assert 'visual_approved:false' in gen
+          assert 'awaiting_visual_approval:true,no_publish:true' in gen
+          assert 'needs_approved_art:false' in gen
+          assert 'feed_ilustracao_revisada' in publish
+          assert 'reel_ilustracao_revisada' in publish
+          assert ".eq('visual_approved',true)" in publish
+          assert ".eq('status','aprovada')" in publish
+          assert "giro_instagram_semaforo_gate" in publish
+          assert "media_provenance_or_human_review_missing" in publish
+          assert 'if(!autoApproved)' in prep
+          assert 'verifiedPhoto&&' in prep
+          print('PASS: labelled vector-only editorial art, private review required, Meta gate preserved')
+          PY
