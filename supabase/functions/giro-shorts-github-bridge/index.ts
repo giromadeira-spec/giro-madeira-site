@@ -162,7 +162,7 @@ Deno.serve(async req=>{
   const videoUrl=url+"/storage/v1/object/public/news-videos/"+path;
   const patch={
     video_url:videoUrl,
-    status:"pronto_para_revisao",visual_review_status:"approved",editor_approved:true,
+    status:"pronto_para_revisao",visual_review_status:"pending",editor_approved:false,
     shorts_render_version:settings.visual_template_version,
     shorts_render_origin:"github_oidc_v1",
     shorts_image_credit:String(reqBody.image_credit).slice(0,450),
@@ -174,7 +174,7 @@ Deno.serve(async req=>{
    .is("provider_post_id",null).select("id").maybeSingle();
   if(ue)throw ue;
   if(!updated)return response({success:false,error:"render_completion_conflict"},409);
-  return response({success:true,processed:1,queue_id:id,ready_to_publish:true});
+  return response({success:true,processed:1,queue_id:id,ready_to_publish:false});
  }catch(e){
   console.error("github shorts bridge:",e instanceof Error?e.name:"unknown");
   return response({success:false,error:"bridge_operation_failed"},500);
