@@ -9,6 +9,18 @@ const jwks = createRemoteJWKSet(new URL("https://token.actions.githubusercontent
 const response=(obj:unknown,status=200)=>new Response(JSON.stringify(obj),{
   status,headers:{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"}
 });
+// The media registry records manual clearance; platform posts are discovery, not permission.
+const registryReady=(a:any)=>!!a && a.approval_status==="approved" &&
+  a.photo_matches_event===true && a.rights_verified===true &&
+  a.social_use_allowed===true && a.adaptation_allowed===true &&
+  a.commercial_use_allowed===true &&
+  ["cc0","cc_by","permission_written","owned"].includes(String(a.license_kind||"")) &&
+  !!a.evidence_url && !!a.evidence_description && !!a.reviewed_at &&
+  !!a.reviewer && !!a.copyright_owner && !!a.credit_line &&
+  /^approved\/[a-zA-Z0-9_./-]+\.(?:jpg|jpeg|png|webp)$/.test(String(a.storage_path||"")) &&
+  (!a.valid_until || Date.parse(String(a.valid_until))>Date.now());
+const registryCredit=(a:any)=>("registered_event_"+String(a.id)+" — "+String(a.credit_line||"")).slice(0,445);
+
 Deno.serve(async req=>{
  if(req.method!=="POST")return response({success:false,error:"method_not_allowed"},405);
  const authorization=req.headers.get("Authorization")||"";
@@ -82,7 +94,27 @@ Deno.serve(async req=>{
       if(!pub || pub.url!==sourceUrl || Number(pub.score||0)<25)continue;
       const {data:source}=await db.from("giro_madeira_fontes")
         .select("nome").eq("id",pub.fonte_id).maybeSingle();
-      const uuid=crypto.randomUUID();
+      // Optional rights-verified private photo; a social post is never permission.
+// If this optional lookup fails, the existing verified-Wikimedia flow still works.
+       let registeredImage:any=null;
+       const {data:archiveCandidates,error:archiveError}=await db.from("giro_imagens_autorizadas")
+         .select("id,article_url,headline,approval_status,photo_matches_event,rights_verified,social_use_allowed,adaptation_allowed,commercial_use_allowed,license_kind,evidence_url,evidence_description,reviewed_at,reviewer,copyright_owner,credit_line,storage_path,valid_until")
+         .eq("article_url",sourceUrl).eq("headline",title).eq("approval_status","approved")
+         .order("reviewed_at",{ascending:false}).limit(5);
+       if(archiveError)console.error("archive lookup unavailable; Wikimedia-only fallback");
+       for(const a of archiveCandidates||[]){
+         if(!registryReady(a))continue;
+         const {data:signedImage,error:signError}=await db.storage.from("giro-imagens-autorizadas")
+           .createSignedUrl(String(a.storage_path),1800);
+         if(signError||!signedImage?.signedUrl)continue;
+         const signedUrl=new URL(signedImage.signedUrl,url);
+         if(signedUrl.origin!==new URL(url).origin ||
+            !signedUrl.pathname.startsWith("/storage/v1/object/sign/giro-imagens-autorizadas/approved/"))continue;
+         registeredImage={id:a.id,article_url:sourceUrl,headline:title,
+           image_url:signedUrl.toString(),image_credit:registryCredit(a)};
+         break;
+       }
+       const uuid=crypto.randomUUID();
       const path="shorts/auto/"+String(item.source_id)+"/"+uuid+".mp4";
       const {data:claim,error:claimError}=await db.from("giro_social_video_queue").update({
         status:"aguardando_autorizacao",shorts_render_job_id:jobId,
@@ -125,6 +157,7 @@ Deno.serve(async req=>{
         throw Error("invalid_upload_origin");
       return response({success:true,processed:1,queue_id:item.id,source_id:item.source_id,
          title,scenes,topic_scope:item.topic_scope,source_url:sourceUrl,
+         registered_image:registeredImage,
          source_name:source?.nome||"Fonte original",storage_path:path,upload_url:uploadUrl,
          brand_logo_url:"https://raw.githubusercontent.com/giromadeira-spec/giro-madeira-site/main/assets/logo-oficial.webp",
          river_sample_video_url:url+"/storage/v1/object/public/news-videos/shorts/551/1791494145636-giro-madeira-short-tre-rj-2026-10-08.mp4",
@@ -135,7 +168,7 @@ Deno.serve(async req=>{
   const id=Number(reqBody.queue_id||0);
   if(!Number.isSafeInteger(id)||id<1)return response({success:false,error:"invalid_queue_id"},400);
   const {data:row,error:re}=await db.from("giro_social_video_queue")
-    .select("id,status,shorts_render_job_id,shorts_render_storage_path,shorts_render_version,provider_post_id")
+    .select("id,status,shorts_render_job_id,shorts_render_storage_path,shorts_render_version,provider_post_id,source_url,title")
     .eq("id",id).maybeSingle();
   if(re)throw re;
   if(!row||row.shorts_render_job_id!==jobId || row.status!=="aguardando_autorizacao"||
@@ -156,8 +189,18 @@ Deno.serve(async req=>{
   const meta=(files||[]).find(o=>o.name===path.slice(path.lastIndexOf("/")+1));
   const size=Number(meta?.metadata?.size||0);
   if(!meta||size<100000||size>30*1024*1024)return response({success:false,error:"rendered_file_missing_or_invalid_size"},422);
-  if(!/^wikimedia_event_/.test(String(reqBody.image_credit||"")))
-    return response({success:false,error:"image_credit_not_verified"},422);
+  const imageCredit=String(reqBody.image_credit||"");
+  if(!/^wikimedia_event_/.test(imageCredit)){
+    const approvedImageId=Number(reqBody.registered_image_id||0);
+    if(!/^registered_event_/.test(imageCredit) || !Number.isSafeInteger(approvedImageId) || approvedImageId<1)
+      return response({success:false,error:"image_credit_not_verified"},422);
+    const {data:registered,error:registeredError}=await db.from("giro_imagens_autorizadas")
+      .select("id,article_url,headline,approval_status,photo_matches_event,rights_verified,social_use_allowed,adaptation_allowed,commercial_use_allowed,license_kind,evidence_url,evidence_description,reviewed_at,reviewer,copyright_owner,credit_line,storage_path,valid_until")
+      .eq("id",approvedImageId).eq("article_url",String(row.source_url||""))
+      .eq("headline",String(row.title||"")).maybeSingle();
+    if(registeredError || !registryReady(registered) || registryCredit(registered)!==imageCredit)
+      return response({success:false,error:"approved_archive_image_not_valid_for_article"},422);
+  }
   if(reqBody.quality_passed!==true)return response({success:false,error:"render_qa_not_passed"},422);
   const videoUrl=url+"/storage/v1/object/public/news-videos/"+path;
   const patch={
