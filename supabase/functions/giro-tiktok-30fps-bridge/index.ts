@@ -7,6 +7,11 @@ const ref=owner+"/.github/workflows/giro-tiktok-30fps.yml@refs/heads/main";
 const audience="https://dsihvbdhocbqscaypraw.supabase.co/functions/v1/giro-tiktok-30fps-bridge";
 const jwks=createRemoteJWKSet(new URL("https://token.actions.githubusercontent.com/.well-known/jwks"));
 const response=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{"Content-Type":"application/json","Cache-Control":"no-store"}});
+const originalArtCredit=async(url:string,title:string)=>{
+ const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(url+"\n"+title));
+ return "original_editorial_labeled_v2_"+
+   Array.from(new Uint8Array(digest)).map(x=>x.toString(16).padStart(2,"0")).join("").slice(0,24);
+};
 Deno.serve(async(req:Request)=>{
  if(req.method!=="POST")return response({success:false,error:"method_not_allowed"},405);
  const auth=req.headers.get("Authorization")||"";
@@ -34,15 +39,20 @@ Deno.serve(async(req:Request)=>{
   if(action==="status")return response({success:true,transcoder:"independent_30fps",channel:"giro_madeira"});
   if(action==="claim"){
     const {data:sources,error:e}=await db.from("giro_social_video_queue")
-      .select("id,title,topic_scope,video_url,source_id,scheduled_for,shorts_rendered_at,shorts_render_origin,storyboard_status,editor_approved,visual_review_status,provider_privacy_status,provider_post_id,shorts_image_credit")
+      .select("id,title,topic_scope,video_url,source_id,scheduled_for,shorts_rendered_at,shorts_render_origin,storyboard_status,editor_approved,visual_review_status,provider_privacy_status,provider_post_id,shorts_image_credit,source_url")
       .eq("platform","tiktok").eq("status","pronto_para_revisao")
       .in("topic_scope",["brasil","mundo"])
       .eq("editor_approved",true).eq("visual_review_status","approved")
-      .eq("shorts_render_origin","tiktok_github_oidc_v1").like("shorts_image_credit","wikimedia_event_%").eq("storyboard_status","preparado")
+      .eq("shorts_render_origin","tiktok_github_oidc_v1").or("shorts_image_credit.like.wikimedia_event_%,shorts_image_credit.like.original_editorial_labeled_v2_%").eq("storyboard_status","preparado")
       .gte("shorts_rendered_at",new Date(Date.now()-18*3600000).toISOString())
       .order("scheduled_for",{ascending:false}).limit(16);
     if(e)return response({success:false,error:"source_lookup_failed"},503);
     for(const row of sources||[]){
+      const credit=String(row.shorts_image_credit||"");
+      if(/^original_editorial_labeled_v2_/.test(credit) &&
+         credit!==await originalArtCredit(String(row.source_url||""),String(row.title||"")))continue;
+      if(!/^wikimedia_event_/.test(credit) &&
+         !/^original_editorial_labeled_v2_[0-9a-f]{24}$/.test(credit))continue;
        const headline=String(row.title||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
        const localRo=/\b(rondonia|porto velho|ji parana|ariquemes|vilhena|cacoal|guajara mirim|jaru|rolim de moura|pimenta bueno|candeias do jamari|em ro)\b/;
        if(localRo.test(headline)&&!/\b(em todo o brasil|em todo o pais|todo territorio nacional|rodovias federais)\b/.test(headline))continue;
@@ -85,7 +95,20 @@ Deno.serve(async(req:Request)=>{
     await db.from("giro_tiktok_media_prepared").update({status:"failed",last_error:"transcode_or_media_quality_failed"}).eq("source_queue_id",sourceId).eq("render_job_id",run);
     return response({success:true,failed:true,source_queue_id:sourceId});
   }
-  if(String(body.storage_path||"")!==claimed.storage_path)return response({success:false,error:"storage_path_conflict"},409);
+  // Validate provenance and human approval again after transcode (fail closed).
+  const {data:source,error:sourceError}=await db.from("giro_social_video_queue")
+    .select("title,source_url,shorts_image_credit,editor_approved,visual_review_status,shorts_render_origin,status")
+    .eq("id",sourceId).eq("platform","tiktok").maybeSingle();
+  if(sourceError||!source||source.status!=="pronto_para_revisao"||
+     source.editor_approved!==true||source.visual_review_status!=="approved"||
+     source.shorts_render_origin!=="tiktok_github_oidc_v1")
+    return response({success:false,error:"editorial_review_not_current"},422);
+  const credit=String(source.shorts_image_credit||"");
+  if(!/^wikimedia_event_/.test(credit) &&
+      (!/^original_editorial_labeled_v2_[0-9a-f]{24}$/.test(credit)||
+       credit!==await originalArtCredit(String(source.source_url||""),String(source.title||""))))
+    return response({success:false,error:"visual_provenance_not_current"},422);
+    if(String(body.storage_path||"")!==claimed.storage_path)return response({success:false,error:"storage_path_conflict"},409);
   const fps=Number(body.output_fps),width=Number(body.width),height=Number(body.height),seconds=Number(body.seconds);
   if(!Number.isFinite(fps)||fps<29.5||fps>30.5||width<480||height<720||height<=width||seconds<5||seconds>180
      ||body.codec!=="h264"||body.pix_fmt!=="yuv420p")
