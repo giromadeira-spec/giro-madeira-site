@@ -3,6 +3,9 @@ on:
   schedule:
     # Preparação antecipada 06:30/07:15 e 20:30/21:15 PV (UTC-4).
     # Recuperação 08:05/08:20 e 22:05/22:20; somente preparação, sem reenvio incerto.
+    # Passo antecipado 06:05/20:05 PV, dentro das 2h autorizadas de render.
+    # Manter 06:30/20:30 e 07:15/21:15 como contingência.
+    - cron: '5 0,10 * * *'
     - cron: '30 0,10 * * *'
     - cron: '15 1,11 * * *'
     - cron: '5,20 2,12 * * *'
