@@ -3,9 +3,9 @@ name: Giro Madeira - TikTok 30fps (isolado)
 on:
   # Scheduled production only. Do not run OIDC upload bridge on push QA events.
   schedule:
-    # 16:25, 16:40 and 17:10 PV: 30fps contingency around ONLY the 17h slot.
+    # 16:25, 16:40, 17:10 and 17:25 PV: contingency through the 17h publication window.
     - cron: '25,40 20 * * *'
-    - cron: '10 21 * * *'
+    - cron: '10,25 21 * * *'
   workflow_dispatch:
 
 permissions:
