@@ -1,4 +1,4 @@
-name: Giro Madeira - ilustrações originais (sem publicar)
+name: Giro Madeira - revisão de mídia (sem publicar)
 on:
   push:
     branches: [main]
@@ -24,7 +24,7 @@ jobs:
           deno check supabase/functions/gerar-arte-noticia-vault/index.ts
           deno check supabase/functions/giro-instagram-publicar-independente/index.ts
           deno check supabase/functions/giro-instagram-preparar-independente/index.ts
-      - name: Confirmar arte claramente ilustrativa e revisão humana obrigatória
+      - name: Confirmar foto factual, pendência de direitos e revisão obrigatória
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -35,11 +35,14 @@ jobs:
           assert 'const originalArt=bg==="original_editorial_illustration"' in gen
           assert 'originalArt?originalGraphicHero(' in gen
           assert 'ILUSTRAÇÃO EDITORIAL — NÃO É FOTO' in gen
-          assert 'ILUSTRAÇÃO EDITORIAL ORIGINAL — representação gráfica simbólica, NÃO É FOTO DO ACONTECIMENTO.' in gen
-          assert 'media_status:"ilustracao_original_aguardando_revisao"' in gen
+          assert 'media_status:"aguardando_foto_licenciada"' in gen
+          assert 'visual_mode:"awaiting_licensed_event_photo"' in gen
           assert 'visual_approved:false' in gen
-          assert 'awaiting_visual_approval:true,no_publish:true' in gen
-          assert 'needs_approved_art:false' in gen
+          assert 'awaiting_visual_approval:true' in gen
+          assert 'needs_approved_art:true' in gen
+          blocked=gen.split('    if(!photo){',1)[1].split('    const attribution=photo.creator',1)[0]
+          assert 'render(' not in blocked and '.upload(' not in blocked, 'Missing photo must not generate a generic replacement'
+          assert 'approvedRegistryPhoto(sb,url,sourceLink,title)' in gen
           assert 'feed_ilustracao_revisada' in publish
           assert 'reel_ilustracao_revisada' in publish
           assert ".eq('visual_approved',true)" in publish
@@ -48,5 +51,5 @@ jobs:
           assert "media_provenance_or_human_review_missing" in publish
           assert 'if(!autoApproved)' in prep
           assert 'verifiedPhoto&&' in prep
-          print('PASS: labelled vector-only editorial art, private review required, Meta gate preserved')
+          print('PASS: factual-photo gate, registry integration, missing-photo hold and Meta controls preserved')
           PY
