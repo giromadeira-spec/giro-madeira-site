@@ -19,6 +19,18 @@ class PipelineObservability(unittest.TestCase):
             result=json.loads((Path(tmp)/'artifacts/render-shorts.json').read_text())
             self.assertFalse(result['publication_attempted']);self.assertFalse(result['ready_to_publish'])
             self.assertIn('awaiting_editorial_visual_review',(Path(tmp)/'summary.md').read_text())
+    def test_missing_event_photo_waits_without_generic_art_or_upload(self):
+        giro=module('renderer_pending','scripts/giro_shorts_auto.py')
+        calls=[]
+        def bridge(token,action,**kwargs):
+            calls.append(action)
+            return {'processed':True,'queue_id':1,'title':'Polícia realiza operação em Porto Velho','source_url':'https://news.test/article','scenes':['Fato confirmado na reportagem.']*3} if action=='claim' else {'success':True}
+        with patch.dict(os.environ,{'GITHUB_EVENT_NAME':'schedule'}), patch.object(giro,'github_token',return_value='offline'), patch.object(giro,'bridge',side_effect=bridge), patch.object(giro,'licensed_event_photo',side_effect=RuntimeError('unlicensed')), patch.object(giro,'render_topic_illustration') as graphic, patch.object(giro.requests,'put') as upload, patch.object(giro,'report_render_outcome') as report:
+            giro.main()
+            self.assertEqual(calls,['claim','photo_pending'])
+            graphic.assert_not_called();upload.assert_not_called()
+            self.assertEqual(report.call_args.args[0]['state'],'awaiting_licensed_event_photo')
+
     def test_monitor_uses_only_status_action_and_fails_on_missing_delivery(self):
         monitor=module('monitor','scripts/giro_pipeline_monitor.py')
         snapshot={'success':True,'read_only':True,'publication_attempted':False,'channels':[],

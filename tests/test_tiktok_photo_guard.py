@@ -53,20 +53,15 @@ class TikTokPhotoGuard(unittest.TestCase):
                 failed=True
         return failed,calls,art.call_count,upload.call_count,complete_payload
 
-    def test_missing_photo_creates_original_labeled_art(self):
+    def test_missing_photo_stays_pending_without_generic_art_or_upload(self):
         for channel in ("shorts","tiktok"):
             with self.subTest(channel=channel):
                 failed,calls,art,upload,completes=self.pipeline(platform=channel,missing=True)
                 self.assertFalse(failed)
-                self.assertEqual(calls,["claim","complete"])
-                self.assertEqual(art,1)
-                self.assertEqual(upload,1)
-                self.assertEqual(len(completes),1)
-                self.assertEqual(completes[0]["visual_kind"],"illustration")
-                self.assertTrue(completes[0]["image_credit"].startswith("original_editorial_labeled_v2_"))
-                self.assertEqual(completes[0]["image_credit"],r.original_illustration_credit(
-                    "https://example.test/report","Terremoto deixa feridos na Rússia"))
-                self.assertTrue(completes[0]["quality_passed"])
+                self.assertEqual(calls,["claim","photo_pending"])
+                self.assertEqual(art,0)
+                self.assertEqual(upload,0)
+                self.assertEqual(completes,[])
 
     def test_invalid_fake_photo_credit_is_not_accepted(self):
         for credit in ("original_editorial_labeled_mundo","openverse_test","wikimedia_archive_test",""):

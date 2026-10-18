@@ -29,3 +29,13 @@ Feed e Reels estavam habilitados, Meta sem integrity hold e retomada em `feed_on
 ## Verificação
 
 Testes offline do renderizador (MP4 1080x1920 com áudio, sem upload); testes de fotos e licenças; regressões editoriais TikTok e reconciliação Buffer; testes do monitor OIDC e da reconciliação YouTube; snapshot real do banco; reserva de Stories desfeita por rollback; revisão de permissões da RPC e advisors. Novas funções preservam autenticação por chave interna/OIDC.
+
+## Revisão de conteúdo e imagens — segundo lote de 18/10
+
+- Inspeção visual encontrou escudos genéricos em Shorts 321 e Feed 52. Shorts 321 foi marcado como revisão rejeitada; Feed 52 continua sem aprovação. Nenhuma mídia foi publicada por esta revisão.
+- Cadastro de fotos antes disponível só para Shorts passou a ser consultado por Instagram e por toda a cadeia TikTok, incluindo conversão 30fps e último gate do Buffer. Artigo, título, crédito, validade e permissões individuais são revalidados. Revogação/ausência de direito impede uso.
+- Descoberta de foto gera somente candidata pendente; não transforma origem pública em licença. Duas candidatas oficiais (tapa-buracos de Porto Velho e Operação Contrafluxo II) foram cadastradas sem aprovação de direitos.
+- Produção deixa de criar escudos genéricos quando falta fotografia factual licenciada. A mesma pauta fica aguardando foto; aprovação individual no cadastro retoma o preparo sem conceder aprovação editorial nem reenviar mídia publicada.
+- Legendas priorizam frases completas do corpo da reportagem; descrições SEO cortadas, iniciais pessoais isoladas e cabeçalhos colados ao texto não devem preencher a notícia.
+- Roteiros rejeitam referências soltas como “Entre elas”, “Ele afirma” e “Esse número”. TikTok verifica o limite de 24 horas no horário futuro da publicação. Item 317 expirado após revisão da data da reportagem.
+- Autorização de uso das fotografias é uma pendência de conteúdo: não foi inferida a partir de site oficial, crédito ou publicação em rede social. Sem licença individual comprovada, a foto não será aprovada.

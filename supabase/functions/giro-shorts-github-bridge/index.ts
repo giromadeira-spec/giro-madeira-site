@@ -64,7 +64,7 @@ Deno.serve(async req=>{
      .eq("id","giro_madeira").single();
   if(settingsError)throw settingsError;
   if(action==="status")return response({success:true,mode:"github_oidc",renderer_enabled:settings.shorts_render_enabled,daily_goal:settings.daily_goal});
-  if(!["claim","complete","fail"].includes(action))return response({success:false,error:"invalid_action"},400);
+  if(!["claim","complete","fail","photo_pending"].includes(action))return response({success:false,error:"invalid_action"},400);
   if(!settings.shorts_render_enabled)return response({success:true,processed:0,reason:"renderer_disabled"});
   if(action==="claim"){
     const yesterday=new Date(Date.now()-36*3600000).toISOString();
@@ -82,7 +82,7 @@ Deno.serve(async req=>{
       .eq("storyboard_status","preparado")
       .in("topic_scope",["brasil","mundo"])
       .eq("visual_review_status","pending")
-      .eq("shorts_render_version",0).is("provider_post_id",null)
+      .eq("shorts_render_version",0).is("shorts_render_error",null).is("provider_post_id",null)
       .gte("created_at",yesterday).gte("scheduled_for",new Date(Date.parse(todayInPortoVelho)-6*3600000).toISOString())
       .lte("scheduled_for",new Date(Date.now()+2*3600000).toISOString())
       .order("scheduled_for",{ascending:true}).limit(8);
@@ -187,6 +187,13 @@ Deno.serve(async req=>{
   if(!row||row.shorts_render_job_id!==jobId || row.status!=="aguardando_autorizacao"||
     row.provider_post_id||!row.shorts_render_storage_path)
     return response({success:false,error:"render_claim_not_owned"},409);
+  if(action==="photo_pending"){
+    const saved=await db.from("giro_social_video_queue").update({status:"pronto_para_revisao",
+      shorts_render_error:"event_photo_rights_review_required",editor_approved:false,visual_review_status:"pending",
+      updated_at:new Date().toISOString()}).eq("id",id).eq("shorts_render_job_id",jobId).is("provider_post_id",null);
+    if(saved.error)throw saved.error;
+    return response({success:true,queue_id:id,ready_to_publish:false,reason:"event_photo_rights_review_required"});
+  }
   if(action==="fail"){
     await db.from("giro_social_video_queue").update({
        status:"falha",shorts_render_error:"renderer_failed_or_unlicensed_image",updated_at:new Date().toISOString()

@@ -1,3 +1,4 @@
+import { registryReady, PHOTO_FIELDS } from "../_shared/photo-registry.ts";
 import {createClient} from "npm:@supabase/supabase-js@2.57.0";
 const response=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers:{"Content-Type":"application/json","Cache-Control":"no-store"}});
 Deno.serve(async req=>{
@@ -64,6 +65,10 @@ Deno.serve(async req=>{
      no_publish:true,skipped_invalid_source:sourceInvalid,
      error:sourceInvalid?"source_insufficient_skipped":"media_preparation_failed"},sourceInvalid?200:502);
   }
+  if(result.needs_approved_art===true){
+    return response({success:true,channel,publication_id:item.id,no_publish:true,
+      reason:"event_photo_rights_review_required",source_image_url:result.source_image_url||null});
+  }
   // The renderer produces editorial PNGs; Meta IMAGE/STORIES requires verified JPEG.
   // Conversion is a preparation step only and never counts as visual approval.
   if(result.needs_approved_art!==true){
@@ -111,6 +116,12 @@ Deno.serve(async req=>{
        (u.hostname==="www.flickr.com"&&u.pathname.startsWith("/photos/")))&&
       String(photo?.creator||"").length>=2;
   }catch{}
+  if(result.visual_mode==="registered_event_photo"&&Number.isSafeInteger(result.registered_image_id)){
+    const registered=await db.from('giro_imagens_autorizadas').select(PHOTO_FIELDS)
+      .eq('id',result.registered_image_id).eq('article_url',item.fonte_url).eq('headline',item.titulo).maybeSingle();
+    if(registered.error)throw registered.error;
+    verifiedPhoto=registryReady(registered.data);
+  }
   if(channel==="feed"&&result.needs_approved_art!==true&&verifiedPhoto&&
      cfg.visual_contract==="GIRO_EDITORIAL_FOTO_MANCHETE_RIO_V2"){
    const check=await db.from(table).select(

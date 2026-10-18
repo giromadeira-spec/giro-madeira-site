@@ -1,3 +1,4 @@
+import { approvedRegistryPhoto, registryReady, registryCredit, PHOTO_FIELDS } from "../_shared/photo-registry.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 import { jwtVerify, createRemoteJWKSet } from "npm:jose@6.0.11";
 
@@ -48,7 +49,7 @@ Deno.serve(async req=>{
   if(lane.error)throw lane.error;
   if(!lane.data.preparation_enabled)return response({success:true,processed:0,reason:"preparation_disabled"});
   if(action==="status")return response({success:true,mode:"github_oidc",renderer_enabled:settings.shorts_render_enabled,daily_goal:settings.daily_goal});
-  if(!["claim","complete","fail"].includes(action))return response({success:false,error:"invalid_action"},400);
+  if(!["claim","complete","fail","photo_pending"].includes(action))return response({success:false,error:"invalid_action"},400);
   if(!settings.shorts_render_enabled)return response({success:true,processed:0,reason:"renderer_disabled"});
   if(action==="claim"){
     const yesterday=new Date(Date.now()-36*3600000).toISOString();
@@ -66,7 +67,7 @@ Deno.serve(async req=>{
       .eq("storyboard_status","preparado")
       .in("topic_scope",["brasil","mundo"])
       .eq("visual_review_status","pending")
-      .eq("shorts_render_version",0).is("provider_post_id",null)
+      .eq("shorts_render_version",0).is("shorts_render_error",null).is("provider_post_id",null)
       .gte("created_at",yesterday).gte("scheduled_for",new Date(Date.parse(todayInPortoVelho)-6*3600000).toISOString())
       .lte("scheduled_for",new Date(Date.now()+2*3600000).toISOString())
       .order("scheduled_for",{ascending:true}).limit(8);
@@ -92,6 +93,7 @@ Deno.serve(async req=>{
       if(scenes.some(s=>/é redator|produção jornalística|conteúdos para plataformas digitais|biografia|sobre o autor/i.test(String(s))))continue;
       const {data:source}=await db.from("giro_madeira_fontes")
         .select("nome").eq("id",pub.fonte_id).maybeSingle();
+      const registeredImage=await approvedRegistryPhoto(db,url,sourceUrl,title);
       const uuid=crypto.randomUUID();
       const path="shorts/tiktok-original/"+String(item.source_id)+"/"+uuid+".mp4";
       const {data:claim,error:claimError}=await db.from("giro_social_video_queue").update({
@@ -115,6 +117,7 @@ Deno.serve(async req=>{
         throw Error("invalid_upload_origin");
       return response({success:true,processed:1,queue_id:item.id,source_id:item.source_id,
          title,scenes,topic_scope:item.topic_scope,source_url:sourceUrl,
+         registered_image:registeredImage?{id:registeredImage.id,article_url:sourceUrl,headline:title,image_url:registeredImage.image_url,image_credit:registeredImage.image_credit}:null,
          source_name:source?.nome||"Fonte original",storage_path:path,upload_url:uploadUrl,
          brand_logo_url:"https://raw.githubusercontent.com/giromadeira-spec/giro-madeira-site/main/assets/logo-oficial.webp",
          river_sample_video_url:url+"/storage/v1/object/public/news-videos/shorts/551/1791494145636-giro-madeira-short-tre-rj-2026-10-08.mp4",
@@ -131,6 +134,13 @@ Deno.serve(async req=>{
   if(!row||row.shorts_render_job_id!==jobId || row.status!=="aguardando_autorizacao"||
     row.provider_post_id||!row.shorts_render_storage_path)
     return response({success:false,error:"render_claim_not_owned"},409);
+  if(action==="photo_pending"){
+    const saved=await db.from("giro_social_video_queue").update({status:"pronto_para_revisao",
+      shorts_render_error:"event_photo_rights_review_required",editor_approved:false,visual_review_status:"pending",
+      updated_at:new Date().toISOString()}).eq("id",id).eq("shorts_render_job_id",jobId).is("provider_post_id",null);
+    if(saved.error)throw saved.error;
+    return response({success:true,queue_id:id,ready_to_publish:false,reason:"event_photo_rights_review_required"});
+  }
   if(action==="fail"){
     await db.from("giro_social_video_queue").update({
        status:"falha",shorts_render_error:"renderer_failed_or_unlicensed_image",updated_at:new Date().toISOString()
@@ -155,7 +165,13 @@ Deno.serve(async req=>{
     if(credit!==await originalArtCredit(String(row.source_url||""),String(row.title||"")))
       return response({success:false,error:"illustration_source_mismatch"},422);
   }else if(!/^wikimedia_event_/.test(credit)){
-    return response({success:false,error:"image_credit_not_verified"},422);
+    const imageId=Number(reqBody.registered_image_id||0);
+    if(!/^registered_event_/.test(credit)||!Number.isSafeInteger(imageId)||imageId<1)
+      return response({success:false,error:"image_credit_not_verified"},422);
+    const registered=await db.from('giro_imagens_autorizadas').select(PHOTO_FIELDS)
+      .eq('id',imageId).eq('article_url',String(row.source_url||'')).eq('headline',String(row.title||'')).maybeSingle();
+    if(registered.error||!registryReady(registered.data)||registryCredit(registered.data)!==credit)
+      return response({success:false,error:"approved_archive_image_not_valid_for_article"},422);
   }
   if(reqBody.quality_passed!==true)return response({success:false,error:"render_qa_not_passed"},422);
   const videoUrl=url+"/storage/v1/object/public/news-videos/"+path;

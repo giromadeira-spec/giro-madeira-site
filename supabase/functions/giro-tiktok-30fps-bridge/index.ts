@@ -1,3 +1,4 @@
+import { registeredCreditVerified } from "../_shared/photo-registry.ts";
 import {createClient} from "npm:@supabase/supabase-js@2.57.0";
 import {jwtVerify,createRemoteJWKSet} from "npm:jose@6.0.11";
 
@@ -43,7 +44,7 @@ Deno.serve(async(req:Request)=>{
       .eq("platform","tiktok").eq("status","pronto_para_revisao")
       .in("topic_scope",["brasil","mundo"])
       .eq("editor_approved",true).eq("visual_review_status","approved")
-      .eq("shorts_render_origin","tiktok_github_oidc_v1").or("shorts_image_credit.like.wikimedia_event_%,shorts_image_credit.like.original_editorial_labeled_v2_%").eq("storyboard_status","preparado")
+      .eq("shorts_render_origin","tiktok_github_oidc_v1").or("shorts_image_credit.like.wikimedia_event_%,shorts_image_credit.like.registered_event_%,shorts_image_credit.like.original_editorial_labeled_v2_%").eq("storyboard_status","preparado")
       .gte("shorts_rendered_at",new Date(Date.now()-18*3600000).toISOString())
       .order("scheduled_for",{ascending:false}).limit(16);
     if(e)return response({success:false,error:"source_lookup_failed"},503);
@@ -52,7 +53,8 @@ Deno.serve(async(req:Request)=>{
       if(/^original_editorial_labeled_v2_/.test(credit) &&
          credit!==await originalArtCredit(String(row.source_url||""),String(row.title||"")))continue;
       if(!/^wikimedia_event_/.test(credit) &&
-         !/^original_editorial_labeled_v2_[0-9a-f]{24}$/.test(credit))continue;
+         !/^original_editorial_labeled_v2_[0-9a-f]{24}$/.test(credit) &&
+         !await registeredCreditVerified(db,credit,String(row.source_url||""),String(row.title||"")))continue;
        const headline=String(row.title||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
        const localRo=/\b(rondonia|porto velho|ji parana|ariquemes|vilhena|cacoal|guajara mirim|jaru|rolim de moura|pimenta bueno|candeias do jamari|em ro)\b/;
        if(localRo.test(headline)&&!/\b(em todo o brasil|em todo o pais|todo territorio nacional|rodovias federais)\b/.test(headline))continue;
@@ -105,6 +107,7 @@ Deno.serve(async(req:Request)=>{
     return response({success:false,error:"editorial_review_not_current"},422);
   const credit=String(source.shorts_image_credit||"");
   if(!/^wikimedia_event_/.test(credit) &&
+      !await registeredCreditVerified(db,credit,String(source.source_url||""),String(source.title||"")) &&
       (!/^original_editorial_labeled_v2_[0-9a-f]{24}$/.test(credit)||
        credit!==await originalArtCredit(String(source.source_url||""),String(source.title||""))))
     return response({success:false,error:"visual_provenance_not_current"},422);

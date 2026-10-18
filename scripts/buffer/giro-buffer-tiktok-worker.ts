@@ -1,3 +1,4 @@
+import { registeredCreditVerified } from "../../supabase/functions/_shared/photo-registry.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 
 // Giro Madeira -> Buffer -> TikTok. Runs only after explicit admin activation.
@@ -480,6 +481,7 @@ Deno.serve(async req=>{
    const credit=String(article?.shorts_image_credit||"");
    const illustrated=/^original_editorial_labeled_v2_[0-9a-f]{24}$/.test(credit);
    const matchesOrigin=/^wikimedia_event_/.test(credit) ||
+      await registeredCreditVerified(db,credit,String(article?.source_url||""),String(article?.title||"")) ||
       (illustrated && credit===await originalArtCredit(String(article?.source_url||""),String(article?.title||"")));
    if(source.error || !article || !/^https:\/\//.test(String(article.source_url||"")) ||
        article.status!=="pronto_para_revisao" || article.shorts_render_origin!=="tiktok_github_oidc_v1" ||

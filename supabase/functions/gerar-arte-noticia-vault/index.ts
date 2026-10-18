@@ -1,3 +1,4 @@
+import { approvedRegistryPhoto, discoverPhotoCandidate } from "../_shared/photo-registry.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.49.1";
 import { load } from "npm:cheerio@1.0.0";
 import { initWasm, Resvg } from "npm:@resvg/resvg-wasm@2.6.2";
@@ -79,8 +80,12 @@ function articleSourcePhoto($:any,articleUrl:string,title:string):string{
     const score=weight+(topical?10:0)+(u.hostname==="upload.wikimedia.org"&&topical?3:0);
     if(!choices.some(x=>x.url===value))choices.push({url:value,score});
   };
-  // Captioned photos belonging to the article are stronger candidates than
-  // the global OpenGraph image, which is often the publisher's logo.
+  // A publisher's canonical article image outranks related-story thumbnails.
+  // Logos/placeholders are still rejected; discovery never grants reuse rights.
+  add($('meta[property="og:image"]').attr("content"),
+      $('meta[property="og:image:alt"]').attr("content"),30);
+  $('.related,.related-posts,.recommended,.post-navigation,.td-related-row').remove();
+  // Captioned figures may supply an alternative when the canonical image is absent.
   $("article figure, main article figure, .entry-content figure, .article-content figure, .noticia-corpo figure").slice(0,20).each((_:any,el:any)=>{
     const figure=$(el),im=figure.find("img").first();
     add(im.attr("data-src")||im.attr("data-lazy-src")||im.attr("src"),
@@ -115,7 +120,8 @@ function factualFallback(title:string,desc:string,article:string){
   // Extrai fatos da matéria original quando o resumo por IA está indisponível.
   // Evita invenções: se não houver informação específica suficiente, suspende a pauta.
   const lead=clean(title).replace(/[.!?]*$/,".") ;
-  const parts=[clean(desc),...String(article||"").split(/(?<=[.!?])\s+|\n+/).map(clean)];
+  article=String(article||"").replace(/(?:Desenvolvimento da Ação|Resultados da Operação|Continuidade das Investigações)\s*(?=[A-ZÀ-Ý])/g,"");
+  const parts=[...String(article||"").split(/(?<=[.!?])\s+|\n+/).map(clean),clean(desc)];
   const chosen:string[]=[];
   let used=lead.toLowerCase();
   for(const part of parts){
@@ -124,7 +130,8 @@ function factualFallback(title:string,desc:string,article:string){
       .replace(/^(publicidade|assine|compartilhe|leia mais|saiba mais).*/i,"").trim();
     // Não cortar frases de matérias ao atingir limite de caracteres:
     // cortes no meio da oração podem mudar radicalmente o sentido de uma notícia.
-    if(t.length<45||t.length>360||/^(mais informac|confira|leia tamb[eé]m|acesse|clique|o portal)/i.test(t))continue;
+    if(!/[.!?][”"’)]?$/.test(t)||t.length<45||t.length>360||/^(mais informac|confira|leia tamb[eé]m|acesse|clique|o portal)/i.test(t))continue;
+    if(/\b[A-Z]\.$/.test(t))continue;
     const key=t.toLowerCase().slice(0,65);
     if(used.includes(key)||chosen.some(x=>x.toLowerCase().includes(key)))continue;
     chosen.push(t); used+=" "+t.toLowerCase();
@@ -136,7 +143,12 @@ function factualFallback(title:string,desc:string,article:string){
   const details=chosen.slice(1).join(" ");
   const text=leadBlock+(details?"\n\n"+details:"");
   if(text.length<250)throw new Error("Informações insuficientes para conteúdo jornalístico completo.");
-  return text.slice(0,1150);
+  if(text.length<=1150)return text;
+  const complete=text.match(/[^.!?]+[.!?]+(?:[”"’)]|$)?/g)||[];
+  let bounded="";
+  for(const sentence of complete){if((bounded+sentence).length>1150)break;bounded+=sentence;}
+  if(bounded.trim().length<250)throw new Error("Legenda não cabe sem cortar frase; revisão necessária.");
+  return bounded.trim();
 }
 
 async function writeOriginalSummary(title:string,desc:string,article:string,_source:string){
@@ -298,7 +310,7 @@ function fitHeadline(raw:string,maxWidth:number,maxLines:number,maxFont:number,m
   throw new Error("Manchete extensa demais para a arte; revisar título antes da publicação.");
 }
 
-type EditorialPhoto={dataUri:string,creator:string,license:string,source:string};
+type EditorialPhoto={dataUri:string,creator:string,license:string,source:string,registryId?:number};
 function isTimberVisualStory(raw:string){
  const s=String(raw||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
  return /madeireir|desmatamento|troncos|toras|madeira (?:retirad|apreendid|ilegal)|(?:apreensao|retirada|extracao) (?:de )?madeira|terra indigena.*madeira/.test(s);
@@ -874,56 +886,35 @@ Deno.serve(async(req)=>{
     const isCityIdentityStory=isRegional&&
       /(?:hist[oó]ria de porto velho|anivers[aá]rio de porto velho|rio madeira|locomotiva|cidade de porto velho|capital de rond[oô]nia)/i.test(title)&&
       !/(?:acidente|homic[ií]dio|pris[aã]o|inc[eê]ndio|v[ií]tima|suspeito|morte|opera[cç][aã]o|pol[ií]cia)/i.test(title);
-    const photo=!withinBudget()?null:
+    if(imageUrl)await discoverPhotoCandidate(sb,sourceLink,title,imageUrl,desc);
+    const registered=await approvedRegistryPhoto(sb,url,sourceLink,title);
+    const registeredData=registered?await imageDataUri(registered.image_url):"";
+    const registeredPhoto:EditorialPhoto|null=registered&&registeredData?{
+      dataUri:registeredData,creator:String(registered.record.credit_line),
+      license:registered.record.license_kind==='cc0'?'CC0':registered.record.license_kind==='cc_by'?'CC BY '+String(registered.record.license_version||''):'Autorização individual verificada',
+      source:String(registered.record.evidence_url),registryId:registered.id
+    }:null;
+    const photo=registeredPhoto||(!withinBudget()?null:
       await Promise.race([
         linkedEventPhoto(sourceArticleHtml,imageUrl,title),
         new Promise<null>(resolve=>setTimeout(()=>resolve(null),Math.min(12500,remainingGenerationMs())))
-      ]);
+      ]));
     // Preservar a pauta e a legenda mesmo quando não há imagem adequada/licenciada.
     // Nunca publicar fotografia genérica ou afirmar que a arte está aprovada.
     // Never auto-render the abstract shields/background that produced the bad Feed post.
     if(!photo){
-      // No reusable event photo: render original, visibly labeled abstract
-      // newspaper art. No third-party imagery, depicted people or fake footage.
-      // Rendering the draft does NOT authorize any public Meta post.
-      await prepareBrandLogo();const font=new Uint8Array();
-      const graphic="original_editorial_illustration";
-      const feed=await render(makeSvg("feed",title,desc,source,category,graphic,item.urgente===true,"",false),font);
-      const story=await render(makeSvg("story",title,desc,source,category,graphic,item.urgente===true,"",false),font);
-      const stamp=Date.now();
-      const feedPath="auto/feed/"+channel+"/"+id+"-"+stamp+"-original.png";
-      const storyPath="auto/story/"+channel+"/"+id+"-"+stamp+"-original.png";
-      const [uf,us]=await Promise.all([
-        sb.storage.from("news-images").upload(feedPath,feed,{contentType:"image/png",upsert:false}),
-        sb.storage.from("news-images").upload(storyPath,story,{contentType:"image/png",upsert:false})
-      ]);
-      if(uf.error)throw uf.error;
-      if(us.error)throw us.error;
-      const feedUrl=sb.storage.from("news-images").getPublicUrl(feedPath).data.publicUrl;
-      const storyUrl=sb.storage.from("news-images").getPublicUrl(storyPath).data.publicUrl;
-      const draftCaption=originalText+"\n\nFonte: "+source+"\nMatéria original: "+sourceLink+
-        "\n\nILUSTRAÇÃO EDITORIAL ORIGINAL — representação gráfica simbólica, NÃO É FOTO DO ACONTECIMENTO."+
-        "\n\n#GiroMadeira #PortoVelho #Rondônia";
+      // Keep the factual draft and the actual source photo candidate. A generic
+      // shield is not a replacement for the required photograph of this event.
       const pending=await sb.from(publicationTable).update({
         titulo:title,resumo:desc||item.resumo||null,categoria:category,
-        legenda:draftCaption,image_url:feedUrl,feed_image_url:feedUrl,story_image_url:storyUrl,
-        source_image_url:imageUrl||null,source_video_url:videoRaw||null,
-        publicar_story:false,publicar_reel:reelRecommended,
-        reel_interesse_ro:reelInterestRo,video_url:item.video_url||null,
-        media_pipeline_version:channel==="feed"?6:5,visual_approved:false,
-        media_status:"ilustracao_original_aguardando_revisao",
-        status:"pendente",erro:null
+        legenda:originalText+"\n\nFonte: "+source+"\nMatéria original: "+sourceLink,
+        source_image_url:imageUrl||null,visual_approved:false,
+        media_status:"aguardando_foto_licenciada",status:"pendente",erro:"event_photo_rights_review_required"
       }).eq("id",id).in("status",["pendente","erro"]).eq("visual_approved",false);
       if(pending.error)throw pending.error;
-      return new Response(JSON.stringify({
-        success:true,id,feed_image_url:feedUrl,story_image_url:storyUrl,
-        reel_ready:Boolean(item.video_url),reel_recommended:reelRecommended,
-        reel_interesse_ro:reelInterestRo,reel_generated:false,
-        source_image_url:imageUrl||null,visual_mode:"original_illustration",
-        illustrative_photo_credit:null,needs_approved_art:false,
-        awaiting_visual_approval:true,no_publish:true,
-        reason:"Arte original abstrata criada, identificada e aguardando revisão antes de publicar."
-      }),{headers:H});
+      return new Response(JSON.stringify({success:true,id,no_publish:true,needs_approved_art:true,
+        visual_mode:"awaiting_licensed_event_photo",source_image_url:imageUrl||null,
+        reason:"event_photo_rights_review_required",awaiting_visual_approval:true}),{headers:H});
     }
     const attribution=photo.creator+" • "+photo.license;
     const bg=photo.dataUri;
@@ -951,7 +942,7 @@ Deno.serve(async(req)=>{
       status:"pendente",erro:null,story_erro:null,reel_erro:null,media_pipeline_version:channel==="feed"?6:5,media_status:"feed_pronto"
     };
     const up=await sb.from(publicationTable).update(upd).eq("id",id); if(up.error) throw up.error;
-    return new Response(JSON.stringify({success:true,id,feed_image_url:feedUrl,story_image_url:storyUrl,reel_ready:Boolean(item.video_url),reel_recommended:reelRecommended,reel_interesse_ro:reelInterestRo,reel_generated:false,source_image_url:imageUrl||null,visual_mode:"original_event_photo",illustrative_photo_credit:{creator:photo.creator,license:photo.license,source:photo.source}}),{headers:H});
+    return new Response(JSON.stringify({success:true,id,feed_image_url:feedUrl,story_image_url:storyUrl,reel_ready:Boolean(item.video_url),reel_recommended:reelRecommended,reel_interesse_ro:reelInterestRo,reel_generated:false,source_image_url:imageUrl||null,visual_mode:photo.registryId?"registered_event_photo":"original_event_photo",registered_image_id:photo.registryId||null,illustrative_photo_credit:{creator:photo.creator,license:photo.license,source:photo.source}}),{headers:H});
   }catch(e){
     return new Response(JSON.stringify({success:false,error:e instanceof Error?e.message:String(e)}),{status:500,headers:H});
   }

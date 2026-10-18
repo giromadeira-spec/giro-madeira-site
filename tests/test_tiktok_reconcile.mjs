@@ -3,7 +3,7 @@ import {readFileSync} from "node:fs";
 import {stripTypeScriptTypes} from "node:module";
 import vm from "node:vm";
 const source=readFileSync(new URL("../scripts/buffer/giro-buffer-tiktok-worker.ts",import.meta.url),"utf8");
-const script=stripTypeScriptTypes(source.replace(/^import[^\n]+\n/,""),{mode:"strip"});
+const script=stripTypeScriptTypes(source.replace(/^import[^\n]+\n/gm,""),{mode:"strip"});
 let handler,mutations=[],queries=[],sourcePlatform="tiktok",remotePosts=[],state="uncertain",remoteId=null;
 const job={id:16,source_queue_id:207,created_at:"2026-10-15T02:00:02.359Z",
  caption:"Ataques russos deixam mais de 600 mil pessoas sem energia na Ucrânia. Fonte: https://cnnbrasil.com.br/internacional/noticia #GiroMadeira",last_error:"TimeoutError"};

@@ -935,7 +935,7 @@ def render_self_test():
                     raise RuntimeError("Test with incomplete storyboard must fail before upload")
                 if calls!=["claim","fail"]:
                     raise RuntimeError("Incomplete storyboard incorrectly advanced to publication")
-                illustration.assert_called_once()
+                illustration.assert_not_called()
                 upload.assert_not_called()
     if article_subject("PF faz operação contra crimes de ódio e violência sexual contra crianças na internet") != ("cyber safety editorial","SEGURANÇA"):
         raise RuntimeError("Child cybercrime story must use safe symbolic visuals")
@@ -1027,23 +1027,24 @@ def main():
         query,category=article_subject(result["title"])
         if not result.get("title") or not result.get("source_url"):
             raise RuntimeError("Verified news title and original source required")
-        # Editorial choice: real event photo -> approved private photo -> original
-        # *symbolic* artwork. All art is visibly labeled and never a fake event photo.
+        if not isinstance(result.get("scenes"),list) or len(result["scenes"])!=3:
+            raise RuntimeError("Verified three-scene storyboard required")
+        # Event photo or individually cleared private image. Missing rights stays
+        # on the same item for review; no generic shield substitutes for the event.
         registered_image_id=0
         try:
             picture,credit,file_title=licensed_event_photo(result["source_url"],result["title"])
         except Exception as no_photo:
-            registered=result.get("registered_image") if PLATFORM=="shorts" else None
+            registered=result.get("registered_image")
             if registered:
                 picture,credit,file_title=approved_registry_photo(
                     registered,result["source_url"],result["title"])
                 registered_image_id=registered["id"]
             else:
-                picture=render_topic_illustration(result["title"],category)
-                credit=original_illustration_credit(result["source_url"],result["title"])
-                file_title="ARTE GRÁFICA EDITORIAL ORIGINAL — NÃO É FOTO DO FATO"
-                print("No reusable event photo; creating clearly labeled symbolic art:",
-                      type(no_photo).__name__)
+                bridge(token,"photo_pending",queue_id=qid)
+                report_render_outcome({"state":"awaiting_licensed_event_photo","queue_id":qid,
+                                       "ready_to_publish":False,"reason":"event_photo_rights_review_required"})
+                return
         visual_origin_valid=is_acceptable_visual_credit(
             credit,result["source_url"],result["title"])
         if not visual_origin_valid:

@@ -35,6 +35,7 @@ function meaningfulSegments(title:string,summary:string,caption:string,source:st
    // Only a COMPLETE short sentence or a naturally delimited independent clause can be used.
    const candidate=s.length<=110?s:s.split(/[,;:]\s+/)[0];
    if(candidate.length>110||!fitCard(candidate))continue;
+   if(/^(entre el[ae]s|ele afirma|ela afirma|el[ae]s|esse n[uú]mero|essa quantidade|isso|isto|aquilo|segundo ele|segundo ela|desde o fim)/i.test(candidate))continue;
    if(candidate.length<28||candidate.length>110)continue;
    if(!hasFiniteVerb(candidate))continue;
    // Never emit a cut-off private-name initial or a trailing person-name fragment.
@@ -81,7 +82,7 @@ Deno.serve(async req=>{
    if(lane.error)throw lane.error;
    if(args.dry_run===true||!lane.data.preparation_enabled)return respond({success:true,dry_run:args.dry_run===true,no_publish:true,channel:'tiktok',preparation_enabled:lane.data.preparation_enabled});
    const {data:pending,error:qerr}=await db.from("giro_social_video_queue")
-     .select("id,source_kind,source_id,platform,status,source_url,shorts_render_retry_count")
+     .select("id,source_kind,source_id,platform,status,source_url,scheduled_for,shorts_render_retry_count")
      .eq("platform","tiktok").in("storyboard_status",["aguardando","revisar"]).eq("visual_review_status","pending")
      .eq("status","pronto_para_revisao").or("storyboard_prepared_at.is.null,storyboard_prepared_at.lte."+new Date(Date.now()-15*60000).toISOString()).gte("created_at",new Date(Date.now()-36*3600000).toISOString()).order("scheduled_for",{ascending:true}).limit(24);
    if(qerr)throw qerr;
@@ -125,7 +126,7 @@ Deno.serve(async req=>{
              }catch{}
            }
          }
-         if(!articleIsFresh(published,sourceUrl.toString()))
+         if(!articleIsFresh(published,sourceUrl.toString(),Math.max(Date.now(),Date.parse(item.scheduled_for)||Date.now())))
            throw Error("article_date_unverified_or_outdated");
          $("script,style,nav,footer,header,aside,form,iframe,.advertisement,.ads,.related,.share-buttons,.newsletter").remove();
          const description=clean($('meta[property="og:description"]').attr("content")||$('meta[name="description"]').attr("content")||"");
