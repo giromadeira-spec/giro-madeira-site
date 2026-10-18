@@ -20,31 +20,38 @@ Deno.serve(async req=>{
   if(gate.error)throw gate.error;
   const meta=await db.from('giro_meta_rate_state').select('integrity_hold,rollout_stage,traffic_light_target,traffic_light_reel_test_enabled,traffic_light_story_test_enabled').eq('id',1).single();
   if(meta.error)throw meta.error;
-  // Yellow-mode Feed 1/day, Reels 1/day at noon, and the authorized Story
-  // pilot 1/day in the evening. A restricted RPC also requires real recent
-  // Meta deliveries and fresh quota measurements before a Story is allowed.
+  // Instagram begins at noon in Porto Velho. Feed is first (12:00-12:44),
+  // then Reel (13:30-14:44), then Story (15:30-16:59). The Meta semaforo
+  // enforces a variable 75-105 minute gap across ALL media types in yellow,
+  // so three simultaneous 12:00 posts would violate established protections.
+  // Separate media/IDs, 1 per format per day; missing approvals never bypassed.
   const localParts=new Intl.DateTimeFormat('en-GB',{timeZone:'America/Porto_Velho',
     hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date());
   const localHour=Number(localParts.find(p=>p.type==='hour')?.value??-1);
   const localMinute=Number(localParts.find(p=>p.type==='minute')?.value??-1);
-  const reelsNoon=channel==='reels'&&localHour===12&&localMinute>=0&&localMinute<45;
-  const reelsRecovery=reelsNoon&&meta.data.rollout_stage==='feed_only'&&
+  const feedNoon=channel==='feed'&&localHour===12&&localMinute<45;
+  const reelsAfterNoon=channel==='reels'&&
+    ((localHour===13&&localMinute>=30)||localHour===14&&localMinute<45);
+  const storiesAfterNoon=channel==='stories'&&
+    ((localHour===15&&localMinute>=30)||localHour===16);
+  const reelsRecovery=reelsAfterNoon&&meta.data.rollout_stage==='feed_only'&&
     meta.data.traffic_light_target==='amarelo'&&meta.data.traffic_light_reel_test_enabled===true;
-  const storyEvening=channel==='stories'&&localHour>=18&&localHour<21;
-  const storiesRecovery=storyEvening&&meta.data.rollout_stage==='feed_only'&&
+  const storiesRecovery=storiesAfterNoon&&meta.data.rollout_stage==='feed_only'&&
     meta.data.traffic_light_target==='amarelo'&&meta.data.traffic_light_story_test_enabled===true;
   const channelAllowed=channel==='feed'||meta.data.rollout_stage==='full'||
     (channel==='reels'&&reelsRecovery)||(channel==='stories'&&storiesRecovery);
   const blocked=!cfg.data.publication_enabled||meta.data.integrity_hold===true||
     gate.data?.allowed!==true||!channelAllowed||
-    (channel==='reels'&&!reelsNoon)||(channel==='stories'&&!storyEvening);
+    (channel==='feed'&&!feedNoon)||(channel==='reels'&&!reelsAfterNoon)||
+    (channel==='stories'&&!storiesAfterNoon);
   const blockedReasons=[
     !cfg.data.publication_enabled?"channel_publication_disabled":null,
     meta.data.integrity_hold===true?"meta_integrity_hold":null,
     gate.data?.allowed!==true?"meta_semaphore_denied":null,
     !channelAllowed?"rollout_channel_not_allowed":null,
-    channel==='reels'&&!reelsNoon?"outside_reels_window":null,
-    channel==='stories'&&!storyEvening?"outside_stories_window":null
+    channel==='feed'&&!feedNoon?"outside_feed_noon_window":null,
+    channel==='reels'&&!reelsAfterNoon?"outside_reels_window":null,
+    channel==='stories'&&!storiesAfterNoon?"outside_stories_window":null
   ].filter(Boolean);
   if(body.dry_run===true||blocked)return response({success:true,channel,reason:body.dry_run===true?"dry_run":blockedReasons[0],blocked_reasons:blockedReasons,dry_run:body.dry_run===true,no_publish:true,publication_enabled:cfg.data.publication_enabled,gate:gate.data,integrity_hold:meta.data.integrity_hold,rollout_stage:meta.data.rollout_stage});
   const table='giro_publicacoes_'+channel;
