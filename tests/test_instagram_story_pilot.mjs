@@ -51,7 +51,7 @@ async function invoke(){
  const res=await handler(new Request(root,{method:'POST',headers:{'x-giro-db-key':'test'},body:JSON.stringify({channel:'stories'})}));
  return {status:res.status,body:await res.json()};
 }
-const init=()=>{row=record();publishCalls=0;approved=true;photo=true;allowed=true;enabled=true;at='2026-10-18T22:15:00Z';
+const init=()=>{publishCalls=0;approved=true;photo=true;allowed=true;enabled=true;at='2026-10-18T22:15:00Z';row=record();
  meta={integrity_hold:false,rollout_stage:'feed_only',traffic_light_target:'amarelo',
  traffic_light_reel_test_enabled:true,traffic_light_story_test_enabled:true};};
 init();assert.equal((await invoke()).body.provider_id,'story-id-123');assert.equal(publishCalls,1);
