@@ -54,7 +54,7 @@ async function send(channel='feed'){
  return {status:r.status,body:await r.json()};
 }
 for(const channel of Object.keys(idFields)){
- reset();if(channel==='stories')at='2026-10-18T22:15:00Z';const r=await send(channel);assert.equal(r.status,200);assert.equal(r.body.provider_id,'confirmed-provider-id');
+ reset();at=channel==='feed'?'2026-10-18T16:20:00Z':channel==='reels'?'2026-10-18T17:40:00Z':'2026-10-18T19:40:00Z';const r=await send(channel);assert.equal(r.status,200);assert.equal(r.body.provider_id,'confirmed-provider-id');
  assert.equal(rows[channel][idFields[channel]],'confirmed-provider-id');assert.equal(rows[channel].status,'publicada');
  assert.ok(writes.every(w=>w.channel===channel));assert.equal(requests.length,1);
  assert.equal(requests[0].media_type,{feed:'IMAGE',stories:'STORIES',reels:'REELS'}[channel]);
@@ -69,7 +69,7 @@ for(const failure of ['timeout','missing_id']){
 reset();saveFails=true;assert.equal((await send()).body.error,'confirmed_provider_id_not_saved');
 assert.equal(rows.feed.status,'publicando');assert.equal((await send()).body.reason,'reconciliation_required');assert.equal(requests.length,1);
 reset();legacy.instagram_media_id='old-feed';assert.equal((await send('feed')).body.reason,'already_published');assert.equal(requests.length,0);
-assert.equal((await send('reels')).body.provider_id,'confirmed-provider-id','A legacy Feed cannot consume the independent Reels story');
+at='2026-10-18T17:40:00Z';assert.equal((await send('reels')).body.provider_id,'confirmed-provider-id','A legacy Feed cannot consume the independent Reels story');
 reset();loseReservation=true;assert.equal((await send()).body.reason,'already_reserved');assert.equal(requests.length,0);
 reset();allowed=false;assert.ok((await send()).body.blocked_reasons.includes('meta_semaphore_denied'));assert.equal(requests.length,0);
 console.log('PASS: simulated Instagram delivery verifies provider IDs, channel isolation, duplicates, reservation races and uncertain-result holds. No external requests.');
