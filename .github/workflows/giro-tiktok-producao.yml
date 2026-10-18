@@ -5,7 +5,10 @@ on:
     # Recuperação 08:05/08:20 e 22:05/22:20; somente preparação, sem reenvio incerto.
     # Passo 06:05/20:05 PV dentro da janela de preparação de 8h.
     # Manter 06:30/20:30 e 07:15/21:15 como contingência.
-    # Pré-produção 02h15/16h15 PV para revisão antes do agendamento.\n    # Fotos externas não autorizadas e ilustrações sem revisão continuam bloqueadas.\n    - cron: '15 6,20 * * *'\n    - cron: '5 0,10 * * *'
+    # Pré-produção 02h15/16h15 PV para revisão antes do agendamento.
+    # Fotos externas não autorizadas e ilustrações sem revisão continuam bloqueadas.
+    - cron: '15 6,20 * * *'
+    - cron: '5 0,10 * * *'
     - cron: '30 0,10 * * *'
     - cron: '15 1,11 * * *'
     - cron: '5,20 2,12 * * *'
