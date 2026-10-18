@@ -25,6 +25,9 @@ function scopeOf(v:{titulo:string;fonte_nome:string;fonte_url:string}):"brasil"|
 const blocked = (title:string,source:string,url:string) => {
  const t=normalize(title),s=normalize(source);
  if(!title||title.length<28||title.length>160)return true;
+ // News slots need reportable facts; political commentary cannot occupy
+ // the slot merely because it mentions a president or election.
+ if(/^(analise|opiniao|editorial|coluna|comentario)(?:\s|:)/.test(t))return true;
  if(/news rondonia/.test(s)&&/\b(convida|recebe|entrevista|apresenta|podcast|ao vivo)\b/.test(t))return true;
  if(/\b(requerimento de licenca|licenca ambiental|edital|processo seletivo da empresa|assine|anuncie|publicidade|classificados|avisos legais|nota de falecimento|patrocinado)\b/.test(t))return true;
  if(/^(leia|assista|saiba mais|confira|veja|receba|acompanhe)\b/.test(t))return true;
