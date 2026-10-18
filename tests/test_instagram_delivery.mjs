@@ -13,7 +13,7 @@ function reset(){
   media_pipeline_version:6,media_status:channel==='feed'?'feed_foto_verificada':channel==='stories'?'stories_foto_verificada':'foto_verificada',
   fonte_url:'https://source.test/event',legenda:'Foto do acontecimento: Fotógrafo / fonte autorizada\nFonte: fonte\nMatéria original: https://source.test/event',
   created_at:'2026-10-18T12:00:00Z',editorial_expires_at:'2026-10-19T12:00:00Z',
-  feed_image_url:base+'/storage/v1/object/public/news-images/feed.jpg',story_image_url:base+'/storage/v1/object/public/news-images/story.jpg',
+  feed_image_url:base+'/storage/v1/object/public/news-images/feed.jpg',story_image_url:base+'/storage/v1/object/public/news-images/auto/jpeg/stories/story/story.jpg',
   video_url:base+'/storage/v1/object/public/news-videos/reel.mp4',publicar_reel:channel==='reels',publicar_story:channel==='stories'}]));
  legacy={};requests=[];writes=[];mode='success';saveFails=false;loseReservation=false;allowed=true;
 }
