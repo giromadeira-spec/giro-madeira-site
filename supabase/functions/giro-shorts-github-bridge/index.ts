@@ -53,7 +53,23 @@ Deno.serve(async req=>{
  const reqBody=await req.json().catch(()=>({}));
  const action=String(reqBody.action||"status");
  if(jwt.workflow_ref===monitorWorkflow){
-   if(action!=="monitor")return response({success:false,error:"monitor_is_read_only"},403);
+   // Monitoring identity may only READ. Never allow claim, upload or approval.
+   if(action!=="monitor"&&action!=="preflight")
+     return response({success:false,error:"monitor_is_read_only"},403);
+   if(action==="preflight"){
+     // GitHub runs this ahead of the 08:00/22:00 Porto Velho windows.
+     // Include independently sourced items for both lanes; no publishing calls.
+     const checkedAt=new Date();
+     const {data:items,error:preflightError}=await db.from("giro_social_video_queue")
+       .select("id,platform,title,status,scheduled_for,storyboard_status,storyboard_source_published_at,visual_review_status,editor_approved,video_url,shorts_render_version,provider_post_id,shorts_render_error,storyboard_error")
+       .in("platform",["youtube_shorts","tiktok"])
+       .gte("scheduled_for",checkedAt.toISOString())
+       .lte("scheduled_for",new Date(checkedAt.getTime()+7*3600000).toISOString())
+       .neq("status","expirado").order("scheduled_for",{ascending:true}).limit(30);
+     if(preflightError)return response({success:false,error:"preflight_read_failed"},503);
+     return response({success:true,read_only:true,publication_attempted:false,
+       kind:"video_preflight",checked_at:checkedAt.toISOString(),items:items||[]});
+   }
    const snapshot=await db.rpc("giro_pipeline_status_readonly");
    if(snapshot.error)return response({success:false,error:"monitor_snapshot_failed"},503);
    return response({success:true,...snapshot.data});
