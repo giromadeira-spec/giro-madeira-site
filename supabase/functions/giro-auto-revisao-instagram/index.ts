@@ -68,12 +68,23 @@ Deno.serve(async req=>{
  const args=await req.json().catch(()=>({}));const dry=args.dry_run===true;
  const channels=String(args.channel||"") in specs?[String(args.channel)]:["feed","reels","stories"];
  const results:any[]=[];const now=Date.now();
+ const local=Object.fromEntries(new Intl.DateTimeFormat("en-GB",{timeZone:"America/Porto_Velho",
+  year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"})
+   .formatToParts(new Date(now)).map(x=>[x.type,x.value]));
+ const nextWindow=(channel:string)=>{
+   const start:any={feed:[12,0],reels:[13,30],stories:[15,30]};
+   const [hour,minute]=start[channel];
+   const slot=Date.UTC(Number(local.year),Number(local.month)-1,Number(local.day),hour+4,minute);
+   return slot<now-44*60000?slot+86400000:slot;
+ };
  for(const channel of channels){
   const spec=specs[channel];
+  // No stale approval today that would become tomorrow's expired news.
+  const minExpiry=Math.max(now+20*60000,nextWindow(channel)+45*60000);
   const {data,error}=await db.from(spec.table).select("*")
    .eq("status","pendente").eq("visual_approved",false)
    .is(spec.idField,null).gte("created_at",new Date(now-30*3600000).toISOString())
-   .gt("editorial_expires_at",new Date(now+20*60000).toISOString())
+   .gt("editorial_expires_at",new Date(minExpiry).toISOString())
    .order("created_at",{ascending:false}).limit(5);
   if(error){results.push({channel,status:"error",reason:"queue_read_failed"});continue;}
   for(const item of data||[]){
@@ -108,7 +119,7 @@ Deno.serve(async req=>{
       scheduled_at:new Date().toISOString(),erro:null
     }).eq("id",item.id).eq("status","pendente").eq("visual_approved",false)
       .eq("media_pipeline_version",spec.version).is(spec.idField,null)
-      .gt("editorial_expires_at",new Date().toISOString()).select("id").maybeSingle();
+      .gt("editorial_expires_at",new Date(minExpiry).toISOString()).select("id").maybeSingle();
     if(ue||!updated){hold("database_approval_conflict");continue;}
     results.push({channel,id:item.id,status:"approved",reason:"machine_verified_original_abstract_art_v1"});
   }
