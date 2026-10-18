@@ -175,6 +175,35 @@ Deno.serve(async(req:Request)=>{
      .lt("scheduled_for",expirationCutoff)
      .select("id");
    if(expireError)throw expireError;
+   // Release only proven PRE-PUBLICATION render failures. Never reset a Buffer
+   // job, an uncertain delivery, a produced MP4, or a previously attempted post.
+   const {data:preUploadFailures,error:preErr}=await sb.from("giro_social_video_queue")
+     .select("id").eq("platform","tiktok").eq("status","falha")
+     .eq("shorts_render_version",0).is("video_url",null).is("provider_post_id",null)
+     .in("shorts_render_error",["renderer_failed_or_unlicensed_image","signed_upload_creation_failed"])
+     .gte("scheduled_for",new Date().toISOString())
+     .lte("scheduled_for",new Date(Date.now()+8*3600000).toISOString()).limit(20);
+   if(preErr)throw preErr;
+   let releasedPreUpload=0;
+   if(preUploadFailures?.length){
+     const ids=preUploadFailures.map(f=>f.id);
+     const {data:bufferJobs,error:bufferErr}=await sb.from("giro_buffer_tiktok_jobs")
+       .select("source_queue_id").in("source_queue_id",ids);
+     if(bufferErr)throw bufferErr; // fail closed; never guess whether Buffer received a job.
+     const reserved=new Set((bufferJobs||[]).map(j=>String(j.source_queue_id)));
+     for(const f of preUploadFailures){
+       if(reserved.has(String(f.id)))continue;
+       const {data:changed,error:releaseErr}=await sb.from("giro_social_video_queue")
+         .update({status:"expirado",updated_at:new Date().toISOString(),
+           last_error:"Render inicial falhou antes de gerar MP4; liberado para substituição editorial, sem reenviar nem ocultar histórico."})
+         .eq("id",f.id).eq("platform","tiktok").eq("status","falha")
+         .eq("shorts_render_version",0).is("video_url",null).is("provider_post_id",null)
+         .in("shorts_render_error",["renderer_failed_or_unlicensed_image","signed_upload_creation_failed"])
+         .select("id").maybeSingle();
+       if(releaseErr)throw releaseErr;
+       if(changed)releasedPreUpload++;
+     }
+   }
    // A render failure and a null provider ID do not prove absence of delivery.
    // Preserve failed slots until Buffer reconciliation and reviewed replacement.
    const start=startOfBRTDay(),end=start+86400000;
@@ -304,6 +333,7 @@ Deno.serve(async(req:Request)=>{
     football_bonus:extraCount,football_results_verified:finishedReports.length,effective_goal:targetMax,
     radar_candidates:(candidates.data||[]).length,eligible_candidates:options.length,slot_diagnostics:slotDiagnostics,
     queued_new:created,expired_previous_cycle:(expired||[]).length,previous_today:(queued||[]).length,total_today:count,
+    released_preupload_failures:releasedPreUpload,
     automatic_uploads_enabled:settings.data.public_auto_uploads_enabled===true,
     public_uploads_enabled:settings.data.public_auto_uploads_enabled===true,
     note:"Fila editorial apenas: publicar exige aprovação, render verificado e controles da função de upload."});
