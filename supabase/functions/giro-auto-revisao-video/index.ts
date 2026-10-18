@@ -16,6 +16,11 @@ const credit=async(url:string,title:string)=>{
 };
 const getPage=async(raw:string)=>{
  const url=allowedSource(raw);if(!url)return null;
+ // CNN's canonical article URL ends in "/" and redirects the no-slash path.
+ // Normalize it without accepting any cross-origin redirect.
+ if(url.hostname==="www.cnnbrasil.com.br"||url.hostname==="cnnbrasil.com.br"){
+   if(!url.pathname.endsWith("/"))url.pathname+="/";
+ }
  try{
   const r=await fetch(url,{redirect:"error",signal:AbortSignal.timeout(11000),
     headers:{"Accept":"text/html","User-Agent":"GiroMadeiraEditorialValidator/1.0"}});
