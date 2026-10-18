@@ -1,5 +1,12 @@
 # GIRO MADEIRA — retomada gradual de Feed e Reels (18/10/2026)
 
+## Atualização — meta vigente de 1 por formato (18/10/2026)
+
+O usuário definiu a meta operacional **1 Feed, 1 Reel e 1 Story por dia**. Substitui quaisquer propostas antigas de aumentar Feed/Reels para 2 ou mais. Stories foi habilitado em `giro_channel_settings.publication_enabled` e `traffic_light_story_test_enabled=true`, com semáforo AMARELO, `rollout_stage=feed_only` e limites de 1/dia para cada tipo. O cron de Story permanece independente; publicador atualizado exige JPEG vertical do fluxo Stories, própria revisão/ligação à notícia, e janela de 18h–20h59 em Porto Velho. O preparador libera foto oficial somente após registro individual de direitos e correspondência com o evento; ilustração simbólica continua pendente de revisão humana.
+
+A guarda SQL exige quota Meta recente (<80%, ≤24h), 72h sem novo erro, Feed confirmado nos últimos 48h e Reel confirmado nos últimos 72h antes de permitir Stories. A última quota verificada foi em 15/10; em 18/10 ~15h56 PV, `giro_instagram_semaforo_gate('STORIES')` retornou `allowed=false` por falta de telemetria. Nenhum dos três formatos tinha pauta nova aprovada para envio. **Habilitado não equivale a publicado.**
+
+
 ## Decisão operacional
 
 O usuário autorizou começar uma evolução gradual de ritmo, **não** publicar imagens sem revisão, ignorar a API Meta ou elevar de imediato a dezenas de posts por dia.
