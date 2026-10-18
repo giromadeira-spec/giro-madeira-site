@@ -6,13 +6,13 @@ import vm from 'node:vm';
 const file=readFileSync(new URL('../supabase/functions/giro-instagram-publicar-independente/index.ts',import.meta.url),'utf8');
 const code=stripTypeScriptTypes(file.replace(/^import .*;\n/gm,''));
 const root='https://test.local';
-let handler,at='2026-10-18T22:15:00Z',enabled=true,allowed=true,approved=true,photo=true,publishCalls=0,meta;
+let handler,at='2026-10-18T19:40:00Z',enabled=true,allowed=true,approved=true,photo=true,publishCalls=0,meta;
 const record=()=>({
  id:151,status:'aprovada',visual_approved:approved,media_pipeline_version:5,
  media_status:photo?'stories_foto_verificada':'aguardando_revisao_visual',
  fonte_url:'https://www.gov.br/noticia',
  legenda:'Foto do acontecimento: evento licenciado\nFonte: oficial\nMatéria original: https://www.gov.br/noticia',
- created_at:'2026-10-18T20:00:00Z',editorial_expires_at:'2026-10-19T03:00:00Z',
+ created_at:'2026-10-18T18:00:00Z',editorial_expires_at:'2026-10-19T03:00:00Z',
  story_image_url:root+'/storage/v1/object/public/news-images/auto/jpeg/stories/story/151.jpg',
  publicar_story:true,instagram_story_media_id:null
 });
@@ -51,7 +51,7 @@ async function invoke(){
  const res=await handler(new Request(root,{method:'POST',headers:{'x-giro-db-key':'test'},body:JSON.stringify({channel:'stories'})}));
  return {status:res.status,body:await res.json()};
 }
-const init=()=>{publishCalls=0;approved=true;photo=true;allowed=true;enabled=true;at='2026-10-18T22:15:00Z';row=record();
+const init=()=>{publishCalls=0;approved=true;photo=true;allowed=true;enabled=true;at='2026-10-18T19:40:00Z';row=record();
  meta={integrity_hold:false,rollout_stage:'feed_only',traffic_light_target:'amarelo',
  traffic_light_reel_test_enabled:true,traffic_light_story_test_enabled:true};};
 init();assert.equal((await invoke()).body.provider_id,'story-id-123');assert.equal(publishCalls,1);
@@ -67,4 +67,4 @@ init();row.media_status='aguardando_revisao_visual';
 assert.equal((await invoke()).body.reason,'media_provenance_or_human_review_missing');assert.equal(publishCalls,0);
 init();row.story_image_url=root+'/storage/v1/object/public/news-images/auto/jpeg/stories/feed/151.jpg';
 assert.equal((await invoke()).body.reason,'vertical_story_specific_media_required');assert.equal(publishCalls,0);
-console.log('PASS: one-Story pilot respects yellow eligibility, separate visual approval, night window, and provider ID; mocks only.');
+console.log('PASS: one-Story pilot respects yellow eligibility, separate visual approval, afternoon window, and provider ID; mocks only.');
