@@ -22,8 +22,8 @@ const expected=[
 for(const phrase of expected)assert.ok(sql.includes(phrase),'Missing rollout safety guard: '+phrase);
 assert.ok(publisher.includes("const channelAllowed=channel==='feed'||meta.data.rollout_stage==='full'||"),
  'Reels publishing must still honor the controlled staging gate');
-assert.ok(publisher.includes("channel==='reels'&&!reelsNoon"),
- 'Reels only inside controlled pilot window');
+assert.ok(publisher.includes("channel==='reels'&&!reelsAfterNoon"),
+ 'Reels only inside controlled afternoon pilot window after Feed');
 assert.ok(publisher.includes(".eq('visual_approved',true)"),
  'Never publish unrevised media');
 assert.ok(documentation.includes('Nenhuma cota foi aumentada'));
