@@ -3,6 +3,8 @@ on:
   schedule:
     # After the 45-minute publication window at 08h/22h Porto Velho.
     - cron: '50 2,12 * * *'
+    # Early editorial checks 07h, 17h and 21h Porto Velho (UTC-4).
+    - cron: '0 1,11,21 * * *'
   workflow_dispatch:
 permissions:
   contents: read
@@ -12,7 +14,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   confirmar-entregas:
-    if: github.repository == 'giromadeira-spec/giro-madeira-site' && github.ref == 'refs/heads/main'
+    if: github.repository == 'giromadeira-spec/giro-madeira-site' && github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event.schedule == '50 2,12 * * *')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -30,5 +32,30 @@ jobs:
         with:
           name: giro-pipeline-status
           path: artifacts/pipeline-status.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  antecipar-revisao:
+    if: github.repository == 'giromadeira-spec/giro-madeira-site' && github.ref == 'refs/heads/main' && github.event.schedule == '0 1,11,21 * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install 'requests==2.34.2'
+      - name: Exibir MP4 e pendências para revisão ANTES do horário, sem publicar
+        run: python scripts/giro_pipeline_monitor.py --preflight
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: giro-preflight-videos
+          path: artifacts/video-preflight.json
           if-no-files-found: warn
           retention-days: 14
