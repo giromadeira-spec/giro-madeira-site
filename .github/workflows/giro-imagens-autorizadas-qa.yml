@@ -9,6 +9,9 @@ on:
       - 'supabase/functions/giro-tiktok-editorial-queue/**'
       - 'supabase/functions/giro-tiktok-preparar-storyboard/**'
       - 'supabase/functions/_shared/**'
+      - 'supabase/functions/gerar-arte-noticia-vault/**'
+      - 'supabase/functions/giro-instagram-preparar-independente/**'
+      - 'tests/test_instagram_original_art.mjs'
       - 'supabase/functions/giro-youtube-upload-auto/index.ts'
       - 'supabase/functions/giro-tiktok-github-bridge/index.ts'
       - 'supabase/functions/giro-tiktok-30fps-bridge/index.ts'
@@ -40,6 +43,11 @@ jobs:
           deno check supabase/functions/giro-tiktok-github-bridge/index.ts
           deno check supabase/functions/giro-tiktok-30fps-bridge/index.ts
           deno check scripts/buffer/giro-buffer-tiktok-worker.ts
+          deno check supabase/functions/gerar-arte-noticia-vault/index.ts
+          deno check supabase/functions/giro-instagram-preparar-independente/index.ts
+          deno check supabase/functions/giro-instagram-publicar-independente/index.ts
+      - name: Validar contrato de arte original sem publicar
+        run: node --experimental-strip-types tests/test_instagram_original_art.mjs
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
