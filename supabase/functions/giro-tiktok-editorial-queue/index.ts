@@ -63,7 +63,7 @@ const isHighImpact=(c:{titulo:string;fonte_url:string;categoria?:string|null;urg
 };
 const editorialScore=(c:{titulo:string;fonte_nome:string;fonte_url:string;categoria?:string|null;urgente?:boolean|null},
   target:"policial"|"politica"|"rondonia"|"em_alta")=>{
- const local=scopeOf(c)==="rondonia",police=isPolice(c),politics=isPolitics(c);
+ const local=scopeOf({...c,urgente:!!c.urgente})==="rondonia",police=isPolice(c),politics=isPolitics(c);
  let score=(c.urgente?15:0)+(local?9:0)+(isHighImpact(c)?7:0)+(police?4:0)+(politics?4:0);
  if(target==="policial"&&police)score+=40;
  if(target==="politica"&&politics)score+=40;
