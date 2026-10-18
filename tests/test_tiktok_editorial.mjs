@@ -9,6 +9,14 @@ assert.equal(geographicScope(brazil),'brasil');
 assert.equal(geographicScope({...fresh,titulo:'Naufrágio deixa 139 mortos na África Oriental',fonte_nome:'News Rondônia'}),'mundo');
 assert.deepEqual([ro,world,brazil].sort(comparePriority),[brazil,world,ro]);
 for(const story of [brazil,world])assert.ok(eligible(story));
+
+const criticalFire={...fresh,titulo:'Incêndio em base militar do Canadá deixa vários mortos e feridos',fonte_url:'https://www.cnnbrasil.com.br/internacional/incendio-em-base-militar-do-canada-deixa-varios-mortos-e-feridos'};
+const massProtest={...fresh,titulo:'Protesto na França termina com mais de 500 policiais feridos e 1.800 presos',fonte_url:'https://www.cnnbrasil.com.br/internacional/protesto-na-franca-termina-com-mais-de-500-policiais-feridos-e-1-800-presos'};
+for(const story of [criticalFire,massProtest])assert.ok(eligible(story), 'Severe verified-candidate incident should reach article-level fact/date validation');
+for(const titulo of ['Protesto termina com 3 policiais feridos na cidade','Incêndio em quartel sem vítimas deixa danos','Análise: crise diplomática pode avançar']){
+ assert.equal(eligible({...fresh,titulo,fonte_url:'https://www.cnnbrasil.com.br/internacional/pauta'}),false,'Routine/speculative item must not bypass importance gate');
+}
+
 assert.equal(eligible(ro),false, 'Rondônia-local content must never reach TikTok');
 for(const titulo of ['Cabo é preso após agredir companheira em Porto Velho','Feriado tem sol entre nuvens em Rondônia','Prefeitura prepara festa com shows e Carreta Furacão','Lula diz que pode reduzir impostos nacionais','TSE derruba suspensão do canal Exército do Lula'])
  assert.equal(eligible({...fresh,score:100,urgente:true,titulo,fonte_nome:'News Rondônia'}),false,titulo);
