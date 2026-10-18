@@ -259,9 +259,9 @@ Deno.serve(async(req:Request)=>{
    const finishedReports=uniqueFootballReports(options);
    // One football roundup at 22h Porto Velho (23h BRT) only when
    // multiple independent reports confirm final match scores.
-   const extraCount=false && settings.data.football_bonus_enabled===true
-      ?Math.min(1,settings.data.football_bonus_max||0,
-          Math.floor(finishedReports.length/Math.max(2,settings.data.football_bonus_min_confirmed||2)))
+   const extraCount=false && settings.data?.football_bonus_enabled===true
+      ?Math.min(1,settings.data?.football_bonus_max||0,
+          Math.floor(finishedReports.length/Math.max(2,settings.data?.football_bonus_min_confirmed||2)))
       :0;
    const bonusSlots=extraCount>0?[{h:23,m:0,scope:"esporte",footballExtra:true}]:[];
    const daySlots=[...baseSlots.map(s=>({...s,footballExtra:false})),...bonusSlots]
