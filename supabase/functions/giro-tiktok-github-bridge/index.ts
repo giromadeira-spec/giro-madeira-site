@@ -70,7 +70,8 @@ Deno.serve(async req=>{
       .eq("visual_review_status","pending")
       .eq("shorts_render_version",0).is("shorts_render_error",null).is("provider_post_id",null)
       .gte("created_at",yesterday).gte("scheduled_for",new Date(Date.parse(todayInPortoVelho)-6*3600000).toISOString())
-      // Give editorial reviewers a substantial preview window.\n      .lte("scheduled_for",new Date(Date.now()+8*3600000).toISOString())
+      // Give editorial reviewers a substantial preview window.
+      .lte("scheduled_for",new Date(Date.now()+8*3600000).toISOString())
       .order("scheduled_for",{ascending:true}).limit(8);
     if(qe)throw qe;
     for(const item of items||[]){
