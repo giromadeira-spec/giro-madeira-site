@@ -12,6 +12,8 @@ on:
       - 'supabase/functions/gerar-arte-noticia-vault/**'
       - 'supabase/functions/giro-instagram-preparar-independente/**'
       - 'tests/test_instagram_original_art.mjs'
+      - 'tests/test_instagram_story_pilot.mjs'
+      - 'tests/test_instagram_delivery.mjs'
       - 'tests/test_video_early_review.mjs'
       - '.github/workflows/giro-shorts-producao.yml'
       - '.github/workflows/giro-tiktok-producao.yml'
@@ -51,6 +53,10 @@ jobs:
           deno check supabase/functions/giro-instagram-publicar-independente/index.ts
       - name: Validar contrato de arte original sem publicar
         run: node --experimental-strip-types tests/test_instagram_original_art.mjs
+      - name: Validar piloto Story e formatos independentes sem publicar
+        run: |
+          node --experimental-strip-types tests/test_instagram_delivery.mjs
+          node --experimental-strip-types tests/test_instagram_story_pilot.mjs
       - name: Validar antecipação de MP4 e revisão por canal sem publicar
         run: node --experimental-strip-types tests/test_video_early_review.mjs
       - uses: actions/setup-python@v5
