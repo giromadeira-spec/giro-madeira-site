@@ -12,6 +12,9 @@ on:
       - 'supabase/functions/gerar-arte-noticia-vault/**'
       - 'supabase/functions/giro-instagram-preparar-independente/**'
       - 'tests/test_instagram_original_art.mjs'
+      - 'tests/test_video_early_review.mjs'
+      - '.github/workflows/giro-shorts-producao.yml'
+      - '.github/workflows/giro-tiktok-producao.yml'
       - 'supabase/functions/giro-youtube-upload-auto/index.ts'
       - 'supabase/functions/giro-tiktok-github-bridge/index.ts'
       - 'supabase/functions/giro-tiktok-30fps-bridge/index.ts'
@@ -48,6 +51,8 @@ jobs:
           deno check supabase/functions/giro-instagram-publicar-independente/index.ts
       - name: Validar contrato de arte original sem publicar
         run: node --experimental-strip-types tests/test_instagram_original_art.mjs
+      - name: Validar antecipação de MP4 e revisão por canal sem publicar
+        run: node --experimental-strip-types tests/test_video_early_review.mjs
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
