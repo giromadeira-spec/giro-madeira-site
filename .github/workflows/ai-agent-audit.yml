@@ -69,6 +69,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_pipeline_observability.py' -v
           node --experimental-strip-types tests/test_pipeline_monitor.mjs
           node --experimental-strip-types tests/test_youtube_reconcile.mjs
+          node --experimental-strip-types tests/test_instagram_recovery.mjs
       - name: Executar LangGraph offline, sem publicar
         run: >-
           python scripts/ai_agents/orchestrate.py

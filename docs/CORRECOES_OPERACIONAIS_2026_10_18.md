@@ -16,7 +16,7 @@
 
 No diagnóstico inicial, Shorts 321 e TikTok 316 eram ilustrações simbólicas, com revisão pendente e sem ID remoto. O banco não possuía fotografias aprovadas em `giro_imagens_autorizadas`. A correção técnica não concede licença, não converte uma ilustração em fotografia factual e não substitui revisão da mídia.
 
-Feed e Reels estavam habilitados, Meta sem integrity hold e retomada em `feed_only`; Stories permanecia desabilitado. Mantidos esses estados e os horários de publicação existentes. Reels continua com teste ao meio-dia de Porto Velho. Não foi feita postagem de teste.
+Feed e Reels estavam habilitados, Meta sem integrity hold e retomada em `feed_only`; Stories permanecia desabilitado. Mantidos esses estados e os horários de publicação existentes. Reels tem recuperação às 12h00, 12h15 e 12h30 de Porto Velho, dentro da janela até 12h44, mantendo o limite central de uma publicação/dia. Resultado incerto bloqueia novas tentativas naquele canal até reconciliação. Não foi feita postagem de teste.
 
 ## Contingências
 

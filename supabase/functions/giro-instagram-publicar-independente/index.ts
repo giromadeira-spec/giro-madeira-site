@@ -20,18 +20,18 @@ Deno.serve(async req=>{
   if(gate.error)throw gate.error;
   const meta=await db.from('giro_meta_rate_state').select('integrity_hold,rollout_stage,traffic_light_target,traffic_light_reel_test_enabled').eq('id',1).single();
   if(meta.error)throw meta.error;
-  // Gradual restart for Reels ONLY: single daily attempt near 12:00 Porto Velho.
+  // Reels recovery window: 12:00–12:44 Porto Velho. Central daily cap remains unchanged.
   // Stories remain blocked under feed_only. The central semaforo enforces 1/day,
   // the variable gap, Meta rate limits and integrity holds independently.
   const localParts=new Intl.DateTimeFormat('en-GB',{timeZone:'America/Porto_Velho',
     hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date());
   const localHour=Number(localParts.find(p=>p.type==='hour')?.value??-1);
   const localMinute=Number(localParts.find(p=>p.type==='minute')?.value??-1);
-  const reelsNoon=channel==='reels'&&localHour===12&&localMinute>=0&&localMinute<10;
+  const reelsNoon=channel==='reels'&&localHour===12&&localMinute>=0&&localMinute<45;
   const reelsRecovery=reelsNoon&&meta.data.rollout_stage==='feed_only'&&
     meta.data.traffic_light_target==='amarelo'&&meta.data.traffic_light_reel_test_enabled===true;
-  const channelAllowed=channel==='feed'||
-    (channel==='reels'?reelsRecovery:meta.data.rollout_stage==='full');
+  const channelAllowed=channel==='feed'||meta.data.rollout_stage==='full'||
+    (channel==='reels'&&reelsRecovery);
   const blocked=!cfg.data.publication_enabled||meta.data.integrity_hold===true||
     gate.data?.allowed!==true||!channelAllowed||(channel==='reels'&&!reelsNoon);
   const blockedReasons=[
@@ -43,6 +43,11 @@ Deno.serve(async req=>{
   ].filter(Boolean);
   if(body.dry_run===true||blocked)return response({success:true,channel,reason:body.dry_run===true?"dry_run":blockedReasons[0],blocked_reasons:blockedReasons,dry_run:body.dry_run===true,no_publish:true,publication_enabled:cfg.data.publication_enabled,gate:gate.data,integrity_hold:meta.data.integrity_hold,rollout_stage:meta.data.rollout_stage});
   const table='giro_publicacoes_'+channel;
+  // Do not try another item after a timeout/unknown provider result in this channel.
+  const uncertain=await db.from(table).select('id')
+    .or('status.eq.publicando,erro.eq.reconcile_provider_before_resend').limit(1).maybeSingle();
+  if(uncertain.error)throw uncertain.error;
+  if(uncertain.data)return response({success:true,channel,no_publish:true,reason:'reconciliation_required',publication_id:uncertain.data.id});
   const found=await db.from(table).select('*').eq('status','aprovada').eq('visual_approved',true).gte('media_pipeline_version',channel==='feed'?6:5)
    .is(ids[channel],null).or('legenda.like.%Foto do acontecimento:%,legenda.like.%ILUSTRAÇÃO EDITORIAL ORIGINAL%')
     .gte('created_at',new Date(Date.now()-36*3600000).toISOString())
