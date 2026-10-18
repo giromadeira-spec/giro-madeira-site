@@ -91,6 +91,9 @@ Deno.serve(async req=>{
   if(duplicate.data?.length){await db.from(table).update({status:'descartada',erro:'legacy_already_published'}).eq('id',item.id);return response({success:true,channel,no_publish:true,reason:'already_published'});}
   const media=String(channel==='feed'?item.feed_image_url||item.image_url:channel==='stories'?item.story_image_url:item.video_url||'');
   if(!asset(media,url,channel==='reels'?'news-videos':'news-images')||(channel!=='reels'&&!/\.jpe?g$/i.test(new URL(media).pathname)))return response({success:true,channel,no_publish:true,reason:'approved_provider_media_required'});
+  // Never publish a Feed JPEG as a Story: require that format's OWN vertical render.
+  if(channel==='stories'&&!media.startsWith(url+'/storage/v1/object/public/news-images/auto/jpeg/stories/story/'))
+    return response({success:true,channel,no_publish:true,reason:'vertical_story_specific_media_required'});
   if(channel!=='stories'&&!String(item.legenda||'').trim())return response({success:true,channel,no_publish:true,reason:'caption_missing'});
   const reserved=await db.from(table).update({status:'publicando'}).eq('id',item.id).eq('status','aprovada').is(ids[channel],null).select('id').maybeSingle();
   if(reserved.error)throw reserved.error;
