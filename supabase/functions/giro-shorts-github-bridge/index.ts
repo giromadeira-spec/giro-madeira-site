@@ -172,7 +172,7 @@ Deno.serve(async req=>{
         throw Error("invalid_upload_origin");
       return response({success:true,processed:1,queue_id:item.id,source_id:item.source_id,
          title,scenes,topic_scope:item.topic_scope,source_url:sourceUrl,
-         registered_image:registeredImage,
+         registered_image:registeredImage,allow_original_editorial_illustration:true,
          source_name:source?.nome||"Fonte original",storage_path:path,upload_url:uploadUrl,
          brand_logo_url:"https://raw.githubusercontent.com/giromadeira-spec/giro-madeira-site/main/assets/logo-oficial.webp",
          river_sample_video_url:url+"/storage/v1/object/public/news-videos/shorts/551/1791494145636-giro-madeira-short-tre-rj-2026-10-08.mp4",

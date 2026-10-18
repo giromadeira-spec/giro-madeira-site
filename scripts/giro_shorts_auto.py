@@ -572,6 +572,19 @@ def render_topic_illustration(headline,category):
             xa=390-(yy-340)*198/445
             xb=685+(yy-340)*190/445
             d.line((xa,yy,xb,yy),fill=muted,width=12)
+    elif re.search(r"protest|manifesta[cç]|greve",title):
+        # Pictograms and blank placards, never an invented documentary scene.
+        for x,y in ((260,380),(500,325),(735,420)):
+            d.rounded_rectangle((x-94,y,x+94,y+118),radius=12,fill=(15,40,69),outline=accent,width=9)
+            d.line((x,y+118,x,y+290),fill=muted,width=13)
+            d.ellipse((x-35,y+310,x+35,y+380),fill=muted)
+        if re.search(r"fran[cç]a|franc[eê]s",title):
+            for x,color in ((360,(42,87,173)),(480,(240,243,245)),(600,(204,58,66))):
+                d.rectangle((x,690,x+120,735),fill=color)
+    elif re.search(r"inc[eê]ndio|fogo",title):
+        # A flat flame symbol; no victims, buildings or fabricated event photograph.
+        d.polygon([(540,315),(665,475),(697,430),(785,628),(714,753),(377,753),(293,626),(409,451),(433,530)],fill=accent)
+        d.polygon([(540,530),(631,675),(583,753),(479,753),(433,675)],fill=(17,42,68))
     elif re.search(r"crian[cç]as|adolescentes|internet|digital|cibern[eé]tico|online",title):
         # Digital safety: shield and padlock; never show minors.
         d.rounded_rectangle((244,317,834,720),radius=38,outline=muted,width=14)
@@ -596,6 +609,22 @@ def render_topic_illustration(headline,category):
                fill=accent,width=20,joint="curve")
         d.line([(452,565),(515,630),(640,500)],fill=muted,width=23,joint="curve")
     return image
+
+def cleared_editorial_contingency(claim):
+    """17/10 authorization: topical original art, labeled and pending editorial review.
+
+    The bridge must allow this channel explicitly. Unrecognized topics stay on hold;
+    the generic shield and any third-party photograph are never a fallback here.
+    """
+    title=clean(claim.get("title", ""))
+    if claim.get("allow_original_editorial_illustration") is not True:
+        return None
+    if not re.search(r"terremoto|abalo s[ií]smico|\btrem\b|ferrovia|eurot[uú]nel|metr[oô]|protest|manifesta[cç]|greve|inc[eê]ndio|fogo|internet|digital|cibern[eé]tico|online|energia|el[eé]tric|apag[aã]o|sem luz|acidente|rodovia|tr[aâ]nsito|colis[aã]o",title,re.I):
+        return None
+    _,category=article_subject(title)
+    return (render_topic_illustration(title,category),
+            original_illustration_credit(claim["source_url"],title),
+            "Arte editorial original — ilustração simbólica, não é foto do acontecimento")
 
 def cover(im,w,h,x=.5,y=.5):
     ratio=max(w/im.width,h/im.height)
@@ -1040,6 +1069,8 @@ def main():
                 picture,credit,file_title=approved_registry_photo(
                     registered,result["source_url"],result["title"])
                 registered_image_id=registered["id"]
+            elif (original:=cleared_editorial_contingency(result)) is not None:
+                picture,credit,file_title=original
             else:
                 bridge(token,"photo_pending",queue_id=qid)
                 report_render_outcome({"state":"awaiting_licensed_event_photo","queue_id":qid,

@@ -22,6 +22,7 @@ export function geographicScope(s:Story):Scope|null {
  if(/\/ro\/rondonia\/|\.ro\.gov\.br/.test(url)||/rondonia|rondoniagora|portal jipa|o observador|na hora online/.test(name))return 'rondonia';
  // Only nationally-oriented desks can supply an otherwise unqualified
  // national topic; regional/city sections alone are not national proof.
+ if(/g1\.globo\.com\/(?:ac|al|ap|am|ba|ce|df|es|go|ma|mg|ms|mt|pa|pb|pe|pi|pr|rj|rn|ro|rr|rs|sc|se|sp|to)\//.test(url))return null;
  if(/g1 brasil|forbes brasil|agencia brasil|senado federal/.test(name)
    ||/g1\.globo\.com\/(politica|economia|brasil)\//.test(url))return 'brasil';
  return null;

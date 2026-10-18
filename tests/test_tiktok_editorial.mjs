@@ -35,3 +35,16 @@ assert.equal(sourceRecovery('source_http_429',2),'hold');
 assert.equal(sourceRecovery('article_date_unverified_or_outdated',0),null);
 assert.equal(sourceRecovery('source_http_401',0),null);
 console.log('Transient source failures resume the same item with bounded retries; invalid facts remain blocked.');
+
+// A regional G1 desk cannot become national merely through its feed label.
+const localDesk={...fresh,titulo:'Manifestante é atropelado durante ato pró-Lula em BH; motorista foi preso',fonte_nome:'G1 Brasil',fonte_url:'https://g1.globo.com/mg/minas-gerais/eleicoes/2026/noticia/2026/10/18/evento.ghtml'};
+assert.equal(geographicScope(localDesk),null);
+const {readFileSync}=await import('node:fs');
+const {stripTypeScriptTypes}=await import('node:module');
+const vm=await import('node:vm');
+const source=readFileSync(new URL('../supabase/functions/giro-shorts-editorial-queue/index.ts',import.meta.url),'utf8').replace(/^import .*;\n/gm,'').split('Deno.serve')[0];
+const context={Date,URL,Intl,story:localDesk};vm.createContext(context);vm.runInContext(stripTypeScriptTypes(source),context);
+assert.equal(vm.runInContext('scopeOf(story)',context),null);
+context.story={...localDesk,titulo:'Banco Central reduz Selic em decisão nacional'};
+assert.equal(vm.runInContext('scopeOf(story)',context),'brasil');
+console.log('Both independent planners reject regional desk false positives.');

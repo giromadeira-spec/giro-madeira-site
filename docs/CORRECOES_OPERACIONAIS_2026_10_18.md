@@ -62,3 +62,9 @@ Testes offline do renderizador (MP4 1080x1920 com áudio, sem upload); testes de
 - Consulta de configuração do Buffer retornou chave presente, canal `giro_madeira`, dois vídeos por dia e intervalo de 90 minutos. Isso não comprova validade atual das credenciais remotas nem postagem real.
 - Ensaio do publicador Instagram com provedor simulado: confirmou persistência do ID; envio por formato/canal; Reels sem compartilhar no Feed; duplicidade por canal; perda da reserva; timeout; resposta sem ID; falha ao salvar ID confirmado. Resultados incertos bloqueiam reenvio. Nenhuma requisição externa nesse ensaio.
 - Pesquisa de mídia não encontrou pauta atualmente elegível com toda a cadeia de direitos e correspondência da fotografia comprovada. Material de terceiros e arquivo não foi aprovado; algumas páginas/candidatas retornaram indisponibilidade. Não foi produzida uma aprovação de publicação para material sem prova.
+
+### Plano B autorizado e seleção de pauta
+
+- Recuperada a autorização do responsável em 17/10, posterior à regra de 15/10: foto real autorizada primeiro; sem foto segura, arte original assumidamente ilustrativa, sem simular registro real. Esse modo foi reativado separadamente nas pontes Shorts/TikTok, somente para temas reconhecidos; escudo genérico para assunto desconhecido segue bloqueado. Conclusão de ilustração continua pendente de aprovação editorial e visual.
+- Testes cobrem modo desabilitado, tema desconhecido, arte identificada por pauta, prioridade da fotografia, MP4 e ausência de aprovação automática. Sem API paga.
+- Detectado e corrigido falso nacional por rótulo de feed: uma reportagem de editoria regional G1/MG não se torna nacional só porque o coletor se chama G1 Brasil. As políticas de Shorts e TikTok mantêm avaliações independentes. Shorts também reconhece ocorrências com cinco ou mais vítimas como alto impacto e evita escolher matéria já vencida no slot futuro.

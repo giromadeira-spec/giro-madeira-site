@@ -15,11 +15,12 @@ r=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(r)
 
 class TikTokPhotoGuard(unittest.TestCase):
-    def pipeline(self,platform="tiktok",credit="wikimedia_event_test",missing=False):
+    def pipeline(self,platform="tiktok",credit="wikimedia_event_test",missing=False,allow_original=False):
         calls=[]
         complete_payload=[]
         claim={"processed":True,"queue_id":999,"title":"Terremoto deixa feridos na Rússia",
                "source_url":"https://example.test/report","scenes":["Cena 1","Cena 2","Cena 3"],
+               "allow_original_editorial_illustration":allow_original,
                "upload_url":"https://offline.invalid/upload","storage_path":"test.mp4"}
         def bridge(token,action,**kwargs):
             calls.append(action)
@@ -62,6 +63,24 @@ class TikTokPhotoGuard(unittest.TestCase):
                 self.assertEqual(art,0)
                 self.assertEqual(upload,0)
                 self.assertEqual(completes,[])
+
+    def test_cleared_original_art_stays_for_review_without_claiming_photo(self):
+        for channel in ("shorts","tiktok"):
+            failed,calls,art,upload,completes=self.pipeline(platform=channel,missing=True,allow_original=True)
+            self.assertFalse(failed)
+            self.assertEqual(calls,["claim","complete"])
+            self.assertEqual(art,1)
+            self.assertEqual(upload,1)
+            self.assertEqual(completes[0]["visual_kind"],"illustration")
+            self.assertTrue(completes[0]["image_credit"].startswith("original_editorial_labeled_v2_"))
+
+    def test_original_art_requires_explicit_channel_gate_and_known_subject(self):
+        claim={"title":"Protestos na França deixam policiais feridos", "source_url":"https://example.test/report"}
+        self.assertIsNone(r.cleared_editorial_contingency(claim))
+        graphic=r.cleared_editorial_contingency({**claim,"allow_original_editorial_illustration":True})
+        self.assertEqual(graphic[0].size,(1080,1920))
+        self.assertIn("não é foto",graphic[2])
+        self.assertIsNone(r.cleared_editorial_contingency({**claim,"title":"Notícia sem assunto classificável", "allow_original_editorial_illustration":True}))
 
     def test_invalid_fake_photo_credit_is_not_accepted(self):
         for credit in ("original_editorial_labeled_mundo","openverse_test","wikimedia_archive_test",""):

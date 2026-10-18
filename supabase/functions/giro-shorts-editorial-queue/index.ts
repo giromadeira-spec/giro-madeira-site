@@ -17,6 +17,7 @@ function scopeOf(v:{titulo:string;fonte_nome:string;fonte_url:string}):"brasil"|
  if(nationwideScope.test(t))return "brasil";
  if(/\/ro\/rondonia\/|\.ro\.gov\.br/.test(link) ||
     /^(rondonia ao vivo|rondoniagora|g1 rondonia|portal jipa|tudo rondonia|sictv|ge rondonia|news rondonia|rondonia dinamica)$/.test(src))return "rondonia";
+ if(/g1\.globo\.com\/(?:ac|al|ap|am|ba|ce|df|es|go|ma|mg|ms|mt|pa|pb|pe|pi|pr|rj|rn|ro|rr|rs|sc|se|sp|to)\//.test(link))return null;
  if(/^(g1 brasil|forbes brasil|senado federal|agencia brasil)$/.test(src)
    || /g1\.globo\.com\/(politica|economia|brasil)\//.test(link))return "brasil";
  return null;
@@ -73,7 +74,8 @@ const isPolice=(c:{titulo:string;fonte_url:string;categoria?:string|null})=>{
 };
 const isHighImpact=(c:{titulo:string;fonte_url:string;categoria?:string|null;urgente?:boolean|null})=>{
  const t=normalize(c.titulo),cat=normalize(c.categoria);
- return !!c.urgente || ["tecnologia","economia","saude","policia","politica"].includes(cat) ||
+ const casualties=t.match(/\b(\d+)\s+(?:pessoas\s+)?(?:mortos|mortas|feridos|feridas|vitimas)\b/);
+ return !!(casualties&&Number(casualties[1])>=5) || !!c.urgente || ["tecnologia","economia","saude","policia","politica"].includes(cat) ||
    /\b(acidente|colisao|atropelamento|incendio|explosao|enchente|alagamento|temporal|deslizamento|interdicao|alerta|apagao|falta de agua|falta de energia|suspensao|emergencia|hospitais|hospital|saude|vacina|tecnologia|inteligencia artificial|celular|internet|golpe digital|dados pessoais|salario|imposto|inflacao|precos|emprego|desemprego|investigacao|investiga|prisao|prende|votacao|eleicao|governo)\b/.test(t);
 };
 const editorialScore=(c:{titulo:string;fonte_nome:string;fonte_url:string;categoria?:string|null;urgente?:boolean|null},
@@ -298,6 +300,7 @@ Deno.serve(async(req:Request)=>{
        }
      }
      const unused=options.filter(c=>
+       (!c.source_published_at || Date.parse(c.source_published_at)>=Date.parse(scheduled)-24*3600000) &&
        !seenUrls.has(c.fonte_url) && !seenSourceIds.has(String(c.id)) &&
        !seenTitles.some(t=>sameStory(t,c.titulo)) &&
        !created.some(v=>sameStory(v.title,c.titulo))
