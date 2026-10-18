@@ -8,13 +8,13 @@ const tiktok=read('../supabase/functions/giro-tiktok-github-bridge/index.ts');
 const planner=read('../supabase/functions/giro-tiktok-editorial-queue/index.ts');
 const shortFlow=read('../.github/workflows/giro-shorts-producao.yml');
 const tikFlow=read('../.github/workflows/giro-tiktok-producao.yml');
-const slot=Date.parse('2026-10-19T02:00:00Z');
+const slot=Date.parse('2026-10-18T21:00:00Z');
 for(const [lane,src,flow] of [['shorts',shorts,shortFlow],['tiktok',tiktok,tikFlow]]){
  assert.ok(src.includes('Date.now()+8*3600000'),lane+' can claim within eight hours');
  assert.ok(!src.includes('Date.now()+2*3600000'),lane+' not limited to two hours');
  assert.ok(src.includes('if(!storyboardIsCurrent(item))continue'),lane+' requires verified future-slot article date');
- assert.ok(flow.includes("cron: '15 6,20 * * *'"),lane+' has 02:15/16:15 Porto Velho early pass');
- assert.ok(flow.includes("cron: '5 0,10 * * *'"),lane+' retains backup before each slot');
+ assert.ok(flow.includes("cron: '15 15 * * *'"),lane+' has 11:15 Porto Velho early pass');
+ assert.ok(flow.includes("cron: '15,35 20 * * *'"),lane+' retains 16:15 and 16:35 Porto Velho backups');
  assert.ok(src.includes('last_prepared_at:new Date().toISOString()'),lane+' registers real MP4 preparation');
  assert.ok(src.includes('if(!updated)return response'),lane+' only updates after successful completion');
  assert.ok(src.includes('.is("provider_post_id",null)'),lane+' does not reclaim delivered media');
@@ -41,7 +41,7 @@ console.log('PASS: early MP4 production, future-slot freshness, manual illustrat
 const {stripTypeScriptTypes}=await import('node:module');
 const vm=await import('node:vm');
 const activeCron=[...tikFlow.matchAll(/^\s+- cron: '([^']+)'\s*$/gm)].map(m=>m[1]);
-for(const cron of ['15 6,20 * * *','5 0,10 * * *','30 0,10 * * *','15 1,11 * * *','5,20 2,12 * * *']){
+for(const cron of ['15 15 * * *','30 17 * * *','15 19 * * *','15,35 20 * * *']){
  assert.ok(activeCron.includes(cron),'TikTok preparation cron must be active, not text inside a comment: '+cron);
 }
 assert.ok(!tikFlow.split('\n').some(line=>line.trimStart().startsWith('#')&&line.includes('\\n')),
