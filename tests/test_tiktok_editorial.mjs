@@ -55,4 +55,6 @@ const context={Date,URL,Intl,story:localDesk};vm.createContext(context);vm.runIn
 assert.equal(vm.runInContext('scopeOf(story)',context),null);
 context.story={...localDesk,titulo:'Banco Central reduz Selic em decisão nacional'};
 assert.equal(vm.runInContext('scopeOf(story)',context),'brasil');
+assert.equal(vm.runInContext('blocked("Análise: A nove dias da eleição de Israel, Trump declara apoio a Netanyahu","G1","https://g1.globo.com/mundo/noticia/2026/10/18/story.ghtml")',context),true);
+assert.equal(vm.runInContext('blocked("Terremoto deixa ao menos dez mortos em país da Ásia","G1","https://g1.globo.com/mundo/noticia/2026/10/18/story.ghtml")',context),false);
 console.log('Both independent planners reject regional desk false positives.');
