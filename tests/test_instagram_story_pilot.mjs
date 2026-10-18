@@ -36,7 +36,7 @@ function from(table){
       Object.assign(row,update);return {data:{id:row.id},error:null};
      }return {data:null,error:null};
   }
-  return {data:uncertain?null:row.status==='aprovada'?row:null,error:null};
+  return {data:uncertain?null:row.status==='aprovada'&&row.visual_approved?row:null,error:null};
  }
  return q;
 }
