@@ -11,6 +11,8 @@ on:
       - 'tests/test_shorts_recency.mjs'
       - 'tests/test_delivery_recency.mjs'
       - 'tests/test_instagram_delivery.mjs'
+      - 'tests/test_pipeline_observability.py'
+      - 'tests/test_video_early_review.mjs'
       - 'supabase/functions/_shared/**'
       - 'tests/test_tiktok_editorial.mjs'
       - 'tests/test_ai_agents_*.py'
@@ -78,6 +80,7 @@ jobs:
           python -m pip install --disable-pip-version-check 'Pillow==12.3.0' 'requests==2.34.2'
           python -m unittest discover -s tests -p 'test_pipeline_observability.py' -v
           node --experimental-strip-types tests/test_pipeline_monitor.mjs
+          node --experimental-strip-types tests/test_video_early_review.mjs
           node --experimental-strip-types tests/test_youtube_reconcile.mjs
           node --experimental-strip-types tests/test_instagram_recovery.mjs
           node --experimental-strip-types tests/test_instagram_delivery.mjs
