@@ -85,7 +85,7 @@ Deno.serve(async req=>{
       .eq("visual_review_status","pending")
       .eq("shorts_render_version",0).is("shorts_render_error",null).is("provider_post_id",null)
       .gte("created_at",yesterday).gte("scheduled_for",new Date(Date.parse(todayInPortoVelho)-6*3600000).toISOString())
-      .lte("scheduled_for",new Date(Date.now()+2*3600000).toISOString())
+      // Reserve verified storyboards earlier so human artwork review is possible.\n      .lte("scheduled_for",new Date(Date.now()+8*3600000).toISOString())
       .order("scheduled_for",{ascending:true}).limit(8);
     if(qe)throw qe;
     for(const item of items||[]){
@@ -246,7 +246,10 @@ Deno.serve(async req=>{
    .is("provider_post_id",null).select("id").maybeSingle();
   if(ue)throw ue;
   if(!updated)return response({success:false,error:"render_completion_conflict"},409);
-  return response({success:true,processed:1,queue_id:id,ready_to_publish:false});
+  // Observability only: timestamp means an MP4 finished, NEVER that it was approved or sent.
+  const prepState=await db.from("giro_channel_settings").update({last_prepared_at:new Date().toISOString()}).eq("channel","shorts");
+  if(prepState.error)console.error("shorts preparation timestamp unavailable");
+  return response({success:true,processed:1,queue_id:id,ready_to_publish:false,awaiting_visual_review:true});
  }catch(e){
   console.error("github shorts bridge:",e instanceof Error?e.name:"unknown");
   return response({success:false,error:"bridge_operation_failed"},500);
