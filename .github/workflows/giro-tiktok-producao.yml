@@ -1,17 +1,12 @@
 name: Giro Madeira - TikTok independente
 on:
   schedule:
-    # Preparação antecipada 06:30/07:15 e 20:30/21:15 PV (UTC-4).
-    # Recuperação 08:05/08:20 e 22:05/22:20; somente preparação, sem reenvio incerto.
-    # Passo 06:05/20:05 PV dentro da janela de preparação de 8h.
-    # Manter 06:30/20:30 e 07:15/21:15 como contingência.
-    # Pré-produção 02h15/16h15 PV para revisão antes do agendamento.
-    # Fotos externas não autorizadas e ilustrações sem revisão continuam bloqueadas.
-    - cron: '15 6,20 * * *'
-    - cron: '5 0,10 * * *'
-    - cron: '30 0,10 * * *'
-    - cron: '15 1,11 * * *'
-    - cron: '5,20 2,12 * * *'
+    # 1 TikTok/dia às 17:00 Porto Velho (21:00 UTC).
+    # Preparation 11:15, 13:30, 15:15, 16:15, 16:35 PV; NO publishing here.
+    - cron: '15 15 * * *'
+    - cron: '30 17 * * *'
+    - cron: '15 19 * * *'
+    - cron: '15,35 20 * * *'
   workflow_dispatch:
 permissions:
   contents: read
