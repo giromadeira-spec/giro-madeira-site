@@ -89,6 +89,13 @@ Deno.serve(async req=>{
   if(error){results.push({channel,status:"error",reason:"queue_read_failed"});continue;}
   for(const item of data||[]){
     const hold=(reason:string)=>results.push({channel,id:item.id,status:"held",reason});
+    const day=(v:string|number|Date)=>new Intl.DateTimeFormat("en-CA",{
+      timeZone:"America/Porto_Velho",year:"numeric",month:"2-digit",day:"2-digit"
+    }).format(new Date(v));
+    const timeSensitive=/\b(?:tempo|previs[aã]o|chuva|tempestade|hoje|neste|nesta|domingo|segunda-feira|ter[cç]a-feira|quarta-feira|quinta-feira|sexta-feira|s[aá]bado)\b/i;
+    if(day(String(item.created_at))!==day(nextWindow(channel))&&timeSensitive.test(String(item.titulo||""))){
+      hold("calendar_sensitive_article_not_valid_for_next_posting_day");continue;
+    }
     const hasIllustration=String(item.legenda||"").includes("ILUSTRAÇÃO EDITORIAL ORIGINAL")&&
      String(item.legenda||"").includes("NÃO É FOTO DO ACONTECIMENTO");
     const expectedUrl="Matéria original: "+String(item.fonte_url||"");
