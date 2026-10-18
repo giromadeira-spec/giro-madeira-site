@@ -11,6 +11,9 @@ on:
     # 07h15/21h15 PV. Supabase permite reclamar itens ate 2h antes.
     # Somente preparar, sem criar slots adicionais ou republicar falhas.
     # Publicacao SOMENTE 08h e 22h PV pelo cron Supabase.
+    # Extra early pass 06:05/20:05 PV: still inside the bridge's 2h claim window.
+    # Preserve 06:30/20:30 and 07:15/21:15 as contingency passes.
+    - cron: '5 0,10 * * *'
     - cron: '30 0,10 * * *'
     - cron: '15 1,11 * * *'
   workflow_dispatch:
