@@ -66,5 +66,5 @@ assert.equal((await invoke()).body.reason,'no_fresh_verified_media_eligible');as
 init();row.media_status='aguardando_revisao_visual';
 assert.equal((await invoke()).body.reason,'media_provenance_or_human_review_missing');assert.equal(publishCalls,0);
 init();row.story_image_url=root+'/storage/v1/object/public/news-images/auto/jpeg/stories/feed/151.jpg';
-assert.equal((await invoke()).body.error,undefined); // Current whitelist requires news-images and photo approval.
+assert.equal((await invoke()).body.reason,'vertical_story_specific_media_required');assert.equal(publishCalls,0);
 console.log('PASS: one-Story pilot respects yellow eligibility, separate visual approval, night window, and provider ID; mocks only.');
