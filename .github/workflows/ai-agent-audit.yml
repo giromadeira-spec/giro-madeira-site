@@ -9,6 +9,9 @@ on:
       - 'supabase/functions/giro-tiktok-*/**'
       - 'supabase/functions/giro-shorts-preparar-storyboard/**'
       - 'tests/test_shorts_recency.mjs'
+      - 'tests/test_delivery_recency.mjs'
+      - 'tests/test_instagram_delivery.mjs'
+      - 'supabase/functions/_shared/**'
       - 'tests/test_tiktok_editorial.mjs'
       - 'tests/test_ai_agents_*.py'
       - 'docs/**'
@@ -20,6 +23,9 @@ on:
       - 'supabase/functions/giro-tiktok-*/**'
       - 'supabase/functions/giro-shorts-preparar-storyboard/**'
       - 'tests/test_shorts_recency.mjs'
+      - 'tests/test_delivery_recency.mjs'
+      - 'tests/test_instagram_delivery.mjs'
+      - 'supabase/functions/_shared/**'
       - 'tests/test_tiktok_editorial.mjs'
       - 'tests/test_ai_agents_*.py'
       - 'docs/**'
@@ -74,6 +80,7 @@ jobs:
           node --experimental-strip-types tests/test_pipeline_monitor.mjs
           node --experimental-strip-types tests/test_youtube_reconcile.mjs
           node --experimental-strip-types tests/test_instagram_recovery.mjs
+          node --experimental-strip-types tests/test_instagram_delivery.mjs
           node --experimental-strip-types tests/test_editorial_review.mjs
           node --experimental-strip-types tests/test_shorts_recency.mjs
           node --experimental-strip-types tests/test_delivery_recency.mjs

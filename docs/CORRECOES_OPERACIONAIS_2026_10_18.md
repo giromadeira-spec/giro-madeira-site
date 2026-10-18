@@ -54,3 +54,11 @@ Testes offline do renderizador (MP4 1080x1920 com áudio, sem upload); testes de
 - Testes do handler verificam legado preparado vencido, legado atual retomado, item já verificado sem refazer, metadados/JSON-LD e isolamento por plataforma. Teste do publicador recusa datas ausentes e vencidas antes de qualquer requisição de upload; notícia atual passa apenas pela prévia.
 - Instagram mantém a retomada controlada: Feed/Reels com capacidade central de uma publicação ao dia, Stories desabilitado. Esse limite é da conta e não compartilha consumo editorial entre canais. Não se elevou a cadência nem se liberou um canal durante a manutenção.
 - Teste real de entrega segue condicionado a pauta atual elegível, fotografia do acontecimento com direitos comprovados, revisão da mídia e aprovação expressa de publicação. Não há garantia de ausência de futuras indisponibilidades de fontes, GitHub ou plataformas.
+
+### Evidência após implantação
+
+- Commit 281971d: seis funções ativas atualizadas; checagem Deno, foto guard, reconciliação TikTok e auditoria GitHub concluídas com sucesso.
+- Rechecagem autenticada de Shorts (sem uploader) processou o mesmo item 319. Leitura posterior confirmou `status=expirado`, `storyboard_status=invalido` e erro `article_date_unverified_or_outdated`, sem ID remoto e sem aprovação. TikTok não tinha roteiro não renderizado pendente e processou zero.
+- Consulta de configuração do Buffer retornou chave presente, canal `giro_madeira`, dois vídeos por dia e intervalo de 90 minutos. Isso não comprova validade atual das credenciais remotas nem postagem real.
+- Ensaio do publicador Instagram com provedor simulado: confirmou persistência do ID; envio por formato/canal; Reels sem compartilhar no Feed; duplicidade por canal; perda da reserva; timeout; resposta sem ID; falha ao salvar ID confirmado. Resultados incertos bloqueiam reenvio. Nenhuma requisição externa nesse ensaio.
+- Pesquisa de mídia não encontrou pauta atualmente elegível com toda a cadeia de direitos e correspondência da fotografia comprovada. Material de terceiros e arquivo não foi aprovado; algumas páginas/candidatas retornaram indisponibilidade. Não foi produzida uma aprovação de publicação para material sem prova.
