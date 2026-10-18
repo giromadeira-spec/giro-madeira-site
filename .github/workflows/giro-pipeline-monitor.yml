@@ -1,10 +1,10 @@
 name: Giro Madeira - confirmação operacional (somente leitura)
 on:
   schedule:
-    # After the 45-minute publication window at 08h/22h Porto Velho.
-    - cron: '50 2,12 * * *'
-    # Early editorial checks 07h, 17h and 21h Porto Velho (UTC-4).
-    - cron: '0 1,11,21 * * *'
+    # After the 17h–17h44 PV delivery window; 17h50 PV = 21h50 UTC.
+    - cron: '50 21 * * *'
+    # 15h and 16h PV preflight; 19h and 20h UTC.
+    - cron: '0 19,20 * * *'
   workflow_dispatch:
 permissions:
   contents: read
@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   confirmar-entregas:
-    if: github.repository == 'giromadeira-spec/giro-madeira-site' && github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event.schedule == '50 2,12 * * *')
+    if: github.repository == 'giromadeira-spec/giro-madeira-site' && github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event.schedule == '50 21 * * *')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -36,7 +36,7 @@ jobs:
           retention-days: 14
 
   antecipar-revisao:
-    if: github.repository == 'giromadeira-spec/giro-madeira-site' && github.ref == 'refs/heads/main' && github.event.schedule == '0 1,11,21 * * *'
+    if: github.repository == 'giromadeira-spec/giro-madeira-site' && github.ref == 'refs/heads/main' && github.event.schedule == '0 19,20 * * *'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
