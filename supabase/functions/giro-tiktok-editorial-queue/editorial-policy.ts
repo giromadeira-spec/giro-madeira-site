@@ -39,6 +39,13 @@ export function importanceReason(s:Story):string|null {
  const casualties=t.match(/\b(\d+)\s+(?:pessoas\s+)?(?:mortos|mortas|feridos|feridas|vitimas)\b/);
  if(casualties&&Number(casualties[1])>=5)return 'ocorrencia grave com multiplas vitimas';
  if(/\b(cinco|seis|sete|oito|nove|dez|dezenas|centenas)\s+(mortos|mortas|feridos|feridas)\b/.test(t))return 'ocorrencia grave com multiplas vitimas';
+ // High-severity civilian/military incidents and mass injuries remain important
+ // even when the headline uses "vários" or identifies the injured as police.
+ // This only picks a candidate for SOURCE verification, never approves a video.
+ if(/\b(incendio|explosao|desabamento)\b.*\b(base militar|quartel|hospital|aeroporto|escola)\b.*\b(varios|diversos|multiplos|dezenas)\s+(?:mortos|mortas|feridos|feridas|vitimas)\b/.test(t))
+   return 'incidente grave em instalacao critica com multiplas vitimas';
+ if(/\b(protesto|manifestacao|confronto|operacao)\b.*\b(\d{2,}|centenas|milhares)\s+(?:policiais\s+|pessoas\s+|manifestantes\s+)?(?:feridos|feridas|presos|presas|mortos|mortas)\b/.test(t))
+   return 'incidente coletivo grave com dezenas de vitimas ou detidos';
  return null;
 }
 export function eligible(s:Story,now=Date.now()):boolean {
