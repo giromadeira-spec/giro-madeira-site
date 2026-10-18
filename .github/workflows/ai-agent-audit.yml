@@ -11,6 +11,8 @@ on:
       - 'tests/test_shorts_recency.mjs'
       - 'tests/test_delivery_recency.mjs'
       - 'tests/test_instagram_delivery.mjs'
+      - 'tests/test_instagram_noon_sequence.mjs'
+      - 'tests/test_instagram_recovery.mjs'
       - 'tests/test_instagram_story_pilot.mjs'
       - 'supabase/migrations/**'
       - 'supabase/functions/giro-instagram-publicar-independente/**'
@@ -94,6 +96,8 @@ jobs:
           node --experimental-strip-types tests/test_youtube_reconcile.mjs
           node --experimental-strip-types tests/test_instagram_recovery.mjs
           node --experimental-strip-types tests/test_instagram_delivery.mjs
+          node --experimental-strip-types tests/test_instagram_recovery.mjs
+          node --experimental-strip-types tests/test_instagram_noon_sequence.mjs
           node --experimental-strip-types tests/test_instagram_story_pilot.mjs
           node --experimental-strip-types tests/test_meta_rollout_readiness.mjs
           node --experimental-strip-types tests/test_editorial_review.mjs
