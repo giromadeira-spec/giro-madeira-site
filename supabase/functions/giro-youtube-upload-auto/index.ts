@@ -158,12 +158,9 @@ Deno.serve(async(req:Request)=>{
   if(last24hError)return respond({success:false,error:"min_spacing_check_failed"},500);
   if(last24h?.length && (Date.now()-new Date(last24h[0].updated_at).getTime())<settings.min_interval_minutes*60000)
     return respond({success:true,processed:0,reason:"min_spacing"});
-  const pvhDateParts=Object.fromEntries(new Intl.DateTimeFormat("en-GB",{
-    timeZone:"America/Porto_Velho",year:"numeric",month:"2-digit",day:"2-digit"
-  }).formatToParts(new Date()).map(part=>[part.type,part.value]));
-  const currentPvhDay=new Date(Date.UTC(
-    Number(pvhDateParts.year),Number(pvhDateParts.month)-1,Number(pvhDateParts.day),4,0,0
-  )).toISOString();
+  // The uploader is cron-driven at 08:00/22:00 PV.
+  // Only accept the slot currently in progress; never send an 08h draft at 22h.
+  const activeWindowStart=new Date(Date.now()-45*60000).toISOString();
   const {data:eligible,error:queueError}=await db.from("giro_social_video_queue")
     .select("id,source_id,platform,title,caption,source_url,video_url,topic_scope,status,editor_approved,visual_review_status,storyboard_status,shorts_render_version,shorts_render_origin,shorts_image_credit,provider_post_id,scheduled_for,created_at,storyboard_source_published_at")
     .eq("platform","youtube_shorts").eq("status","pronto_para_revisao")
@@ -172,7 +169,7 @@ Deno.serve(async(req:Request)=>{
     .eq("shorts_render_origin","github_oidc_v1")
     .or("shorts_image_credit.like.wikimedia_event_%,shorts_image_credit.like.registered_event_%,shorts_image_credit.like.original_editorial_labeled_v2_%")
     .eq("storyboard_status","preparado").eq("shorts_render_version",settings.visual_template_version)
-    .is("provider_post_id",null).gte("scheduled_for",currentPvhDay).lte("scheduled_for",new Date().toISOString())
+    .is("provider_post_id",null).gte("scheduled_for",activeWindowStart).lte("scheduled_for",new Date().toISOString())
     .gte("created_at",new Date(Date.now()-36*3600000).toISOString())
     .order("scheduled_for",{ascending:true}).limit(2);
   if(queueError)return respond({success:false,error:"queue_lookup_failed"},500);
