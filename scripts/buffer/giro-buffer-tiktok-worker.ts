@@ -1,3 +1,4 @@
+import { storyboardIsCurrent } from "../../supabase/functions/_shared/article-recency.ts";
 import { registeredCreditVerified } from "../../supabase/functions/_shared/photo-registry.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 
@@ -475,9 +476,13 @@ Deno.serve(async req=>{
     return respond({ok:false,processed:0,error:"public_video_not_reachable_or_wrong_type"},422);
    }
    const source=await db.from("giro_social_video_queue")
-      .select("source_url,title,shorts_image_credit,editor_approved,visual_review_status,status,shorts_render_origin,storyboard_status")
+      .select("source_url,title,shorts_image_credit,editor_approved,visual_review_status,status,shorts_render_origin,storyboard_status,scheduled_for,storyboard_source_published_at")
       .eq("id",job.source_queue_id).eq("platform","tiktok").maybeSingle();
    const article=source.data;
+   if(article&&!storyboardIsCurrent(article)){
+     await db.from("giro_buffer_tiktok_jobs").update({status:"review_required",last_error:"article_date_revalidation_required",updated_at:new Date().toISOString()}).eq("id",jobId).eq("status","claimed");
+     return respond({ok:false,processed:0,error:"article_date_revalidation_required"},422);
+   }
    const credit=String(article?.shorts_image_credit||"");
    const illustrated=/^original_editorial_labeled_v2_[0-9a-f]{24}$/.test(credit);
    const matchesOrigin=/^wikimedia_event_/.test(credit) ||

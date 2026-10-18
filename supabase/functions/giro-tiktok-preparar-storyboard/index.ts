@@ -1,7 +1,8 @@
+import { storyboardIsCurrent } from "../_shared/article-recency.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 import { load } from "npm:cheerio@1.0.0";
 
-import { articleIsFresh } from "./article-date.ts";
+import { articleIsFresh, articleTimestamp } from "./article-date.ts";
 import { sourceRecovery } from "./recovery-policy.ts";
 const headers={"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"};
 const respond=(data:unknown,status=200)=>new Response(JSON.stringify(data),{headers,status});
@@ -82,13 +83,14 @@ Deno.serve(async req=>{
    if(lane.error)throw lane.error;
    if(args.dry_run===true||!lane.data.preparation_enabled)return respond({success:true,dry_run:args.dry_run===true,no_publish:true,channel:'tiktok',preparation_enabled:lane.data.preparation_enabled});
    const {data:pending,error:qerr}=await db.from("giro_social_video_queue")
-     .select("id,source_kind,source_id,platform,status,source_url,scheduled_for,shorts_render_retry_count")
-     .eq("platform","tiktok").in("storyboard_status",["aguardando","revisar"]).eq("visual_review_status","pending")
+     .select("id,source_kind,source_id,platform,status,source_url,scheduled_for,shorts_render_retry_count,storyboard_status,storyboard_source_published_at")
+     .eq("platform","tiktok").in("storyboard_status",["aguardando","revisar","preparado"]).eq("visual_review_status","pending").eq("shorts_render_version",0).is("provider_post_id",null)
      .eq("status","pronto_para_revisao").or("storyboard_prepared_at.is.null,storyboard_prepared_at.lte."+new Date(Date.now()-15*60000).toISOString()).gte("created_at",new Date(Date.now()-36*3600000).toISOString()).order("scheduled_for",{ascending:true}).limit(24);
    if(qerr)throw qerr;
    const results=[];
    for(const item of pending||[]){
      if(item.source_kind!=="radar")continue;
+     if(storyboardIsCurrent(item))continue;
      const radar=await db.from("giro_radar_tiktok")
        .select("id,titulo,url,fonte_id,score,source_published_at,created_at")
        .eq("id",item.source_id).maybeSingle();
@@ -96,6 +98,7 @@ Deno.serve(async req=>{
      const row=radar.data;
      let scenes:string[]|null=null;
      let fault:string|null=null;
+     let verifiedPublished:string|null=null;
      if(!row || Number(row.score||0)<25){
        fault="radar_source_missing_or_low_score";
      }else if(row.source_published_at && Date.parse(row.source_published_at)<Date.now()-48*3600000){
@@ -128,6 +131,7 @@ Deno.serve(async req=>{
          }
          if(!articleIsFresh(published,sourceUrl.toString(),Math.max(Date.now(),Date.parse(item.scheduled_for)||Date.now())))
            throw Error("article_date_unverified_or_outdated");
+         verifiedPublished=new Date(articleTimestamp(published,sourceUrl.toString())).toISOString();
          $("script,style,nav,footer,header,aside,form,iframe,.advertisement,.ads,.related,.share-buttons,.newsletter").remove();
          const description=clean($('meta[property="og:description"]').attr("content")||$('meta[name="description"]').attr("content")||"");
          const facts=$("article p, .entry-content p, .post-content p, .article-body p, main p").toArray()
@@ -145,23 +149,23 @@ Deno.serve(async req=>{
      const retries=Number(item.shorts_render_retry_count||0);
      const recovery=sourceRecovery(fault,retries);
      const patch=valid?{
-       scene_cards:scenes,story_image_url:null,storyboard_status:"preparado",
+       scene_cards:scenes,story_image_url:null,storyboard_status:"preparado",storyboard_source_published_at:verifiedPublished,
        storyboard_prepared_at:new Date().toISOString(),storyboard_error:null
      }:recovery?{
        status:recovery==="retry"?"pronto_para_revisao":"falha",storyboard_status:"revisar",
-       storyboard_error:fault,last_error:"Falha temporária da fonte; preservar a mesma pauta, sem publicar.",
+       storyboard_source_published_at:null,storyboard_error:fault,last_error:"Falha temporária da fonte; preservar a mesma pauta, sem publicar.",
        shorts_render_retry_count:retries+1,storyboard_prepared_at:new Date().toISOString()
      }:{
        // An unverified source must not monopolize today's upload slot.
        // Preserve its audit record; the independent planner will choose another Radar item.
-       status:"expirado",storyboard_status:"invalido",
+       status:"expirado",storyboard_status:"invalido",storyboard_source_published_at:null,
        last_error:"Short não produzido: "+String(fault||"insufficient_verified_facts"),
        storyboard_error:fault||"insufficient_verified_facts",
        storyboard_prepared_at:new Date().toISOString()
      };
      const {error:uerr}=await db.from("giro_social_video_queue")
-       .update(patch).eq("id",item.id)
-       .in("storyboard_status",["aguardando","revisar"]).eq("visual_review_status","pending");
+       .update(patch).eq("id",item.id).eq("platform","tiktok").eq("status","pronto_para_revisao")
+       .in("storyboard_status",["aguardando","revisar","preparado"]).eq("visual_review_status","pending").eq("shorts_render_version",0).is("provider_post_id",null);
      if(uerr)throw uerr;
      results.push({queue_id:item.id,storyboard_ready:valid,status:valid?"preparado":"revisar"});
    }

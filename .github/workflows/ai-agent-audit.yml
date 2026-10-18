@@ -76,6 +76,7 @@ jobs:
           node --experimental-strip-types tests/test_instagram_recovery.mjs
           node --experimental-strip-types tests/test_editorial_review.mjs
           node --experimental-strip-types tests/test_shorts_recency.mjs
+          node --experimental-strip-types tests/test_delivery_recency.mjs
       - name: Executar LangGraph offline, sem publicar
         run: >-
           python scripts/ai_agents/orchestrate.py

@@ -45,3 +45,12 @@ Testes offline do renderizador (MP4 1080x1920 com áudio, sem upload); testes de
 - Checks de auditoria e revisão de mídia do commit 7121be8 concluídos com sucesso. Consulta ao cron sem falhas de execução nas duas horas anteriores à retomada; isso não comprova entrega social.
 - Shorts passa a verificar a data na reportagem original (metadados/JSON-LD), com limite de 24 horas no horário previsto da postagem. A coleta recente do radar não torna uma matéria antiga atual. Teste do handler cobre data válida, antiga, ausente e inválida, inclusive publicação futura, sem upload.
 - Mantidos os horários e os estados de habilitação de cada canal. As duas fotografias cadastradas ainda estão pendentes de direitos; não há item pronto nem confirmação pública nas últimas 24 horas no snapshot da retomada. Nenhuma publicação foi acionada durante a manutenção.
+
+## Validação final solicitada em 18/10
+
+- Data verificada da reportagem persistida em `storyboard_source_published_at`. Roteiros preparados antes dessa prova entram novamente no preparo, apenas enquanto não renderizados e sem ID remoto. Registro e arquivos anteriores são preservados.
+- Shorts e TikTok verificam a data tanto para o horário previsto quanto para o momento efetivo. Atraso não estende as 24 horas; data futura não é aceita como publicação já ocorrida.
+- Pontes de renderização recusam prova ausente/vencida. YouTube e último gate Buffer repetem a validação antes do envio. A reconciliação de envios passados não depende da atualidade da notícia e continua disponível.
+- Testes do handler verificam legado preparado vencido, legado atual retomado, item já verificado sem refazer, metadados/JSON-LD e isolamento por plataforma. Teste do publicador recusa datas ausentes e vencidas antes de qualquer requisição de upload; notícia atual passa apenas pela prévia.
+- Instagram mantém a retomada controlada: Feed/Reels com capacidade central de uma publicação ao dia, Stories desabilitado. Esse limite é da conta e não compartilha consumo editorial entre canais. Não se elevou a cadência nem se liberou um canal durante a manutenção.
+- Teste real de entrega segue condicionado a pauta atual elegível, fotografia do acontecimento com direitos comprovados, revisão da mídia e aprovação expressa de publicação. Não há garantia de ausência de futuras indisponibilidades de fontes, GitHub ou plataformas.

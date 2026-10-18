@@ -1,3 +1,4 @@
+import { storyboardIsCurrent } from "../_shared/article-recency.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 
 // Giro Madeira: guarded public uploader; at most one verified video per invocation.
@@ -164,7 +165,7 @@ Deno.serve(async(req:Request)=>{
     Number(pvhDateParts.year),Number(pvhDateParts.month)-1,Number(pvhDateParts.day),4,0,0
   )).toISOString();
   const {data:eligible,error:queueError}=await db.from("giro_social_video_queue")
-    .select("id,source_id,platform,title,caption,source_url,video_url,topic_scope,status,editor_approved,visual_review_status,storyboard_status,shorts_render_version,shorts_render_origin,shorts_image_credit,provider_post_id,scheduled_for,created_at")
+    .select("id,source_id,platform,title,caption,source_url,video_url,topic_scope,status,editor_approved,visual_review_status,storyboard_status,shorts_render_version,shorts_render_origin,shorts_image_credit,provider_post_id,scheduled_for,created_at,storyboard_source_published_at")
     .eq("platform","youtube_shorts").eq("status","pronto_para_revisao")
     .in("topic_scope",["brasil","mundo"])
     .eq("visual_review_status","approved").eq("editor_approved",true)
@@ -183,6 +184,7 @@ Deno.serve(async(req:Request)=>{
      return !localRo.test(headline)||national.test(headline);
   });
   if(!row)return respond({success:true,processed:0,reason:"regional_headline_filtered"});
+  if(!storyboardIsCurrent(row))return respond({success:true,processed:0,reason:"article_date_revalidation_required",queue_id:row.id});
   const id=row.id;
   if(action==="preview")return respond({success:true,mode:"preview",queue_id:id,
      title:row.title,will_upload:false,privacy_status:"public",target_channel:"@GIROMADEIRA"});

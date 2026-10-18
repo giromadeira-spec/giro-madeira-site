@@ -5,6 +5,8 @@ on:
     paths:
       - 'supabase/functions/giro-shorts-github-bridge/index.ts'
       - 'supabase/functions/giro-shorts-preparar-storyboard/**'
+      - 'supabase/functions/giro-tiktok-preparar-storyboard/**'
+      - 'supabase/functions/_shared/**'
       - 'supabase/functions/giro-youtube-upload-auto/index.ts'
       - 'supabase/functions/giro-tiktok-github-bridge/index.ts'
       - 'supabase/functions/giro-tiktok-30fps-bridge/index.ts'
@@ -29,6 +31,7 @@ jobs:
         run: |
           deno check supabase/functions/giro-shorts-github-bridge/index.ts
           deno check supabase/functions/giro-shorts-preparar-storyboard/index.ts
+          deno check supabase/functions/giro-tiktok-preparar-storyboard/index.ts
           deno check supabase/functions/giro-youtube-upload-auto/index.ts
           deno check supabase/functions/giro-tiktok-github-bridge/index.ts
           deno check supabase/functions/giro-tiktok-30fps-bridge/index.ts

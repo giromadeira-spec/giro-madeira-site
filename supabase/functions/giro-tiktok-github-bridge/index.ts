@@ -1,3 +1,4 @@
+import { storyboardIsCurrent } from "../_shared/article-recency.ts";
 import { approvedRegistryPhoto, registryReady, registryCredit, PHOTO_FIELDS } from "../_shared/photo-registry.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 import { jwtVerify, createRemoteJWKSet } from "npm:jose@6.0.11";
@@ -61,7 +62,7 @@ Deno.serve(async req=>{
       Number(pvh.year),Number(pvh.month)-1,Number(pvh.day),4,0,0
     )).toISOString();
     const {data:items,error:qe}=await db.from("giro_social_video_queue")
-      .select("id,source_id,title,caption,source_url,scene_cards,topic_scope,scheduled_for")
+      .select("id,source_id,title,caption,source_url,scene_cards,topic_scope,scheduled_for,storyboard_status,storyboard_source_published_at")
       .eq("platform","tiktok").eq("source_kind","radar")
       .eq("status","pronto_para_revisao")
       .eq("storyboard_status","preparado")
@@ -73,6 +74,7 @@ Deno.serve(async req=>{
       .order("scheduled_for",{ascending:true}).limit(8);
     if(qe)throw qe;
     for(const item of items||[]){
+      if(!storyboardIsCurrent(item))continue;
       // Defense in depth: never render regional/local-only news on video lanes.
       const headline=String(item.title||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
       const roLocal=/\b(rondonia|porto velho|ji parana|ariquemes|vilhena|cacoal|guajara mirim|jaru|rolim de moura|pimenta bueno|candeias do jamari|machadinho do oeste|ouro preto do oeste|buritis|em ro)\b/;
