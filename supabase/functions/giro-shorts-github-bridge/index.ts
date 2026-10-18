@@ -3,6 +3,7 @@ import { jwtVerify, createRemoteJWKSet } from "npm:jose@6.0.11";
 
 const owner = "giromadeira-spec/giro-madeira-site";
 const workflow = owner+"/.github/workflows/giro-shorts-producao.yml@refs/heads/main";
+const monitorWorkflow = owner+"/.github/workflows/giro-pipeline-monitor.yml@refs/heads/main";
 const repoId = "1403695629";
 const scope = "https://dsihvbdhocbqscaypraw.supabase.co/functions/v1/giro-shorts-github-bridge";
 const jwks = createRemoteJWKSet(new URL("https://token.actions.githubusercontent.com/.well-known/jwks"));
@@ -39,7 +40,7 @@ Deno.serve(async req=>{
    });
    jwt=verified.payload;
    if(jwt.repository!==owner || String(jwt.repository_id)!==repoId ||
-      jwt.ref!=="refs/heads/main" || jwt.workflow_ref!==workflow ||
+      jwt.ref!=="refs/heads/main" || (jwt.workflow_ref!==workflow && jwt.workflow_ref!==monitorWorkflow) ||
       jwt.event_name!=="schedule" && jwt.event_name!=="workflow_dispatch")
       throw Error("github_claims_mismatch");
  }catch{return response({success:false,error:"github_identity_not_authorized"},403);}
@@ -50,6 +51,12 @@ Deno.serve(async req=>{
  const db=createClient(url,svc,{auth:{persistSession:false}});
  const reqBody=await req.json().catch(()=>({}));
  const action=String(reqBody.action||"status");
+ if(jwt.workflow_ref===monitorWorkflow){
+   if(action!=="monitor")return response({success:false,error:"monitor_is_read_only"},403);
+   const snapshot=await db.rpc("giro_pipeline_status_readonly");
+   if(snapshot.error)return response({success:false,error:"monitor_snapshot_failed"},503);
+   return response({success:true,...snapshot.data});
+ }
  
  try{
   const {data:settings,error:settingsError}=await db.from("giro_shorts_settings")
@@ -175,7 +182,7 @@ Deno.serve(async req=>{
   if(!Number.isSafeInteger(id)||id<1)return response({success:false,error:"invalid_queue_id"},400);
   const {data:row,error:re}=await db.from("giro_social_video_queue")
     .select("id,status,shorts_render_job_id,shorts_render_storage_path,shorts_render_version,provider_post_id,source_url,title")
-    .eq("id",id).maybeSingle();
+    .eq("id",id).eq("platform","youtube_shorts").maybeSingle();
   if(re)throw re;
   if(!row||row.shorts_render_job_id!==jobId || row.status!=="aguardando_autorizacao"||
     row.provider_post_id||!row.shorts_render_storage_path)

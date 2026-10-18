@@ -85,7 +85,7 @@ jobs:
             shorts-test-preview/auto-qa-photo-cover.png
             shorts-test-preview/auto-qa-video.mp4
           if-no-files-found: error
-          retention-days: 2
+          retention-days: 14
 
   gerar-short:
     if: github.event_name == 'schedule' && github.repository == 'giromadeira-spec/giro-madeira-site' && github.ref == 'refs/heads/main'
@@ -116,7 +116,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: giro-short-previa
-          path: shorts-test-preview/*.png
+          path: |
+            shorts-test-preview/*.png
+            artifacts/render-*.json
           if-no-files-found: ignore
-          retention-days: 1
+          retention-days: 14
 

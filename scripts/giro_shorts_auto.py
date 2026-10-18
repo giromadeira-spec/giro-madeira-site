@@ -999,6 +999,16 @@ def render_self_test():
         },ensure_ascii=False))
 
 
+def report_render_outcome(outcome):
+    """Record renderer outcome separately from approval and remote delivery."""
+    outcome={"channel":PLATFORM,"publication_attempted":False,**outcome}
+    print(json.dumps(outcome,ensure_ascii=False))
+    out=ROOT/"artifacts";out.mkdir(exist_ok=True)
+    (out/("render-"+PLATFORM+".json")).write_text(json.dumps(outcome,ensure_ascii=False,indent=2))
+    if os.environ.get("GITHUB_STEP_SUMMARY"):
+        with open(os.environ["GITHUB_STEP_SUMMARY"],"a") as f:
+            f.write("\n### Render "+PLATFORM+"\n\n```json\n"+json.dumps(outcome,ensure_ascii=False,indent=2)+"\n```\n")
+
 def main():
     # Never claim or publish during a git push, even if old flags are present.
     # The --self-test mode below renders locally, without credentials or uploads.
@@ -1008,7 +1018,7 @@ def main():
     token=github_token()
     result=bridge(token,"claim")
     if not result.get("processed"):
-        print("Nothing eligible:",result.get("reason","no candidate"))
+        report_render_outcome({"state":"idle","reason":result.get("reason","no_candidate"),"ready_to_publish":False})
         return
     qid=result["queue_id"]
     try:
@@ -1078,10 +1088,13 @@ def main():
                  quality_passed=(len(frames)==3 and visual_origin_valid),image_credit=credit,
                  visual_kind=("illustration" if credit.startswith("original_editorial_labeled_v2_") else "event_photo"),
                  registered_image_id=registered_image_id)
-        print("Rendered and stored approved video for queue",confirmed["queue_id"])
+        report_render_outcome({"state":"ready_for_publication" if confirmed.get("ready_to_publish") is True else "awaiting_editorial_visual_review",
+                              "queue_id":confirmed["queue_id"],"ready_to_publish":confirmed.get("ready_to_publish") is True,
+                              "visual_kind":"illustration" if credit.startswith("original_editorial_labeled_v2_") else "event_photo"})
         print("Visual provenance:",file_title)
         print("Original labeled illustration:",credit.startswith("original_editorial_labeled_v2_"))
     except Exception as e:
+        report_render_outcome({"state":"failed","queue_id":qid,"ready_to_publish":False,"reason":type(e).__name__})
         try: bridge(token,"fail",queue_id=qid)
         except Exception: print("Could not update queue error status.")
         raise RuntimeError("Render failed safely without publishing: "+str(e)[:150]) from e

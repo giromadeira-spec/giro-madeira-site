@@ -33,7 +33,75 @@ Deno.serve(async(req:Request)=>{
   if(verified.error||verified.data!==true) return respond({success:false,error:"unauthorized"},401);
   const params=await req.json().catch(()=>({}));
   const action=String(params.action||"run");
-  if(!["run","preview"].includes(action))return respond({success:false,error:"unsupported_action"},400);
+  if(!["run","preview","reconcile"].includes(action))return respond({success:false,error:"unsupported_action"},400);
+  // Delivery-only reconciliation: existing IDs, GET video status, no upload session.
+  if(action==="reconcile"){
+    if(params.dry_run===true)return respond({success:true,no_publish:true,action,checked:0});
+    const pending=await db.from("giro_social_video_queue")
+      .select("id,provider_post_id").eq("platform","youtube_shorts").eq("status","enviado")
+      .not("provider_post_id","is",null)
+      .or("provider_privacy_status.is.null,provider_privacy_status.neq.public")
+      .order("updated_at",{ascending:false}).limit(20);
+    if(pending.error)return respond({success:false,error:"reconciliation_lookup_failed"},503);
+    if(!pending.data?.length)return respond({success:true,action,no_new_posts:true,checked:0});
+  const connection=await db.from("giro_youtube_oauth_connection")
+    .select("refresh_token_ciphertext,refresh_token_nonce,granted_scopes")
+    .eq("id","giro_madeira").maybeSingle();
+  if(connection.error||!connection.data) return respond({success:false,error:"youtube_not_connected"},409);
+  if(!String(connection.data.granted_scopes).includes("youtube.upload")||
+     !String(connection.data.granted_scopes).includes("youtube.readonly"))
+    return respond({success:false,error:"youtube_scopes_missing"},409);
+  let refreshToken="";
+  try{
+    const aes=await crypto.subtle.importKey("raw",
+      await digest("giro-madeira/youtube/refresh-token/v1:"+clientSecret),
+      {name:"AES-GCM"},false,["decrypt"]);
+    const decrypted=await crypto.subtle.decrypt({
+      name:"AES-GCM",iv:decode64(connection.data.refresh_token_nonce),
+      additionalData:textBytes("giro_madeira")
+    },aes,decode64(connection.data.refresh_token_ciphertext));
+    refreshToken=new TextDecoder().decode(decrypted);
+  }catch{return respond({success:false,error:"stored_youtube_refresh_token_unreadable"},409);}
+  const refreshed=await fetch("https://oauth2.googleapis.com/token",{
+    method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},
+    body:new URLSearchParams({client_id:clientId,client_secret:clientSecret,
+      refresh_token:refreshToken,grant_type:"refresh_token"}),
+    signal:AbortSignal.timeout(18000)
+  }).catch(()=>null);
+  if(!refreshed?.ok) return respond({success:false,error:"youtube_token_refresh_failed"},401);
+  const access=String((await refreshed.json()).access_token||"");
+  if(!access) return respond({success:false,error:"youtube_access_token_missing"},401);
+
+  // Verify the current user has exactly the authorized Giro Madeira channel.
+  const channel=await fetch("https://www.googleapis.com/youtube/v3/channels?part=id&mine=true",{
+    headers:{Authorization:"Bearer "+access},signal:AbortSignal.timeout(12000)
+  }).catch(()=>null);
+  if(!channel?.ok) return respond({success:false,error:"youtube_channel_check_failed"},409);
+  const channels=await channel.json();
+  if(!Array.isArray(channels.items)||channels.items[0]?.id!==expectedChannel)
+    return respond({success:false,error:"connected_youtube_channel_mismatch"},403);
+
+
+    const valid=pending.data.filter(row=>/^[A-Za-z0-9_-]{11}$/.test(String(row.provider_post_id)));
+    if(!valid.length)return respond({success:false,error:"invalid_existing_provider_ids",no_new_posts:true},409);
+    const checked=await fetch("https://www.googleapis.com/youtube/v3/videos?part=status,snippet&id="+
+      encodeURIComponent(valid.map(row=>row.provider_post_id).join(",")),{
+       headers:{Authorization:"Bearer "+access},signal:AbortSignal.timeout(18000)
+      }).catch(()=>null);
+    if(!checked?.ok)return respond({success:false,error:"youtube_reconciliation_unavailable",no_new_posts:true},502);
+    const data=await checked.json();let confirmed=0;
+    for(const row of valid){
+      const remote=data.items?.find((item:any)=>item.id===row.provider_post_id&&item.snippet?.channelId===expectedChannel);
+      const privacy=String(remote?.status?.privacyStatus||"unknown");
+      if(!["public","private","unlisted"].includes(privacy))continue;
+      const saved=await db.from("giro_social_video_queue").update({provider_privacy_status:privacy,
+        last_error:privacy==="public"?null:"youtube_visibility_not_public"})
+        .eq("id",row.id).eq("platform","youtube_shorts").eq("provider_post_id",row.provider_post_id);
+      if(saved.error)return respond({success:false,error:"reconciliation_save_failed",no_new_posts:true},503);
+      if(privacy==="public")confirmed++;
+    }
+    return respond({success:true,action,no_new_posts:true,checked:valid.length,confirmed_public:confirmed});
+  }
   const {data:lane,error:laneError}=await db.from('giro_channel_settings').select('publication_enabled').eq('channel','shorts').single();
   if(laneError)return respond({success:false,error:'channel_settings_unavailable'},503);
   if(params.dry_run===true || !lane.publication_enabled)return respond({success:true,no_publish:true,channel:'shorts',publication_enabled:lane.publication_enabled,dry_run:params.dry_run===true});

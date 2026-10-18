@@ -37,6 +37,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: giro-tiktok-previa
-          path: shorts-test-preview/*.png
+          path: |
+            shorts-test-preview/*.png
+            artifacts/render-*.json
           if-no-files-found: ignore
-          retention-days: 2
+          retention-days: 14

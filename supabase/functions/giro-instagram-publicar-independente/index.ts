@@ -34,7 +34,14 @@ Deno.serve(async req=>{
     (channel==='reels'?reelsRecovery:meta.data.rollout_stage==='full');
   const blocked=!cfg.data.publication_enabled||meta.data.integrity_hold===true||
     gate.data?.allowed!==true||!channelAllowed||(channel==='reels'&&!reelsNoon);
-  if(body.dry_run===true||blocked)return response({success:true,channel,dry_run:body.dry_run===true,no_publish:true,publication_enabled:cfg.data.publication_enabled,gate:gate.data,integrity_hold:meta.data.integrity_hold,rollout_stage:meta.data.rollout_stage});
+  const blockedReasons=[
+    !cfg.data.publication_enabled?"channel_publication_disabled":null,
+    meta.data.integrity_hold===true?"meta_integrity_hold":null,
+    gate.data?.allowed!==true?"meta_semaphore_denied":null,
+    !channelAllowed?"rollout_channel_not_allowed":null,
+    channel==='reels'&&!reelsNoon?"outside_reels_window":null
+  ].filter(Boolean);
+  if(body.dry_run===true||blocked)return response({success:true,channel,reason:body.dry_run===true?"dry_run":blockedReasons[0],blocked_reasons:blockedReasons,dry_run:body.dry_run===true,no_publish:true,publication_enabled:cfg.data.publication_enabled,gate:gate.data,integrity_hold:meta.data.integrity_hold,rollout_stage:meta.data.rollout_stage});
   const table='giro_publicacoes_'+channel;
   const found=await db.from(table).select('*').eq('status','aprovada').eq('visual_approved',true).gte('media_pipeline_version',channel==='feed'?6:5)
    .is(ids[channel],null).or('legenda.like.%Foto do acontecimento:%,legenda.like.%ILUSTRAÇÃO EDITORIAL ORIGINAL%')
@@ -92,5 +99,8 @@ Deno.serve(async req=>{
    await db.from(table).update({status:'erro',erro:'reconcile_provider_before_resend',media_status:'verificar_meta_antes_de_reenviar'}).eq('id',item.id).eq('status','publicando');
    return response({success:false,channel,error:'reconciliation_required'},502);
   }
- }catch{return response({success:false,error:'independent_publish_failed'},500)}
+ }catch(e){
+  console.error(JSON.stringify({channel:"instagram",stage:"publish",error:e instanceof Error?e.name:"database_or_provider_error"}));
+  return response({success:false,error:'independent_publish_failed',retry_allowed:false},500)
+ }
 });

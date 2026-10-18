@@ -18,6 +18,8 @@ Deno.serve(async req=>{
     // Allow one extra, safe art-generation attempt after the original-art upgrade.
     // Previously blocked items remain drafts and still require editorial approval.
     .eq("status","pendente").eq("visual_approved",false).lt("preparation_attempts",3)
+    // Completed media awaits review; it is not a render failure to regenerate.
+    .not("media_status","in","(aguardando_revisao_visual,aguardando_verificacao_foto_e_licenca)")
     .or("preparation_retry_at.is.null,preparation_retry_at.lte."+new Date().toISOString())
     .gte("created_at",new Date(Date.now()-36*3600000).toISOString())
     .gt("editorial_expires_at",new Date().toISOString())

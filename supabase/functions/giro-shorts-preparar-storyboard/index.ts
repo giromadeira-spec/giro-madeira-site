@@ -1,3 +1,4 @@
+import { sourceRecovery } from "./recovery-policy.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 import { load } from "npm:cheerio@1.0.0";
 
@@ -27,6 +28,8 @@ function meaningfulSegments(title:string,summary:string,caption:string,source:st
  for(const raw of sourceSentences){
    const s=clean(raw).replace(/^[.!?\s-]+/,"").replace(/[.!?]+$/,"");
    if(!s||/^(foto|divulgacao|reproducao|crédito|credito):/i.test(s))continue;
+   // Fail closed on author biographies and editorial staff profiles.
+   if(/jornalista formado|formad[oa] em comunica[cç][aã]o|chefe de reda[cç][aã]o|desde 20\d\d.*(?:jornalista|redação)|atua no .*desde 20\d\d|produz conte[uú]dos em diferentes editorias|sobre o autor|perfil do autor|biografia do autor/i.test(s))continue;
    // Never trim a sentence to fit the image: this can silently change the factual meaning.
    // Only a COMPLETE short sentence or a naturally delimited independent clause can be used.
    const candidate=s.length<=110?s:s.split(/[,;:]\s+/)[0];
@@ -77,9 +80,9 @@ Deno.serve(async req=>{
    if(lane.error)throw lane.error;
    if(args.dry_run===true||!lane.data.preparation_enabled)return respond({success:true,dry_run:args.dry_run===true,no_publish:true,channel:'shorts',preparation_enabled:lane.data.preparation_enabled});
    const {data:pending,error:qerr}=await db.from("giro_social_video_queue")
-     .select("id,source_kind,source_id,platform,status,source_url")
+     .select("id,source_kind,source_id,platform,status,source_url,shorts_render_retry_count")
      .eq("platform","youtube_shorts").in("storyboard_status",["aguardando","revisar"]).eq("visual_review_status","pending")
-     .eq("status","pronto_para_revisao").gte("created_at",new Date(Date.now()-36*3600000).toISOString()).order("scheduled_for",{ascending:true}).limit(24);
+     .eq("status","pronto_para_revisao").or("storyboard_prepared_at.is.null,storyboard_prepared_at.lte."+new Date(Date.now()-15*60000).toISOString()).gte("created_at",new Date(Date.now()-36*3600000).toISOString()).order("scheduled_for",{ascending:true}).limit(24);
    if(qerr)throw qerr;
    const results=[];
    for(const item of pending||[]){
@@ -109,7 +112,7 @@ Deno.serve(async req=>{
          if(type && !type.includes("text/html"))throw Error("non_html_source");
          const html=(await sourceResp.text()).slice(0,1800000);
          const $=load(html);
-         $("script,style,nav,footer,header,aside,form,iframe,.advertisement,.ads,.related,.share-buttons,.newsletter").remove();
+         $("script,style,nav,footer,header,aside,form,iframe,.advertisement,.ads,.related,.share-buttons,.newsletter,.author,.author-bio,.author-box,.about-author,.post-author,.writer-bio,[itemprop=author]").remove();
          const description=clean($('meta[property="og:description"]').attr("content")||$('meta[name="description"]').attr("content")||"");
          const facts=$("article p, .entry-content p, .post-content p, .article-body p, main p").toArray()
            .map(el=>clean($(el).text())).filter(t=>t.length>=40&&t.length<=650)
@@ -123,9 +126,15 @@ Deno.serve(async req=>{
        }
      }
      const valid=!!(scenes&&!fault);
+     const retries=Number(item.shorts_render_retry_count||0);
+     const recovery=sourceRecovery(fault,retries);
      const patch=valid?{
        scene_cards:scenes,story_image_url:null,storyboard_status:"preparado",
        storyboard_prepared_at:new Date().toISOString(),storyboard_error:null
+     }:recovery?{
+       status:recovery==="retry"?"pronto_para_revisao":"falha",storyboard_status:"revisar",
+       storyboard_error:fault,last_error:"Falha temporária da fonte; preservar a mesma pauta, sem publicar.",
+       shorts_render_retry_count:retries+1,storyboard_prepared_at:new Date().toISOString()
      }:{
        // An unverified source must not monopolize today's upload slot.
        // Preserve its audit record; the independent planner will choose another Radar item.
@@ -135,7 +144,7 @@ Deno.serve(async req=>{
        storyboard_prepared_at:new Date().toISOString()
      };
      const {error:uerr}=await db.from("giro_social_video_queue")
-       .update(patch).eq("id",item.id)
+       .update(patch).eq("id",item.id).eq("platform","youtube_shorts").eq("status","pronto_para_revisao")
        .in("storyboard_status",["aguardando","revisar"]).eq("visual_review_status","pending");
      if(uerr)throw uerr;
      results.push({queue_id:item.id,storyboard_ready:valid,status:valid?"preparado":"revisar"});
