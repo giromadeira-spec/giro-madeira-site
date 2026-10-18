@@ -158,8 +158,13 @@ Deno.serve(async(req:Request)=>{
   if(last24hError)return respond({success:false,error:"min_spacing_check_failed"},500);
   if(last24h?.length && (Date.now()-new Date(last24h[0].updated_at).getTime())<settings.min_interval_minutes*60000)
     return respond({success:true,processed:0,reason:"min_spacing"});
-  // The uploader is cron-driven at 08:00/22:00 PV.
-  // Only accept the slot currently in progress; never send an 08h draft at 22h.
+  // Strict daily slot: 17:00–17:44 America/Porto_Velho. Even manual
+  // invocations cannot turn an 08:00/22:00 draft into an off-schedule upload.
+  const localTime=Object.fromEntries(new Intl.DateTimeFormat("en-GB",{
+    timeZone:"America/Porto_Velho",hour:"2-digit",minute:"2-digit",hourCycle:"h23"
+  }).formatToParts(new Date()).map(part=>[part.type,part.value]));
+  if(Number(localTime.hour)!==17||Number(localTime.minute)>=45)
+    return respond({success:true,processed:0,no_publish:true,reason:"outside_17h_pvh_window"});
   const activeWindowStart=new Date(Date.now()-45*60000).toISOString();
   const {data:eligible,error:queueError}=await db.from("giro_social_video_queue")
     .select("id,source_id,platform,title,caption,source_url,video_url,topic_scope,status,editor_approved,visual_review_status,storyboard_status,shorts_render_version,shorts_render_origin,shorts_image_credit,provider_post_id,scheduled_for,created_at,storyboard_source_published_at")
