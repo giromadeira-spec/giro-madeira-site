@@ -5,10 +5,11 @@ import vm from 'node:vm';
 
 const base='https://test.local';
 const idFields={feed:'instagram_media_id',stories:'instagram_story_media_id',reels:'instagram_reel_media_id'};
-const at='2026-10-18T16:20:00Z';
+let at='2026-10-18T16:20:00Z';
 class Clock extends Date {constructor(...args){super(...(args.length?args:[at]))}static now(){return Date.parse(at)}}
 let handler,rows,legacy,requests,writes,mode,saveFails,loseReservation,allowed;
 function reset(){
+ at='2026-10-18T16:20:00Z';
  rows=Object.fromEntries(Object.keys(idFields).map(channel=>[channel,{id:7,status:'aprovada',visual_approved:true,
   media_pipeline_version:6,media_status:channel==='feed'?'feed_foto_verificada':channel==='stories'?'stories_foto_verificada':'foto_verificada',
   fonte_url:'https://source.test/event',legenda:'Foto do acontecimento: Fotógrafo / fonte autorizada\nFonte: fonte\nMatéria original: https://source.test/event',
@@ -53,7 +54,7 @@ async function send(channel='feed'){
  return {status:r.status,body:await r.json()};
 }
 for(const channel of Object.keys(idFields)){
- reset();const r=await send(channel);assert.equal(r.status,200);assert.equal(r.body.provider_id,'confirmed-provider-id');
+ reset();if(channel==='stories')at='2026-10-18T22:15:00Z';const r=await send(channel);assert.equal(r.status,200);assert.equal(r.body.provider_id,'confirmed-provider-id');
  assert.equal(rows[channel][idFields[channel]],'confirmed-provider-id');assert.equal(rows[channel].status,'publicada');
  assert.ok(writes.every(w=>w.channel===channel));assert.equal(requests.length,1);
  assert.equal(requests[0].media_type,{feed:'IMAGE',stories:'STORIES',reels:'REELS'}[channel]);
