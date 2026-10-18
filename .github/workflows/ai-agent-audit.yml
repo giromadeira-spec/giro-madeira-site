@@ -7,6 +7,8 @@ on:
       - '.github/workflows/**'
       - 'scripts/**'
       - 'supabase/functions/giro-tiktok-*/**'
+      - 'supabase/functions/giro-shorts-preparar-storyboard/**'
+      - 'tests/test_shorts_recency.mjs'
       - 'tests/test_tiktok_editorial.mjs'
       - 'tests/test_ai_agents_*.py'
       - 'docs/**'
@@ -16,6 +18,8 @@ on:
       - '.github/workflows/**'
       - 'scripts/**'
       - 'supabase/functions/giro-tiktok-*/**'
+      - 'supabase/functions/giro-shorts-preparar-storyboard/**'
+      - 'tests/test_shorts_recency.mjs'
       - 'tests/test_tiktok_editorial.mjs'
       - 'tests/test_ai_agents_*.py'
       - 'docs/**'
@@ -71,6 +75,7 @@ jobs:
           node --experimental-strip-types tests/test_youtube_reconcile.mjs
           node --experimental-strip-types tests/test_instagram_recovery.mjs
           node --experimental-strip-types tests/test_editorial_review.mjs
+          node --experimental-strip-types tests/test_shorts_recency.mjs
       - name: Executar LangGraph offline, sem publicar
         run: >-
           python scripts/ai_agents/orchestrate.py

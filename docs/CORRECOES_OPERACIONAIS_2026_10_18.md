@@ -39,3 +39,9 @@ Testes offline do renderizador (MP4 1080x1920 com áudio, sem upload); testes de
 - Legendas priorizam frases completas do corpo da reportagem; descrições SEO cortadas, iniciais pessoais isoladas e cabeçalhos colados ao texto não devem preencher a notícia.
 - Roteiros rejeitam referências soltas como “Entre elas”, “Ele afirma” e “Esse número”. TikTok verifica o limite de 24 horas no horário futuro da publicação. Item 317 expirado após revisão da data da reportagem.
 - Autorização de uso das fotografias é uma pendência de conteúdo: não foi inferida a partir de site oficial, crédito ou publicação em rede social. Sem licença individual comprovada, a foto não será aprovada.
+
+## Retomada das configurações — 18/10
+
+- Checks de auditoria e revisão de mídia do commit 7121be8 concluídos com sucesso. Consulta ao cron sem falhas de execução nas duas horas anteriores à retomada; isso não comprova entrega social.
+- Shorts passa a verificar a data na reportagem original (metadados/JSON-LD), com limite de 24 horas no horário previsto da postagem. A coleta recente do radar não torna uma matéria antiga atual. Teste do handler cobre data válida, antiga, ausente e inválida, inclusive publicação futura, sem upload.
+- Mantidos os horários e os estados de habilitação de cada canal. As duas fotografias cadastradas ainda estão pendentes de direitos; não há item pronto nem confirmação pública nas últimas 24 horas no snapshot da retomada. Nenhuma publicação foi acionada durante a manutenção.
