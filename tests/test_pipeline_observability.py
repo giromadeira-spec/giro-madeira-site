@@ -42,4 +42,37 @@ class PipelineObservability(unittest.TestCase):
             self.assertEqual(post.call_args.kwargs['json'],{'action':'monitor'})
             self.assertEqual(post.call_count,1)
 
+    def test_preflight_requires_media_review_and_future_slot_freshness(self):
+        monitor=module('video_preflight','scripts/giro_pipeline_monitor.py')
+        slot='2026-10-19T02:00:00+00:00'
+        baseline={
+            'success':True,'read_only':True,'publication_attempted':False,
+            'kind':'video_preflight','checked_at':'2026-10-18T21:00:00+00:00',
+            'items':[{
+                'id':327,'platform':'youtube_shorts','scheduled_for':slot,'status':'pronto_para_revisao',
+                'storyboard_source_published_at':'2026-10-18T14:31:15+00:00',
+                'video_url':None,'editor_approved':False,'visual_review_status':'pending',
+                'provider_post_id':None
+            },{
+                'id':325,'platform':'tiktok','scheduled_for':slot,'status':'pronto_para_revisao',
+                'storyboard_source_published_at':'2026-10-18T14:55:44+00:00',
+                'video_url':'https://example.com/preview.mp4','editor_approved':False,
+                'visual_review_status':'pending','provider_post_id':None
+            }]}
+        summary,issues=monitor.preview_video_preflight(baseline)
+        self.assertEqual(len(issues),2)
+        self.assertIn('MP4 não renderizado',summary)
+        self.assertIn('revisão editorial/visual pendente',summary)
+        self.assertIn('preview.mp4',summary)
+        for row in baseline['items']:
+            row['video_url']='https://example.com/video.mp4'
+            row['editor_approved']=True
+            row['visual_review_status']='approved'
+        summary,issues=monitor.preview_video_preflight(baseline)
+        self.assertEqual(issues,[])
+        baseline['items'][0]['storyboard_source_published_at']='2026-10-17T00:00:00+00:00'
+        summary,issues=monitor.preview_video_preflight(baseline)
+        self.assertEqual(len(issues),1)
+        self.assertIn('data original inválida',issues[0])
+
 if __name__=='__main__':unittest.main()
