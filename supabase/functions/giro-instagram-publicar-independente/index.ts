@@ -18,11 +18,11 @@ Deno.serve(async req=>{
   if(cfg.error)throw cfg.error;
   const gate=await db.rpc('giro_instagram_semaforo_gate',{p_media_type:types[channel]});
   if(gate.error)throw gate.error;
-  const meta=await db.from('giro_meta_rate_state').select('integrity_hold,rollout_stage,traffic_light_target,traffic_light_reel_test_enabled').eq('id',1).single();
+  const meta=await db.from('giro_meta_rate_state').select('integrity_hold,rollout_stage,traffic_light_target,traffic_light_reel_test_enabled,traffic_light_story_test_enabled').eq('id',1).single();
   if(meta.error)throw meta.error;
-  // Reels recovery window: 12:00–12:44 Porto Velho. Central daily cap remains unchanged.
-  // Stories remain blocked under feed_only. The central semaforo enforces 1/day,
-  // the variable gap, Meta rate limits and integrity holds independently.
+  // Yellow-mode Feed 1/day, Reels 1/day at noon, and the authorized Story
+  // pilot 1/day in the evening. A restricted RPC also requires real recent
+  // Meta deliveries and fresh quota measurements before a Story is allowed.
   const localParts=new Intl.DateTimeFormat('en-GB',{timeZone:'America/Porto_Velho',
     hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date());
   const localHour=Number(localParts.find(p=>p.type==='hour')?.value??-1);
@@ -30,16 +30,21 @@ Deno.serve(async req=>{
   const reelsNoon=channel==='reels'&&localHour===12&&localMinute>=0&&localMinute<45;
   const reelsRecovery=reelsNoon&&meta.data.rollout_stage==='feed_only'&&
     meta.data.traffic_light_target==='amarelo'&&meta.data.traffic_light_reel_test_enabled===true;
+  const storyEvening=channel==='stories'&&localHour>=18&&localHour<21;
+  const storiesRecovery=storyEvening&&meta.data.rollout_stage==='feed_only'&&
+    meta.data.traffic_light_target==='amarelo'&&meta.data.traffic_light_story_test_enabled===true;
   const channelAllowed=channel==='feed'||meta.data.rollout_stage==='full'||
-    (channel==='reels'&&reelsRecovery);
+    (channel==='reels'&&reelsRecovery)||(channel==='stories'&&storiesRecovery);
   const blocked=!cfg.data.publication_enabled||meta.data.integrity_hold===true||
-    gate.data?.allowed!==true||!channelAllowed||(channel==='reels'&&!reelsNoon);
+    gate.data?.allowed!==true||!channelAllowed||
+    (channel==='reels'&&!reelsNoon)||(channel==='stories'&&!storyEvening);
   const blockedReasons=[
     !cfg.data.publication_enabled?"channel_publication_disabled":null,
     meta.data.integrity_hold===true?"meta_integrity_hold":null,
     gate.data?.allowed!==true?"meta_semaphore_denied":null,
     !channelAllowed?"rollout_channel_not_allowed":null,
-    channel==='reels'&&!reelsNoon?"outside_reels_window":null
+    channel==='reels'&&!reelsNoon?"outside_reels_window":null,
+    channel==='stories'&&!storyEvening?"outside_stories_window":null
   ].filter(Boolean);
   if(body.dry_run===true||blocked)return response({success:true,channel,reason:body.dry_run===true?"dry_run":blockedReasons[0],blocked_reasons:blockedReasons,dry_run:body.dry_run===true,no_publish:true,publication_enabled:cfg.data.publication_enabled,gate:gate.data,integrity_hold:meta.data.integrity_hold,rollout_stage:meta.data.rollout_stage});
   const table='giro_publicacoes_'+channel;
@@ -70,7 +75,8 @@ Deno.serve(async req=>{
     item.media_status===(channel==='feed'?'feed_ilustracao_revisada':
                           channel==='reels'?'reel_ilustracao_revisada':'stories_ilustracao_revisada');
   const photoReviewed=photoProof && !originalArt &&
-    (channel!=='feed'||item.media_status==='feed_foto_verificada');
+    (channel!=='feed'||item.media_status==='feed_foto_verificada') &&
+    (channel!=='stories'||item.media_status==='stories_foto_verificada');
   if(!artReviewed&&!photoReviewed)
     return response({success:true,channel,no_publish:true,reason:'media_provenance_or_human_review_missing'});
   if(channel==='reels'&&(
