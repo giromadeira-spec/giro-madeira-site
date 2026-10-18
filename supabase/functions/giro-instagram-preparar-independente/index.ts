@@ -105,17 +105,10 @@ Deno.serve(async req=>{
   // Third-party photographs and inaccessible sources stay under human review.
   let autoApproved=false;
   let approvalReason="awaiting_visual_review";
-  const photo=result.illustrative_photo_credit;
+  // An image's CC license is not evidence that it depicts the actual event.
+  // Automatic approval requires a registry record documenting both provenance
+  // and individual reuse rights; illustrations always remain in human review.
   let verifiedPhoto=false;
-  try{
-    const license=String(photo?.license||"");
-    const u=new URL(String(photo?.source||""));
-    verifiedPhoto=result.visual_mode==="original_event_photo"&&
-      (license==="CC0"||/^CC BY(?: |$)/.test(license))&&
-      ((u.hostname==="commons.wikimedia.org"&&u.pathname.startsWith("/wiki/File:"))||
-       (u.hostname==="www.flickr.com"&&u.pathname.startsWith("/photos/")))&&
-      String(photo?.creator||"").length>=2;
-  }catch{}
   if(result.visual_mode==="registered_event_photo"&&Number.isSafeInteger(result.registered_image_id)){
     const registered=await db.from('giro_imagens_autorizadas').select(PHOTO_FIELDS)
       .eq('id',result.registered_image_id).eq('article_url',item.fonte_url).eq('headline',item.titulo).maybeSingle();
