@@ -1,20 +1,16 @@
-# Giro Madeira — Agenda TikTok vigente (13/10/2026)
+# Giro Madeira — Agenda TikTok vigente (18/10/2026)
+Fuso: **America/Porto_Velho (UTC-4)**. Esta versão substitui integralmente 08h e 22h.
 
-Fuso horário: America/Porto_Velho (UTC−4). Esta versão substitui os cinco horários usados até 12/10.
-
-| Publicação pretendida | Janela de tolerância |
+| Única saída diária | Janela de tolerância |
 | --- | --- |
-| **08:00** | 08:00–08:44 |
-| **22:00** | 22:00–22:44 |
+| **17:00** | 17:00–17:44 |
 
-- Máximo de 2 publicações diárias; mínimo de 90 minutos entre envios.
-- Notícia urgente tem prioridade dentro das janelas e não autoriza enviar fora delas.
-- O radar de descoberta segue a cada 15 minutos, independente do YouTube.
-- GitHub prepara vídeos antes dos horários e faz poucas tentativas de recuperação.
-- O Buffer confirma por status sent e link TikTok; aceitação na fila não basta.
-- O banco sincroniza somente a fila de plataforma tiktok, preservando filas e IDs do Shorts.
-- Notícias imprecisas, imagens incompatíveis, vídeos sem 30fps e estados ambíguos são bloqueados.
+- **1 publicação por dia**: `posting_slots_local={17:00}`, `posting_window_minutes=45`, `daily_limit=1`.
+- Short do YouTube também sai às 17h, mas com **fila, render, aprovação e envio independentes**. Não compartilhar IDs ou publicar cópias como confirmação.
+- Apenas notícias atuais e verificadas de **Brasil e mundo**, com licença e correspondência da imagem ao fato; não encher a vaga com notícia local ou vencida.
+- Radar a cada 15 minutos, primeiro MP4 antecipado e alternativas de produção antes da janela.
+- Buffer só comprova postagem com vídeo TikTok real, ID confirmado e URL; pendência ou timeout requer reconciliação antes de qualquer reenvio.
+- Urgências só têm prioridade dentro da janela, **não** podem contornar a cota diária ou a revisão.
+- As pautas antigas das 08h e 22h não serão reprogramadas retroativamente nem publicadas fora do slot de 17h.
 
-Configuração vigente: posting_slots_local = {08:00,22:00}; posting_window_minutes=45; daily_limit=2; min_interval_minutes=90. O planejamento editorial usa 09:00 e 23:00 no relógio de Brasília, equivalentes a Porto Velho 08:00/22:00.
-
-**Histórico:** a agenda antiga de 06h30, 10h, 13h30, 17h e 20h30 está revogada.
+Histórico: cinco horários até 12/10; dois horários 08h e 22h entre 13 e 18/10; **um horário 17h a partir de 18/10**.
