@@ -217,10 +217,10 @@ Deno.serve(async(req:Request)=>{
      {h:18,m:30,scope:"rondonia"},
      {h:21,m:30,scope:"em_alta"}
    ];
-   // Estrategia de 2 TikToks: 08h e 22h de Porto Velho (09h e 23h BRT).
+   // One TikTok video daily at 17h Porto Velho (18h BRT, 21h UTC).
    // Apenas noticias nacionais/mundiais de alto impacto; sem preencher vaga com esportes ou rotina.
-   const twoDailySlots=[{h:9,m:0,scope:"em_alta"},{h:23,m:0,scope:"em_alta"}] as const;
-   const baseSlots=twoDailySlots; // Separate from Shorts queue; two approved editorial windows per day.
+   const oneDailySlot=[{h:18,m:0,scope:"em_alta"}] as const;
+   const baseSlots=oneDailySlot; // Exclusive 17:00 Porto Velho, independent TikTok queue.
    const {data:queued,error:qerr}=await sb.from("giro_social_video_queue")
      .select("source_id,source_url,title,scheduled_for,topic_scope,football_extra").eq("platform","tiktok").neq("status","expirado")
      .gte("created_at",new Date(start).toISOString()).lt("created_at",new Date(end).toISOString());
