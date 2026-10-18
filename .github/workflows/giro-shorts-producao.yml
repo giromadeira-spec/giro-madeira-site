@@ -7,15 +7,13 @@ on:
       - scripts/giro_shorts_auto.py
       - .github/workflows/giro-shorts-producao.yml
   schedule:
-    # Preparo 06h30/20h30 PV (90 minutos antes); nova checagem
-    # 07h15/21h15 PV. Supabase permite reclamar itens ate 2h antes.
-    # Somente preparar, sem criar slots adicionais ou republicar falhas.
-    # Publicacao SOMENTE 08h e 22h PV pelo cron Supabase.
-    # Contingency passes 06:05/20:05 PV; bridge now reserves at most 8h ahead.
-    # Preserve 06:30/20:30 and 07:15/21:15 as contingency passes.
-    # Rodada antecipada 02h15/16h15 PV, até 5h45 antes do slot.\n    # Exige data da notícia válida para o horário de publicação e revisão humana da arte.\n    - cron: '15 6,20 * * *'\n    - cron: '5 0,10 * * *'
-    - cron: '30 0,10 * * *'
-    - cron: '15 1,11 * * *'
+    # 1 Shorts/dia às 17:00 Porto Velho (21:00 UTC); these are ONLY render passes.
+    # 11:15, 13:30, 15:15, 16:15, 16:35 PV: preparation before editorial review.
+    # The Supabase uploader alone may post inside the 17:00–17:44 PV window.
+    - cron: '15 15 * * *'
+    - cron: '30 17 * * *'
+    - cron: '15 19 * * *'
+    - cron: '15,35 20 * * *'
   workflow_dispatch:
 
 permissions:
