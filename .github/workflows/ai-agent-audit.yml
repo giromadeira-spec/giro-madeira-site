@@ -21,6 +21,9 @@ on:
       - 'supabase/migrations/20261018194000_meta_rollout_readiness_guard.sql'
       - 'tests/test_pipeline_observability.py'
       - 'tests/test_video_early_review.mjs'
+      - 'tests/test_auto_video_editorial.mjs'
+      - 'supabase/functions/giro-auto-revisao-video/**'
+      - 'scripts/ai_agents/ecosystem-policy.json'
       - 'tests/test_video_single_17h.mjs'
       - 'supabase/functions/giro-youtube-upload-auto/**'
       - 'supabase/functions/giro-shorts-editorial-queue/**'
@@ -92,6 +95,7 @@ jobs:
           python -m unittest discover -s tests -p 'test_pipeline_observability.py' -v
           node --experimental-strip-types tests/test_pipeline_monitor.mjs
           node --experimental-strip-types tests/test_video_early_review.mjs
+          node --experimental-strip-types tests/test_auto_video_editorial.mjs
           node --experimental-strip-types tests/test_video_single_17h.mjs
           node --experimental-strip-types tests/test_youtube_reconcile.mjs
           node --experimental-strip-types tests/test_instagram_recovery.mjs
