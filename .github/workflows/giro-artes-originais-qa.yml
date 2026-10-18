@@ -35,13 +35,13 @@ jobs:
           assert 'const originalArt=bg==="original_editorial_illustration"' in gen
           assert 'originalArt?originalGraphicHero(' in gen
           assert 'ILUSTRAÇÃO EDITORIAL — NÃO É FOTO' in gen
-          assert 'media_status:"aguardando_foto_licenciada"' in gen
-          assert 'visual_mode:"awaiting_licensed_event_photo"' in gen
-          assert 'visual_approved:false' in gen
-          assert 'awaiting_visual_approval:true' in gen
-          assert 'needs_approved_art:true' in gen
-          blocked=gen.split('    if(!photo){',1)[1].split('    const attribution=photo.creator',1)[0]
-          assert 'render(' not in blocked and '.upload(' not in blocked, 'Missing photo must not generate a generic replacement'
+          assert 'const photo=registeredPhoto;' in gen, 'Only proven event photos may be treated as factual'
+          assert 'const bg=photo?photo.dataUri:"original_editorial_illustration"' in gen
+          assert 'ILUSTRAÇÃO EDITORIAL ORIGINAL — representação gráfica simbólica' in gen
+          assert 'visual_mode:photo?"registered_event_photo":"original_illustration"' in gen
+          assert 'awaiting_visual_approval:true,publication_not_attempted:true' in gen
+          assert 'needs_approved_art:true' not in gen
+          assert 'const photo=registeredPhoto||' not in gen
           assert 'approvedRegistryPhoto(sb,url,sourceLink,title)' in gen
           assert 'feed_ilustracao_revisada' in publish
           assert 'reel_ilustracao_revisada' in publish
@@ -51,5 +51,5 @@ jobs:
           assert "media_provenance_or_human_review_missing" in publish
           assert 'if(!autoApproved)' in prep
           assert 'verifiedPhoto&&' in prep
-          print('PASS: factual-photo gate, registry integration, missing-photo hold and Meta controls preserved')
+          print('PASS: verified photo provenance or original labeled art; mandatory review, no auto-post')
           PY
