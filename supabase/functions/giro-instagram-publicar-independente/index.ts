@@ -36,9 +36,14 @@ Deno.serve(async req=>{
     ((localHour===13&&localMinute>=30)||localHour===14&&localMinute<45);
   const storiesAfterNoon=channel==='stories'&&
     ((localHour===15&&localMinute>=30)||localHour===16);
-  const reelsRecovery=reelsAfterNoon&&meta.data.rollout_stage==='feed_only'&&
+  // Late recovery is reserved for a fully QA-reviewed ChatGPT package; publication
+  // windows before 17h and all Meta semaphore limits remain intact.
+  const lateCatchup=localHour>=17&&localHour<22;
+  const normalWindow=feedNoon||reelsAfterNoon||storiesAfterNoon;
+  const allowedTime=normalWindow||lateCatchup;
+  const reelsRecovery=(reelsAfterNoon||lateCatchup)&&meta.data.rollout_stage==='feed_only'&&
     meta.data.traffic_light_target==='amarelo'&&meta.data.traffic_light_reel_test_enabled===true;
-  const storiesRecovery=storiesAfterNoon&&meta.data.rollout_stage==='feed_only'&&
+  const storiesRecovery=(storiesAfterNoon||lateCatchup)&&meta.data.rollout_stage==='feed_only'&&
     meta.data.traffic_light_target==='amarelo'&&meta.data.traffic_light_story_test_enabled===true;
   const channelAllowed=channel==='feed'||meta.data.rollout_stage==='full'||
     (channel==='reels'&&reelsRecovery)||(channel==='stories'&&storiesRecovery);
@@ -47,16 +52,13 @@ Deno.serve(async req=>{
   const gateDenied=gate.data?.allowed!==true && !(manualTest&&(sequencingOnly||editorialWindowOnly));
   const blocked=!cfg.data.publication_enabled||meta.data.integrity_hold===true||
     gateDenied||(!manualTest&&!channelAllowed)||
-    (!manualTest&&((channel==='feed'&&!feedNoon)||(channel==='reels'&&!reelsAfterNoon)||
-    (channel==='stories'&&!storiesAfterNoon)));
+    (!manualTest&&!allowedTime);
   const blockedReasons=[
     !cfg.data.publication_enabled?"channel_publication_disabled":null,
     meta.data.integrity_hold===true?"meta_integrity_hold":null,
     gate.data?.allowed!==true?"meta_semaphore_denied":null,
     !channelAllowed?"rollout_channel_not_allowed":null,
-    channel==='feed'&&!feedNoon?"outside_feed_noon_window":null,
-    channel==='reels'&&!reelsAfterNoon?"outside_reels_window":null,
-    channel==='stories'&&!storiesAfterNoon?"outside_stories_window":null
+    !allowedTime?"outside_editorial_publication_window":null
   ].filter(Boolean);
   if(body.dry_run===true||blocked)return response({success:true,channel,reason:body.dry_run===true?"dry_run":blockedReasons[0],blocked_reasons:blockedReasons,dry_run:body.dry_run===true,no_publish:true,publication_enabled:cfg.data.publication_enabled,gate:gate.data,integrity_hold:meta.data.integrity_hold,rollout_stage:meta.data.rollout_stage});
   const table='giro_publicacoes_'+channel;
@@ -71,11 +73,28 @@ Deno.serve(async req=>{
     .gt('editorial_expires_at',new Date().toISOString())
     .or('scheduled_at.is.null,scheduled_at.lte.'+new Date().toISOString())
 ;
+  // An additional evening window cannot release old radar drafts or visual tests.
+  if(lateCatchup&&!normalWindow)eligible=eligible.eq('auto_review_basis','chatgpt_asset_qa_v1');
   if(manualTest&&Number.isSafeInteger(Number(body.publication_id))&&Number(body.publication_id)>0)eligible=eligible.eq('id',Number(body.publication_id));
   const found=await eligible.order('urgente',{ascending:false}).order('created_at',{ascending:true}).limit(1).maybeSingle();
   if(found.error)throw found.error;
   const item=found.data;
   if(!item)return response({success:true,channel,processed:0,no_publish:true,reason:"no_fresh_verified_media_eligible"});
+  // Do not publish a late Reel before its own Feed, nor a late Story before
+  // its own Reel. A status flag alone never proves delivery.
+  if(lateCatchup&&!normalWindow&&channel!=='feed'){
+    const bundle=await db.from('giro_chatgpt_pacotes').select('feed_id,reel_id,story_id')
+      .eq(channel==='reels'?'reel_id':'story_id',item.id).maybeSingle();
+    if(bundle.error)throw bundle.error;
+    if(!bundle.data)return response({success:true,channel,no_publish:true,reason:'late_package_link_missing'});
+    const beforeTable=channel==='reels'?'giro_publicacoes_feed':'giro_publicacoes_reels';
+    const beforeId=channel==='reels'?bundle.data.feed_id:bundle.data.reel_id;
+    const beforeCol=channel==='reels'?'instagram_media_id':'instagram_reel_media_id';
+    const predecessor=await db.from(beforeTable).select('status,'+beforeCol).eq('id',beforeId).maybeSingle();
+    if(predecessor.error)throw predecessor.error;
+    if(predecessor.data?.status!=='publicada'||!predecessor.data?.[beforeCol])
+      return response({success:true,channel,no_publish:true,reason:'late_predecessor_not_confirmed'});
+  }
   if(Date.parse(item.editorial_expires_at||'')<Date.now()||Date.parse(item.created_at)<Date.now()-36*3600000){
    await db.from(table).update({status:'descartada',erro:'editorial_expired'}).eq('id',item.id).eq('status','aprovada');
    return response({success:true,channel,no_publish:true,reason:'editorial_expired'});
