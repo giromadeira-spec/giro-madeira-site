@@ -9,6 +9,6 @@ vm.runInNewContext(source,{URL,Response,JSON,Intl,Date:Clock,AbortSignal,console
 async function run(){const r=await handler(new Request('https://test.local',{method:'POST',headers:{'x-giro-db-key':'test-key'},body:JSON.stringify({channel:'reels'})}));assert.equal(r.status,200);return r.json()}
 assert.equal((await run()).reason,'no_fresh_verified_media_eligible');
 uncertain={id:99};assert.equal((await run()).reason,'reconciliation_required');
-uncertain=null;at='2026-10-18T16:45:00Z';assert.ok((await run()).blocked_reasons.includes('outside_reels_window'));
+uncertain=null;at='2026-10-18T16:45:00Z';assert.ok((await run()).blocked_reasons.includes('outside_editorial_publication_window'));
 rollout='full';at='2026-10-18T18:15:00Z';assert.equal((await run()).reason,'no_fresh_verified_media_eligible');
 console.log('PASS: Reels bounded recovery, full rollout, and uncertain-result hold; no publication');
