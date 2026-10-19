@@ -76,3 +76,32 @@ um ciclo real ponta a ponta e conferir URLs do Storage, IDs de pacote,
 gates da Meta e IDs efetivos do Instagram. Se faltar capacidade no
 ambiente agendado, não aprovar/publicar nem inventar mídia; manter
 o sistema sem fila acumulada e tratar essa integração separadamente.
+
+## Ajuste operacional de 19/10 — recuperação sem lotar fila
+
+- Publicador `giro-instagram-publicar-independente` v18: preserva as janelas normais
+  Feed 12h, Reel 13h30 e Story 15h30; acrescenta tentativas de recuperação de
+  **17h às 21h59 Porto Velho** exclusivamente para linhas já aprovadas do
+  `giro_chatgpt_pacotes` (`auto_review_basis=chatgpt_asset_qa_v1`).
+- Crons UTC ativos: `giro-chatgpt-catchup-feed` nos minutos :00,
+  `giro-chatgpt-catchup-reels` nos minutos :20, e
+  `giro-chatgpt-catchup-stories` nos minutos :40, horas 21–23 e 00–01 UTC.
+  A ordem Feed → Reel → Story no período noturno exige ID de publicação
+  efetivo do formato predecessor do **mesmo pacote**.
+- O semáforo Meta, 1 mídia/dia por formato, intervalo de 75–105 minutos,
+  bloqueio 403/2207051, revisão visual, direitos e controle de duplicidade
+  permanecem ativos. Cron executado **não** é evidência de publicação.
+- Para evitar backlog eterno, `giro-chatgpt-expirar-apos-validade`
+  (minuto :50 de cada hora) encerra somente mídias de pacotes ChatGPT
+  cuja validade editorial passou e que ainda estão no estado
+  `aprovada` sem ID externo. Não altera envios incertos ou já confirmados.
+  O trigger `giro_chatgpt_pacote_guard` só libera pacote de outro dia
+  após cada formato ter ID real e status `publicada`, ou estar
+  `descartada` **e vencida**; no máximo um pacote novo/dia.
+- Teste `dry_run` real autenticado, pedido 14799/14800/14801:
+  HTTP 200, `no_publish=true` em todos. Feed e Reel foram bloqueados
+  pelo limite diário de 19/10, Story por janela preventiva pós-erro da Meta.
+  **Nenhuma publicação foi forçada por esses testes.**
+- Shorts e TikTok permanecem em fluxos separados de 17h. Falta de
+  fatos verificáveis, revisão ou MP4 aprovado não autoriza remessa nem
+  permite afirmar que o canal publicou.
