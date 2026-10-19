@@ -1,5 +1,5 @@
 // Shared evidence rules; queues, approval and delivery remain channel-owned.
-export const PHOTO_FIELDS='id,article_url,headline,approval_status,photo_matches_event,rights_verified,social_use_allowed,adaptation_allowed,commercial_use_allowed,license_kind,license_version,evidence_url,evidence_description,reviewed_at,reviewer,copyright_owner,credit_line,photographer,original_image_url,storage_path,valid_until';
+export const PHOTO_FIELDS='id,article_url,headline,event_description,approval_status,photo_matches_event,rights_verified,social_use_allowed,adaptation_allowed,commercial_use_allowed,license_kind,license_version,evidence_url,evidence_description,reviewed_at,reviewer,copyright_owner,credit_line,photographer,original_image_url,storage_path,valid_until';
 export function registryReady(a:any,now=Date.now()):boolean {
  const path=String(a?.storage_path||'');
  return !!a&&a.approval_status==='approved'&&a.photo_matches_event===true&&a.rights_verified===true&&
