@@ -112,7 +112,7 @@ Deno.serve(async req=>{
   const reserved=await db.from(table).update({status:'publicando'}).eq('id',item.id).eq('status','aprovada').is(ids[channel],null).select('id').maybeSingle();
   if(reserved.error)throw reserved.error;
   if(!reserved.data)return response({success:true,channel,processed:0,reason:'already_reserved'});
-  const payload:any={instagram_account_id:account,media_type:types[channel]};
+  const payload:any={instagram_account_id:account,media_type:types[channel],manual_test:manualTest};
   if(channel==='reels'){payload.video_url=media;payload.caption=item.legenda;payload.share_to_feed=false;}
   else {payload.image_url=media;if(channel==='feed')payload.caption=item.legenda;}
   try{
