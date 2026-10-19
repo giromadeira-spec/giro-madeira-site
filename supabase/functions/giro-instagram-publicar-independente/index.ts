@@ -39,7 +39,7 @@ Deno.serve(async req=>{
   // Late recovery is reserved for a fully QA-reviewed ChatGPT package; publication
   // windows before 17h and all Meta semaphore limits remain intact.
   const lateCatchup=localHour>=17&&localHour<22;
-  const normalWindow=feedNoon||reelsAfterNoon||storiesAfterNoon;
+  const normalWindow=channel==='feed'?feedNoon:channel==='reels'?reelsAfterNoon:storiesAfterNoon;
   const allowedTime=normalWindow||lateCatchup;
   const reelsRecovery=(reelsAfterNoon||lateCatchup)&&meta.data.rollout_stage==='feed_only'&&
     meta.data.traffic_light_target==='amarelo'&&meta.data.traffic_light_reel_test_enabled===true;
