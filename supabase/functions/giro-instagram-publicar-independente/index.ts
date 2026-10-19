@@ -87,13 +87,19 @@ Deno.serve(async req=>{
       .eq(channel==='reels'?'reel_id':'story_id',item.id).maybeSingle();
     if(bundle.error)throw bundle.error;
     if(!bundle.data)return response({success:true,channel,no_publish:true,reason:'late_package_link_missing'});
-    const beforeTable=channel==='reels'?'giro_publicacoes_feed':'giro_publicacoes_reels';
-    const beforeId=channel==='reels'?bundle.data.feed_id:bundle.data.reel_id;
-    const beforeCol=channel==='reels'?'instagram_media_id':'instagram_reel_media_id';
-    const predecessor=await db.from(beforeTable).select('status,'+beforeCol).eq('id',beforeId).maybeSingle();
-    if(predecessor.error)throw predecessor.error;
-    if(predecessor.data?.status!=='publicada'||!predecessor.data?.[beforeCol])
-      return response({success:true,channel,no_publish:true,reason:'late_predecessor_not_confirmed'});
+    if(channel==='reels'){
+      const prior=await db.from('giro_publicacoes_feed')
+        .select('status,instagram_media_id').eq('id',bundle.data.feed_id).maybeSingle();
+      if(prior.error)throw prior.error;
+      if(prior.data?.status!=='publicada'||!prior.data?.instagram_media_id)
+        return response({success:true,channel,no_publish:true,reason:'late_predecessor_not_confirmed'});
+    }else{
+      const prior=await db.from('giro_publicacoes_reels')
+        .select('status,instagram_reel_media_id').eq('id',bundle.data.reel_id).maybeSingle();
+      if(prior.error)throw prior.error;
+      if(prior.data?.status!=='publicada'||!prior.data?.instagram_reel_media_id)
+        return response({success:true,channel,no_publish:true,reason:'late_predecessor_not_confirmed'});
+    }
   }
   if(Date.parse(item.editorial_expires_at||'')<Date.now()||Date.parse(item.created_at)<Date.now()-36*3600000){
    await db.from(table).update({status:'descartada',erro:'editorial_expired'}).eq('id',item.id).eq('status','aprovada');
