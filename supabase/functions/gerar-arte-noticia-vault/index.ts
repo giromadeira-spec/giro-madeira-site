@@ -596,7 +596,7 @@ function rioFooterSvg(W:number,H:number,portrait:boolean){
 }
 function headlineBlockOfficial(lines:string[],x:number,y:number,fs:number,lh:number){
   return '<text x="'+x+'" y="'+y+'" font-family="Anton" font-size="'+fs+'" font-weight="900" stroke="#020a12" stroke-opacity=".30" stroke-width="1.5" paint-order="stroke" letter-spacing=".2">' +
-    lines.map((l,i)=>'<tspan x="'+x+'" dy="'+(i===0?0:lh)+'" fill="'+(i===1?"#FFCC1C":"#FFFFFF")+'">'+esc(l)+'</tspan>').join('') + '</text>';
+    lines.map((l,i)=>'<tspan x="'+x+'" dy="'+(i===0?0:lh)+'" fill="'+(i===lines.length-1?"#FFCC1C":"#FFFFFF")+'">'+esc(l)+'</tspan>').join('') + '</text>';
 }
 function originalGraphicHero(W:number,H:number,title:string,category:string){
   // Original SVG vector motifs, not a photo, reenactment or reconstruction of an event.
@@ -637,29 +637,30 @@ function originalGraphicHero(W:number,H:number,title:string,category:string){
     '<circle cx="540" cy="'+cy+'" r="300" fill="none" stroke="#b8d7e6" stroke-opacity=".18" stroke-width="6"/>'+
     '<g>'+motif+'</g>';
 }
-function makeSvg(kind:"feed"|"story",title:string,summary:string,source:string,category:string,bg:string,urgent=false,photoCredit="",isEventPhoto=false){
+function makeSvg(kind:"feed"|"story",title:string,summary:string,source:string,category:string,bg:string,urgent=false,photoCredit="",isEventPhoto=false,previewLabel=""){
   // Photo remains the first choice. The only fallback is a visibly labeled
   // original abstract vector composition: never a synthetic event photograph.
   const portrait=kind==="story",W=1080,H=portrait?1920:1080;
   const originalArt=bg==="original_editorial_illustration";
   if(!originalArt&&!bg.startsWith("data:image/"))throw new Error("visual_contract_media_required");
   const pad=portrait?66:58;
-  const categoryY=portrait?930:482,titleY=portrait?1090:626,maxBaseline=portrait?1550:918;
-  const layout=fitHeadline(title,W-2*pad,portrait?7:7,portrait?80:68,portrait?43:37,
+  const categoryY=portrait?1100:580,titleY=portrait?1250:710,maxBaseline=portrait?1585:884;
+  const layout=fitHeadline(title,W-2*pad,3,portrait?84:64,portrait?43:37,
     maxBaseline-titleY,portrait?1.12:1.12);
   const lineHeight=Math.round(layout.size*1.12);
   const last=titleY+(layout.lines.length-1)*lineHeight;
   if(last>maxBaseline)throw new Error("visual_contract_headline_outside_safe_area");
-  const cat=clean(category||"GIRO AGORA").toUpperCase().slice(0,22);
+  const obituary=/empres[aá]rio.*morre|morre.*empres[aá]rio/i.test(title);
+  const cat=obituary?"LUTO":clean(category||"GIRO AGORA").toUpperCase().slice(0,22);
   const tagW=Math.min(735,Math.max(220,cat.length*(portrait?23:19)+90));
   const footerY=portrait?1842:1038;
-  const brand=brandHeader(portrait?56:51,portrait?55:42,portrait?1.02:.86);
+  const brand=brandHeader(portrait?56:51,portrait?55:42,portrait?.70:.66);
   const photo=originalArt?originalGraphicHero(W,H,title,category):'<image href="'+bg+'" x="0" y="0" width="'+W+'" height="'+H+'" preserveAspectRatio="xMidYMid slice"/>';
   const gradient='<defs><linearGradient id="newsShade" x1="0" y1="0" x2="0" y2="1">'+
-    '<stop offset="0" stop-color="#04101c" stop-opacity=".55"/>'+
+    '<stop offset="0" stop-color="#04101c" stop-opacity=".10"/>'+
     '<stop offset=".20" stop-color="#04101c" stop-opacity=".08"/>'+
     '<stop offset=".39" stop-color="#04101c" stop-opacity=".17"/>'+
-    '<stop offset=".57" stop-color="#020c18" stop-opacity=".76"/>'+
+    '<stop offset=".57" stop-color="#020c18" stop-opacity=".28"/>'+
     '<stop offset=".83" stop-color="#020912" stop-opacity=".97"/>'+
     '<stop offset="1" stop-color="#020912" stop-opacity="1"/></linearGradient></defs>';
   const flag='<path d="M'+pad+' '+categoryY+' H'+(pad+tagW)+
@@ -668,12 +669,12 @@ function makeSvg(kind:"feed"|"story",title:string,summary:string,source:string,c
     '" fill="#071526">'+esc(cat)+'</text>'+
     '<path d="M'+(pad+tagW+9)+' '+(categoryY+62)+' H'+(W-pad)+
     '" stroke="#ffcc1c" stroke-width="5"/>';
-  const credit=isEventPhoto?"FOTO DO ACONTECIMENTO":"ILUSTRAÇÃO EDITORIAL — NÃO É FOTO";
-  const labelY=portrait?878:425;
+  const credit=previewLabel||(isEventPhoto?"FOTO DA NOTÍCIA":"ILUSTRAÇÃO EDITORIAL — NÃO É FOTO");
+  const labelY=portrait?1050:540;
   const illustrative='<rect x="'+pad+'" y="'+(labelY-28)+'" width="'+(isEventPhoto?360:510)+'" height="42" rx="4" fill="#041526" opacity=".91"/>'+
     '<text x="'+(pad+10)+'" y="'+(labelY+1)+'" font-family="Inter" font-weight="800" font-size="20" fill="#fff">'+credit+'</text>';
   const sourceName=clean(source||"Giro Madeira").slice(0,37);
-  const urgentTag=urgent?
+  const urgentTag=urgent&&!obituary?
     '<rect x="799" y="57" width="231" height="58" rx="5" fill="#dc1729"/>'+
     '<text x="814" y="98" font-family="Anton" font-size="35" fill="#fff">URGENTE</text>':"";
   return '<svg xmlns="http://www.w3.org/2000/svg" width="'+W+'" height="'+H+
@@ -690,13 +691,20 @@ function makeSvg(kind:"feed"|"story",title:string,summary:string,source:string,c
 }
 
 async function render(svg:string,_font:Uint8Array){
+ // Convert typography to SVG paths with the actual fonts BEFORE the remote worker.
+ // Host fallback fonts previously changed the approved headline into monospaced text.
+ await ensureWasm();
+ const [display,regular]=await Promise.all([getDisplayFont(),getFont()]);
+ const typeset=new Resvg(svg,{font:{fontBuffers:[display,regular],defaultFontFamily:"Anton"}});
+ const outlinedSvg=typeset.toString();
+ typeset.free();
  const u=Deno.env.get("SUPABASE_URL")||"",k=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"";
  const sb=createClient(u,k);
  const {data:key,error}=await sb.rpc("giro_reels_worker_key_get");
  if(error||!key)throw new Error("render_worker_key_missing");
  const r=await fetch("https://giro-reels-worker-production.up.railway.app/render-art",{
   method:"POST",headers:{"Content-Type":"application/json","x-giro-worker-key":String(key)},
-  body:JSON.stringify({svg}),signal:AbortSignal.timeout(85000)
+  body:JSON.stringify({svg:outlinedSvg}),signal:AbortSignal.timeout(85000)
  });
  if(!r.ok)throw new Error("render_art_worker_http_"+r.status+":"+(await r.text()).slice(0,220));
  if(!(r.headers.get("content-type")||"").includes("image/png"))throw new Error("render_worker_wrong_content_type");
@@ -753,10 +761,10 @@ Deno.serve(async(req)=>{
     if(q.error) throw q.error; if(!q.data) return new Response(JSON.stringify({success:false,error:"Publicação não encontrada"}),{status:404,headers:H});
     const item:any=q.data;
     // Regenerating an already-published item would risk changing historical assets.
-    if(item.status==="publicada"||item.instagram_media_id||item.instagram_story_media_id||item.instagram_reel_media_id)
+    if(body?.preview_art!==true&&(item.status==="publicada"||item.instagram_media_id||item.instagram_story_media_id||item.instagram_reel_media_id))
       return new Response(JSON.stringify({success:false,error:"already_published_no_regeneration"}),{status:409,headers:H});
     // Aprovação manual nunca pode ser sobrescrita pelo radar automático.
-    if(item.visual_approved===true)
+    if(body?.preview_art!==true&&item.visual_approved===true)
       return new Response(JSON.stringify({success:false,error:"approved_visual_protected_no_regeneration"}),{status:409,headers:H});
     if(body?.preview_art===true){
       const visualSmoke=body?.qa_layout_smoke===true&&body?.qa_embed===true;
@@ -780,10 +788,14 @@ Deno.serve(async(req)=>{
       const previewOriginal=absUrl(clean(previewPage('meta[property="og:image"]').attr("content")||previewPage('meta[name="twitter:image"]').attr("content")),clean(item.fonte_url));
       // A topical licensed image cannot be presented as a photo of the event.
       // A preview without exact provenance shows original, labeled artwork.
-      const photo=visualSmoke?await licensedRioMadeiraPhoto():null;
+      const previewData=!visualSmoke&&previewOriginal?await imageDataUri(previewOriginal):"";
+      const photo=visualSmoke?await licensedRioMadeiraPhoto():previewData?{
+        dataUri:previewData,creator:"Prévia com foto da reportagem — uso não liberado",
+        license:"não verificada",source:previewOriginal
+      }:null;
             const attribution=photo?(photo.creator+" • "+photo.license):"";
-      const feedSvg=makeSvg("feed",title,visualSmoke?"PRÉVIA DE LAYOUT • NÃO PUBLICAR":clean(item.resumo),visualSmoke?"FOTOGRAFIA CC0":clean(item.fonte_nome)||"Giro Madeira",category,photo?.dataUri||"original_editorial_illustration",visualSmoke?false:item.urgente===true,attribution,false);
-      const storySvg=makeSvg("story",title,visualSmoke?"PRÉVIA DE LAYOUT • NÃO PUBLICAR":clean(item.resumo),visualSmoke?"FOTOGRAFIA CC0":clean(item.fonte_nome)||"Giro Madeira",category,photo?.dataUri||"original_editorial_illustration",visualSmoke?false:item.urgente===true,attribution,false);
+      const feedSvg=makeSvg("feed",title,visualSmoke?"PRÉVIA DE LAYOUT • NÃO PUBLICAR":clean(item.resumo),visualSmoke?"FOTOGRAFIA CC0":clean(item.fonte_nome)||"Giro Madeira",category,photo?.dataUri||"original_editorial_illustration",visualSmoke?false:item.urgente===true,attribution,false,photo?"FOTO DA REPORTAGEM • PRÉVIA":"");
+      const storySvg=makeSvg("story",title,visualSmoke?"PRÉVIA DE LAYOUT • NÃO PUBLICAR":clean(item.resumo),visualSmoke?"FOTOGRAFIA CC0":clean(item.fonte_nome)||"Giro Madeira",category,photo?.dataUri||"original_editorial_illustration",visualSmoke?false:item.urgente===true,attribution,false,photo?"FOTO DA REPORTAGEM • PRÉVIA":"");
       // QA requests generate only the asked image: avoid a second unused 1080x1920
       // render consuming memory and causing HTTP 503 with long headlines.
       const embed=body?.qa_embed===true;
@@ -792,7 +804,7 @@ Deno.serve(async(req)=>{
       const story=embed&&!onlyStory?new Uint8Array():await render(storySvg,font);
       // Authenticated read-only visual QA: no new rows, no uploads, no publishing.
       if(body?.qa_embed===true) return new Response(JSON.stringify({
-        success:true,preview_art:true,qa_embed:true,publication_id:item.id,layout_smoke_test:visualSmoke,not_for_publication:visualSmoke,
+        success:true,preview_art:true,qa_embed:true,publication_id:item.id,layout_smoke_test:visualSmoke,not_for_publication:true,
         visual_mode:photo?(!visualSmoke?"original_event_photo":"licensed_editorial_photo"):"original_illustration",
         illustrative_photo_credit:photo?{creator:photo.creator,license:photo.license,source:photo.source}:null,
         rio_photo_qa:rioPhotoQaState,
@@ -898,6 +910,18 @@ Deno.serve(async(req)=>{
     // Exact registered evidence is required for an actual event photograph.
     // Without it, prepare original art with an explicit illustration label for editorial review.
     const photo=registeredPhoto;
+    // Owner-approved photo-first production: discovery is automatic, rights are evidence-based.
+    // Do not spend render time on the generic fallback rejected on 18 October.
+    if(!photo){
+      await sb.from(publicationTable).update({
+        media_status:"aguardando_verificacao_foto_e_licenca",visual_approved:false,
+        source_image_url:imageUrl||null,erro:"photographic_layout_requires_verified_photo"
+      }).eq("id",id).eq("status","pendente").eq("visual_approved",false);
+      return new Response(JSON.stringify({success:true,id,needs_approved_art:true,
+        visual_mode:"photo_pending",source_image_url:imageUrl||null,
+        reason:"photographic_layout_requires_verified_photo",publication_not_attempted:true}),{headers:H});
+    }
+
     const attribution=photo?photo.creator+" • "+photo.license:"";
     const bg=photo?photo.dataUri:"original_editorial_illustration";
     await prepareBrandLogo(); const font=new Uint8Array();
