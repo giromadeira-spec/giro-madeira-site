@@ -7,6 +7,7 @@ const {load}=require('cheerio');
 const headline='Senado aprova projeto de proteção das crianças';
 assert.equal(sourceHeadlineMatches(headline,'Senado aprova projeto de proteção das crianças'),true);
 assert.equal(sourceHeadlineMatches(headline,'Empresário morre em queda de avião'),false);
+assert.equal(sourceHeadlineMatches('Governo Lula envia comboio ministerial ao Amazonas para conter incêndios criminosos e expõe falhas na resposta estadual','Governo envia comboio ao Amazonas para conter incêndios'),true);
 assert.equal(sourceHeadlineMatches('Acidente deixa 12 mortos na rodovia federal','Acidente deixa 2 mortos na rodovia federal'),false);
 const sources=[
  {home:'https://agenciabrasil.ebc.com.br/fotos',name:'Agência Brasil'},
