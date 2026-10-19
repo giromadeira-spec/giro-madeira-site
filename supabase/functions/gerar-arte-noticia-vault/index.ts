@@ -1,4 +1,4 @@
-import { approvedRegistryPhoto, discoverPhotoCandidate } from "../_shared/photo-registry.ts";
+import { approvedRegistryPhoto, discoverPhotoCandidate, searchRegisteredPhotoSources } from "../_shared/photo-registry.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.49.1";
 import { load } from "npm:cheerio@1.0.0";
 import { initWasm, Resvg } from "npm:@resvg/resvg-wasm@2.6.2";
@@ -913,12 +913,13 @@ Deno.serve(async(req)=>{
     // Owner-approved photo-first production: discovery is automatic, rights are evidence-based.
     // Do not spend render time on the generic fallback rejected on 18 October.
     if(!photo){
+      const sourceSearch=await searchRegisteredPhotoSources(sb,sourceLink,title,load);
       await sb.from(publicationTable).update({
         media_status:"aguardando_verificacao_foto_e_licenca",visual_approved:false,
         source_image_url:imageUrl||null,erro:"photographic_layout_requires_verified_photo"
       }).eq("id",id).eq("status","pendente").eq("visual_approved",false);
       return new Response(JSON.stringify({success:true,id,needs_approved_art:true,
-        visual_mode:"photo_pending",source_image_url:imageUrl||null,
+        visual_mode:"photo_pending",source_image_url:imageUrl||null,source_search:sourceSearch,
         reason:"photographic_layout_requires_verified_photo",publication_not_attempted:true}),{headers:H});
     }
 
