@@ -60,7 +60,7 @@ init();meta.traffic_light_story_test_enabled=false;
 assert.ok((await invoke()).body.blocked_reasons.includes('rollout_channel_not_allowed'));assert.equal(publishCalls,0);
 init();allowed=false;assert.ok((await invoke()).body.blocked_reasons.includes('meta_semaphore_denied'));assert.equal(publishCalls,0);
 init();at='2026-10-18T17:00:00Z';
-assert.ok((await invoke()).body.blocked_reasons.includes('outside_stories_window'));assert.equal(publishCalls,0);
+assert.ok((await invoke()).body.blocked_reasons.includes('outside_editorial_publication_window'));assert.equal(publishCalls,0);
 init();approved=false;row.visual_approved=false;
 assert.equal((await invoke()).body.reason,'no_fresh_verified_media_eligible');assert.equal(publishCalls,0);
 init();row.media_status='aguardando_revisao_visual';
