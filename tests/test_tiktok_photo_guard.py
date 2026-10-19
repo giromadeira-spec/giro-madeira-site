@@ -64,15 +64,16 @@ class TikTokPhotoGuard(unittest.TestCase):
                 self.assertEqual(upload,0)
                 self.assertEqual(completes,[])
 
-    def test_cleared_original_art_stays_for_review_without_claiming_photo(self):
-        for channel in ("shorts","tiktok"):
-            failed,calls,art,upload,completes=self.pipeline(platform=channel,missing=True,allow_original=True)
-            self.assertFalse(failed)
-            self.assertEqual(calls,["claim","complete"])
-            self.assertEqual(art,1)
-            self.assertEqual(upload,1)
-            self.assertEqual(completes[0]["visual_kind"],"illustration")
-            self.assertTrue(completes[0]["image_credit"].startswith("original_editorial_labeled_v2_"))
+    def test_tiktok_legacy_art_flag_cannot_bypass_photo_first_policy(self):
+        # The 18 October photo-first contract supersedes the legacy art flag.
+        # Do not restore generic artwork, upload or complete without a photo.
+        failed,calls,art,upload,completes=self.pipeline(
+            platform="tiktok",missing=True,allow_original=True)
+        self.assertFalse(failed)
+        self.assertEqual(calls,["claim","photo_pending"])
+        self.assertEqual(art,0)
+        self.assertEqual(upload,0)
+        self.assertEqual(completes,[])
 
     def test_original_art_requires_explicit_channel_gate_and_known_subject(self):
         claim={"title":"Protestos na França deixam policiais feridos", "source_url":"https://example.test/report"}
@@ -135,3 +136,4 @@ class TikTokPhotoGuard(unittest.TestCase):
 
 if __name__=="__main__":
     unittest.main()
+
