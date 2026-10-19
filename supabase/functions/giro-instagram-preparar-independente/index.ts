@@ -124,7 +124,7 @@ Deno.serve(async req=>{
    const m=check.data;
    let official=false;
    try{const u=new URL(String(m?.fonte_url||""));official=u.protocol==="https:"&&u.hostname.endsWith(".gov.br")}catch{}
-   const verified=official&&m?.status==="pendente"&&m.visual_approved===false&&
+   const verified=verifiedPhoto&&m?.status==="pendente"&&m.visual_approved===false&&
      Number(m.media_pipeline_version)===6&&Date.parse(String(m.editorial_expires_at||""))>Date.now()&&
      String(m.legenda||"").length>=400&&
      String(m.legenda||"").includes("Fonte: ")&&String(m.legenda||"").includes("Matéria original: ")&&
@@ -194,7 +194,7 @@ Deno.serve(async req=>{
    const m=check.data;
    let official=false;
    try{const u=new URL(String(m?.fonte_url||""));official=u.protocol==="https:"&&u.hostname.endsWith(".gov.br")}catch{}
-   const verified=official&&m?.status==="pendente"&&m.visual_approved===false&&
+   const verified=verifiedPhoto&&m?.status==="pendente"&&m.visual_approved===false&&
      m.publicar_story===true&&!m.instagram_story_media_id&&
      Number(m.media_pipeline_version)===5&&
      Date.parse(String(m.editorial_expires_at||""))>Date.now()&&
