@@ -1,3 +1,5 @@
+import { searchRegisteredPhotoSources } from "../_shared/photo-registry.ts";
+import { load } from "npm:cheerio@1.0.0";
 import { storyboardIsCurrent } from "../_shared/article-recency.ts";
 import { approvedRegistryPhoto, registryReady, registryCredit, PHOTO_FIELDS } from "../_shared/photo-registry.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.0";
@@ -142,7 +144,8 @@ Deno.serve(async req=>{
       shorts_render_error:"event_photo_rights_review_required",editor_approved:false,visual_review_status:"pending",
       updated_at:new Date().toISOString()}).eq("id",id).eq("shorts_render_job_id",jobId).is("provider_post_id",null);
     if(saved.error)throw saved.error;
-    return response({success:true,queue_id:id,ready_to_publish:false,reason:"event_photo_rights_review_required"});
+    const sourceSearch=await searchRegisteredPhotoSources(db,String(row.source_url||""),String(row.title||""),load);
+    return response({success:true,queue_id:id,ready_to_publish:false,reason:"event_photo_rights_review_required",source_search:sourceSearch});
   }
   if(action==="fail"){
     await db.from("giro_social_video_queue").update({
