@@ -42,3 +42,15 @@ O layout de **foto realista de abastecimento, logo grande circular, categoria am
 **Regra executável:** gerador principal \`scripts/giro_shorts_auto.py\`, contrato visual \`GIRO_EDITORIAL_FOTO_MANCHETE_RIO_V1\`, entrada comum para Shorts e cópia TikTok 30fps. Para Feed/Stories/Reels, adaptar a MESMA composição, não importar templates genéricos nem colar capa quadrada em vídeo vertical. O layout atual deve incluir: logo original sem palavra GIRO/MADEIRA redundante, tarja amarela editorial, manchete central-baixa de grande escala (cores branca/amarela), e faixa panorâmica permanente do Rio Madeira na base.
 
 **Antes de permitir postagem**, efetuar QA visual do arquivo renderizado e não apenas confiar que os arquivos de prompt existem. Bloquear no caso de logo cortada/duplicada, manchete truncada, arquivo fora de dimensão, play/triângulo, ausência do Rio Madeira, crédito impossível de ler, arte sem ligação com a pauta ou uso não licenciado de imagens. Sem aprovação visual válida, reter o trabalho; não recriar/duplicar registros de postagem anteriores.
+
+## Padrão aprovado em 18/10/2026 — substitui referências anteriores conflitantes
+
+O responsável aprovou a segunda prévia fotográfica da matéria sobre Victor Simões. Aplicar em Feed, Stories, Reels, Shorts e TikTok, com filas independentes:
+- Foto autêntica ligada à pessoa ou ao acontecimento domina 60–70% da composição. Retrato anterior recebe FOTO DE ARQUIVO; nunca identificar como foto do acidente.
+- Logo ORIGINAL menor no canto superior esquerdo, aproximadamente 13–16% da largura, sem reconstrução ou duplicação.
+- Manchete curta, preferencialmente 3 linhas completas, branca com trecho principal amarelo; apoio factual em uma linha.
+- Tarja de categoria discreta e faixa baixa do Rio Madeira, sem competir com a fotografia.
+- ChatGPT trabalha composição e tipografia. A fotografia e rostos devem ser preservados, sem reconstrução generativa na mídia final de produção.
+- Fonte e crédito na legenda; preservar atribuições exigidas pela licença. Prévia não comprova permissão de republicação.
+- NÃO aprovar automaticamente arte abstrata/simbólica genérica como substituta dessa composição. Sem fotografia pertinente e autorizada, buscar outra pauta com foto válida ou reter o item; não publicar fundo genérico.
+- Aprovação depende de inspeção da saída final. Documentação e HTTP 200 não comprovam qualidade nem publicação.
