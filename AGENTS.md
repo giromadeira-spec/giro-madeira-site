@@ -68,3 +68,15 @@ Código principal: `scripts/giro_shorts_auto.py` (Shorts/TikTok, execução GitH
 ## Contingência editorial autorizada em 17/10/2026
 
 A autorização posterior do responsável mantém fotografia do acontecimento como primeira opção e permite, quando não houver foto segura, **arte original claramente identificada como ilustração**, sem simular registro real, com identidade oficial. A arte não recebe licença fotográfica nem a tarja de foto real. Deve ser pertinente à pauta, vinculada à URL/manchete, sem escudo genérico para assunto desconhecido, sem foto de terceiros e sem API paga. A ponte autoriza esse modo separadamente em Shorts e TikTok; a conclusão permanece sem aprovação editorial/visual. A autorização de preparar arte não é autorização de publicar. Instagram continua com seu contrato próprio e revisão por formato.
+
+## Padrão aprovado em 18/10/2026 — substitui referências anteriores conflitantes
+
+O responsável aprovou a segunda prévia fotográfica da matéria sobre Victor Simões. Aplicar em Feed, Stories, Reels, Shorts e TikTok, com filas independentes:
+- Foto autêntica ligada à pessoa ou ao acontecimento domina 60–70% da composição. Retrato anterior recebe FOTO DE ARQUIVO; nunca identificar como foto do acidente.
+- Logo ORIGINAL menor no canto superior esquerdo, aproximadamente 13–16% da largura, sem reconstrução ou duplicação.
+- Manchete curta, preferencialmente 3 linhas completas, branca com trecho principal amarelo; apoio factual em uma linha.
+- Tarja de categoria discreta e faixa baixa do Rio Madeira, sem competir com a fotografia.
+- ChatGPT trabalha composição e tipografia. A fotografia e rostos devem ser preservados, sem reconstrução generativa na mídia final de produção.
+- Fonte e crédito na legenda; preservar atribuições exigidas pela licença. Prévia não comprova permissão de republicação.
+- NÃO aprovar automaticamente arte abstrata/simbólica genérica como substituta dessa composição. Sem fotografia pertinente e autorizada, buscar outra pauta com foto válida ou reter o item; não publicar fundo genérico.
+- Aprovação depende de inspeção da saída final. Documentação e HTTP 200 não comprovam qualidade nem publicação.
