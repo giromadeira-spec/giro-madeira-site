@@ -11,9 +11,11 @@ assert.ok(publisher.includes("localHour===13&&localMinute>=30") &&
 assert.ok(publisher.includes("localHour===15&&localMinute>=30") &&
  publisher.includes("localHour===16"),
  'Stories must wait for the later afternoon window');
-assert.ok(publisher.includes("channel==='feed'&&!feedNoon") &&
- publisher.includes("channel==='stories'&&!storiesAfterNoon"),
- 'Even manual calls must remain within the configured channel window');
+assert.ok(publisher.includes("const normalWindow=channel==='feed'?feedNoon:channel==='reels'?reelsAfterNoon:storiesAfterNoon;") &&
+ publisher.includes("const allowedTime=normalWindow||lateCatchup;") &&
+ publisher.includes("(!manualTest&&!allowedTime)") &&
+ publisher.includes("eligible=eligible.eq('auto_review_basis','chatgpt_asset_qa_v1')"),
+ 'Original midday slots stay channel-specific; evening recovery only permits approved ChatGPT assets');
 assert.ok(publisher.includes("meta_semaphore_denied") &&
  publisher.includes("gate.data?.allowed!==true"),'Cannot bypass Meta safe-interval gate');
 assert.ok(publisher.includes("vertical_story_specific_media_required") &&
