@@ -48,3 +48,68 @@ export async function registeredCreditVerified(db:any,credit:string,article:stri
   .eq('id',id).eq('article_url',article).eq('headline',headline).maybeSingle();
  return !found.error&&registryReady(found.data)&&registryCredit(found.data)===credit;
 }
+
+/** Search approved source catalogues for closely matching photo candidates.
+ * Search never grants image rights or visual approval; those remain file-level.
+ */
+export function sourceHeadlineMatches(headline:string,candidate:string):boolean{
+ const words=(s:string)=>new Set((s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().match(/[a-z0-9]{4,}/g)||[])
+  .filter(w=>!['para','sobre','apos','pela','pelo','entre','noticia','noticias','foto','fotos','brasil'].includes(w)));
+ const a=words(headline),b=words(candidate);
+ const matches=[...a].filter(w=>b.has(w)).length;
+ const numbers=headline.match(/\b\d+\b/g)||[];
+ return a.size>=3&&matches>=3&&matches/a.size>=0.7&&numbers.every(n=>new RegExp('\\b'+n+'\\b').test(candidate));
+}
+export async function searchRegisteredPhotoSources(db:any,article:string,headline:string,parse:any,request:typeof fetch=fetch){
+ const result={searched:0,candidates:0,errors:[] as string[]};
+ const configured=await db.from('giro_pesquisa_fontes_imagens').select('note,active').eq('platform','orgao_oficial').maybeSingle();
+ if(configured.error||!configured.data?.active)return result;
+ let catalog:any;try{catalog=JSON.parse(configured.data.note)}catch{return result;}
+ const definitions=[
+  {home:'https://agenciabrasil.ebc.com.br/fotos',host:'agenciabrasil.ebc.com.br',index:'https://agenciabrasil.ebc.com.br/fotos',path:/\/(?:[^/]+\/noticia\/|foto\/|fotos\/)/},
+  {home:'https://www.camara.leg.br/banco-imagens/',host:'www.camara.leg.br',index:'https://www.camara.leg.br/busca-portal?contextoBusca=BuscaNoticia&termo='+encodeURIComponent(headline),path:/\/noticias\/\d/},
+  {home:'https://www12.senado.leg.br/fotos',host:'www12.senado.leg.br',index:'https://www12.senado.leg.br/noticias/busca?SearchableText='+encodeURIComponent(headline),path:/\/noticias\/materias\/\d{4}/}
+ ];
+ async function page(url:string,host:string){
+  const r=await request(url,{signal:AbortSignal.timeout(6500),redirect:'error',headers:{'User-Agent':'GiroMadeiraBot/3.2 (editorial photo discovery)'}});
+  if(!r.ok)throw Error('http_'+r.status);
+  if(r.url&&new URL(r.url).hostname!==host)throw Error('unexpected_host');
+  if(!String(r.headers.get('content-type')).includes('text/html'))throw Error('unexpected_content_type');
+  const html=await r.text();if(html.length>2000000)throw Error('page_too_large');
+  return parse(html);
+ }
+ await Promise.all(definitions.map(async def=>{
+  const source=catalog.sources?.find((s:any)=>s.home===def.home);if(!source)return;
+  result.searched++;
+  try{
+   const $=await page(def.index,def.host),links=new Map<string,string>();
+   $('a[href]').each((_:any,el:any)=>{
+    const a=$(el),label=String(a.attr('title')||a.text()||'').replace(/\s+/g,' ').trim();
+    if(!sourceHeadlineMatches(headline,label))return;
+    try{const u=new URL(a.attr('href'),def.index);
+     if(u.protocol==='https:'&&u.hostname===def.host&&def.path.test(u.pathname)){u.hash='';links.set(u.toString(),label);}
+    }catch{}
+   });
+   // One best candidate per provider keeps the scheduled request bounded.
+   for(const [url,label] of [...links].slice(0,1)){
+    const doc=await page(url,def.host);
+    const title=String(doc('meta[property="og:title"]').attr('content')||doc('h1').first().text()||label);
+    if(!sourceHeadlineMatches(headline,title))continue;
+    const raw=doc('meta[property="og:image"]').attr('content');
+    if(!raw)continue;
+    const image=new URL(raw,url);
+    if(image.protocol!=='https:'||/logo|placeholder|favicon|sem-foto/i.test(image.pathname))continue;
+    const credit=String(doc('figcaption').text()||doc('.foto-legenda').text()||doc('meta[property="og:image:alt"]').attr('content')||'').replace(/\s+/g,' ').slice(0,1200);
+    const saved=await db.from('giro_imagens_autorizadas').upsert({
+     source_platform:'orgao_oficial',discovery_url:url,original_image_url:image.toString(),
+     article_url:article,headline,event_description:credit||title,
+     notes:JSON.stringify({discovery:'registered_source_search_v1',source:source.name,source_article:url,terms:source.terms,required_credit:source.credit,conditions:source.conditions,
+      review_required:'Confirmar mesma pessoa/ocorrência, data, crédito, licença individual e autorização de adaptação. Busca textual não comprova pertinência nem aprova publicação.'})
+    },{onConflict:'article_url,headline,original_image_url',ignoreDuplicates:true});
+    if(saved.error)throw Error('candidate_save_failed');
+    result.candidates++;
+   }
+  }catch(e){result.errors.push(def.host+':'+(e instanceof Error?e.message:'search_failed'));}
+ }));
+ return result;
+}
