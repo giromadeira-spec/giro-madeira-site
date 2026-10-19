@@ -950,10 +950,11 @@ Deno.serve(async(req)=>{
         reason:"photographic_layout_requires_verified_photo",publication_not_attempted:true}),{headers:H});
     }
 
+    const archivePhoto=/foto de arquivo/i.test(String(registered?.record?.event_description||""));
     const attribution=photo?photo.creator+" • "+photo.license:"";
     const bg=photo?photo.dataUri:"original_editorial_illustration";
     await prepareBrandLogo(); const font=new Uint8Array();
-    const feed=await render(makeSvg("feed",title,desc,source,category,bg,item.urgente===true,attribution,!!photo),font);
+    const feed=await render(makeSvg("feed",title,desc,source,category,bg,item.urgente===true,attribution,!!photo,archivePhoto?"FOTO DE ARQUIVO":""),font);
     const story=await render(makeSvg("story",title,desc,source,category,bg,item.urgente===true,attribution,!!photo),font);
         const feedPath=`auto/feed/${channel}/${id}-${Date.now()}.png`,storyPath=`auto/story/${channel}/${id}-${Date.now()}.png`;
     const [uf,us]=await Promise.all([
@@ -967,7 +968,7 @@ Deno.serve(async(req)=>{
     // Keep its source URL only; original Reel media is made by the approved worker.
     const vid={source:videoRaw,publicUrl:""};
     const photoCredit=photo
-      ?"\nFoto do acontecimento: "+photo.creator+" ("+photo.license+") — "+photo.source
+      ?("\n"+(archivePhoto?"Foto de arquivo: ":"Foto do acontecimento: "))+photo.creator+" ("+photo.license+") — "+photo.source
       :"\nILUSTRAÇÃO EDITORIAL ORIGINAL — representação gráfica simbólica, NÃO É FOTO DO ACONTECIMENTO.";
     const legenda=`${originalText}\n\nFonte: ${source}\nMatéria original: ${sourceLink}${photoCredit}\n\n#GiroMadeira #PortoVelho #Rondônia`;
     const upd:any={
