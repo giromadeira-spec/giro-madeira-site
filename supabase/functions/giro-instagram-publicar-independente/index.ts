@@ -43,7 +43,8 @@ Deno.serve(async req=>{
   const channelAllowed=channel==='feed'||meta.data.rollout_stage==='full'||
     (channel==='reels'&&reelsRecovery)||(channel==='stories'&&storiesRecovery);
   const sequencingOnly=gate.data?.reason==="Stories aguardam Feed e Reel recentes confirmados pela Meta.";
-  const gateDenied=gate.data?.allowed!==true && !(manualTest&&sequencingOnly);
+  const editorialWindowOnly=gate.data?.reason==="Fora da janela editorial de Porto Velho (06h às 23h30).";
+  const gateDenied=gate.data?.allowed!==true && !(manualTest&&(sequencingOnly||editorialWindowOnly));
   const blocked=!cfg.data.publication_enabled||meta.data.integrity_hold===true||
     gateDenied||(!manualTest&&!channelAllowed)||
     (!manualTest&&((channel==='feed'&&!feedNoon)||(channel==='reels'&&!reelsAfterNoon)||
