@@ -58,7 +58,7 @@ export function sourceHeadlineMatches(headline:string,candidate:string):boolean{
  const a=words(headline),b=words(candidate);
  const matches=[...a].filter(w=>b.has(w)).length;
  const numbers=headline.match(/\b\d+\b/g)||[];
- return a.size>=3&&matches>=3&&matches/a.size>=0.7&&numbers.every(n=>new RegExp('\\b'+n+'\\b').test(candidate));
+ return a.size>=3&&matches>=3&&matches/a.size>=0.45&&numbers.every(n=>new RegExp('\\b'+n+'\\b').test(candidate));
 }
 export async function searchRegisteredPhotoSources(db:any,article:string,headline:string,parse:any,request:typeof fetch=fetch){
  const result={searched:0,candidates:0,errors:[] as string[]};
@@ -66,9 +66,12 @@ export async function searchRegisteredPhotoSources(db:any,article:string,headlin
  if(configured.error||!configured.data?.active)return result;
  let catalog:any;try{catalog=JSON.parse(configured.data.note)}catch{return result;}
  const definitions=[
-  {home:'https://agenciabrasil.ebc.com.br/fotos',host:'agenciabrasil.ebc.com.br',index:'https://agenciabrasil.ebc.com.br/fotos',path:/\/(?:[^/]+\/noticia\/|foto\/|fotos\/)/},
+  {home:'https://agenciabrasil.ebc.com.br/fotos',host:'agenciabrasil.ebc.com.br',index:'https://agenciabrasil.ebc.com.br/ultimas',path:/\/(?:[^/]+\/noticia\/|foto\/|fotos\/)/},
   {home:'https://www.camara.leg.br/banco-imagens/',host:'www.camara.leg.br',index:'https://www.camara.leg.br/busca-portal?contextoBusca=BuscaNoticia&termo='+encodeURIComponent(headline),path:/\/noticias\/\d/},
-  {home:'https://www12.senado.leg.br/fotos',host:'www12.senado.leg.br',index:'https://www12.senado.leg.br/noticias/busca?SearchableText='+encodeURIComponent(headline),path:/\/noticias\/materias\/\d{4}/}
+  {home:'https://www12.senado.leg.br/fotos',host:'www12.senado.leg.br',index:'https://www12.senado.leg.br/noticias/busca?SearchableText='+encodeURIComponent(headline),path:/\/noticias\/materias\/\d{4}/},
+  {home:'https://rondonia.ro.gov.br/portal/',host:'rondonia.ro.gov.br',index:'https://rondonia.ro.gov.br/portal/?s='+encodeURIComponent(headline.split(/\s+/).slice(0,5).join(' '))+'&e=portal',path:/^\/(?!portal|wp-|tag|category)[a-z0-9-]{15,}\/?$/},
+  {home:'https://www.portovelho.ro.gov.br/galerias',host:'www.portovelho.ro.gov.br',index:'https://www.portovelho.ro.gov.br/busca?busca='+encodeURIComponent(headline.split(/\s+/).slice(0,5).join(' ')),path:/\/artigo\/\d+/},
+  {home:'https://www.al.ro.leg.br/',host:'www.al.ro.leg.br',index:'https://www.al.ro.leg.br/noticias/?q='+encodeURIComponent(headline.split(/\s+/).slice(0,5).join(' ')),path:/\/noticias\/[^/?]{10,}/}
  ];
  async function page(url:string,host:string){
   const r=await request(url,{signal:AbortSignal.timeout(6500),redirect:'error',headers:{'User-Agent':'GiroMadeiraBot/3.2 (editorial photo discovery)'}});
@@ -83,6 +86,8 @@ export async function searchRegisteredPhotoSources(db:any,article:string,headlin
   result.searched++;
   try{
    const $=await page(def.index,def.host),links=new Map<string,string>();
+   // The original report itself is the strongest discovery lead when hosted by this provider.
+   try{const original=new URL(article);if(original.hostname===def.host&&def.path.test(original.pathname))links.set(article,headline);}catch{}
    $('a[href]').each((_:any,el:any)=>{
     const a=$(el),label=String(a.attr('title')||a.text()||'').replace(/\s+/g,' ').trim();
     if(!sourceHeadlineMatches(headline,label))return;
