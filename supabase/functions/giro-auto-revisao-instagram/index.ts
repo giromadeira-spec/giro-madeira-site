@@ -7,7 +7,7 @@ function allowed(url:string){
  try{const u=new URL(url);
   const hosts=["www.cnnbrasil.com.br","cnnbrasil.com.br","www.rondoniadinamica.com","rondoniadinamica.com",
    "portaljipa.com.br","www.portaljipa.com.br","www.rondoniaovivo.com","rondoniaovivo.com",
-   "agenciabrasil.ebc.com.br","g1.globo.com","www.g1.globo.com","www.nahoraonline.com","nahoraonline.com"];
+   "agenciabrasil.ebc.com.br","g1.globo.com","www.g1.globo.com","www.nahoraonline.com","nahoraonline.com","newsrondonia.com.br","www.newsrondonia.com.br"];
   if(u.protocol!=="https:"||u.username||u.password||u.port||u.pathname.length<17)return null;
   if(!hosts.includes(u.hostname)&&!u.hostname.endsWith(".gov.br"))return null;
   if(["cnnbrasil.com.br","www.cnnbrasil.com.br"].includes(u.hostname)&&!u.pathname.endsWith("/"))u.pathname+="/";
@@ -17,13 +17,17 @@ function allowed(url:string){
 async function sourceCheck(item:any){
  const u=allowed(String(item.fonte_url||""));if(!u)return {ok:false,reason:"source_not_allowlisted"};
  try{
-  const r=await fetch(u,{redirect:"error",signal:AbortSignal.timeout(11000),
+  const r=await fetch(u,{redirect:"follow",signal:AbortSignal.timeout(15000),
     headers:{"Accept":"text/html","User-Agent":"GiroMadeiraEditorialValidator/1.0"}});
   if(!r.ok||!String(r.headers.get("content-type")||"").includes("text/html"))
     return {ok:false,reason:"source_html_unavailable"};
+  const finalUrl=allowed(r.url);
+  if(!finalUrl)return {ok:false,reason:"source_redirect_outside_allowlist"};
   const raw=(await r.text()).slice(0,1250000);
-  const title=norm(raw.match(/<meta[^>]+(?:property|name)=["']og:title["'][^>]+content=["']([^"']+)/i)?.[1]||
-     raw.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]||"");
+  const metaTags=raw.match(/<meta\\b[^>]*>/gi)||[];
+  const ogTag=metaTags.find((tag:string)=>/(?:property|name)=["']og:title["']/i.test(tag));
+  const metaTitle=ogTag?.match(/content=["']([^"']+)/i)?.[1]||"";
+  const title=norm(metaTitle||raw.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]||"");
   const body=norm(raw.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi," ")
     .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi," ").replace(/<[^>]+>/g," "));
   const words=norm(item.titulo).split(" ").filter(x=>x.length>=4);
@@ -98,6 +102,10 @@ Deno.serve(async req=>{
     }
     const hasIllustration=String(item.legenda||"").includes("ILUSTRAÇÃO EDITORIAL ORIGINAL")&&
      String(item.legenda||"").includes("NÃO É FOTO DO ACONTECIMENTO");
+    // Owner-approved photographic standard, 18 October 2026.
+    // This reviewer verifies abstract assets, not authentic photographs.
+    // Generic symbolic art must no longer receive automatic approval.
+    if(hasIllustration){hold("photographic_layout_required_generic_art_not_approved");continue;}
     const expectedUrl="Matéria original: "+String(item.fonte_url||"");
     if(item.media_pipeline_version!==spec.version||!hasIllustration||
       !String(item.legenda||"").includes(expectedUrl)||
