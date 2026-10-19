@@ -19,9 +19,9 @@ Versão editorial: 10/10/2026. Referências aprovadas pelo responsável: artes c
 ## Fotografia, autenticidade e direitos
 - Priorizar **foto documental com autorização de uso explícita**, arquivo próprio/licenciado ou foto de domínio público/CC0/CC BY verificada no arquivo individual, com autor, licença e página de origem.
 - Fotos externas de portais e `og:image` não são automaticamente autorizadas para republicação. Não remover logo de terceiros com finalidade de reutilizar a foto.
-- Se a foto licenciada for genérica (não foi capturada naquele acontecimento), marcar claramente **IMAGEM ILUSTRATIVA** na própria arte e incluir crédito na legenda. Não usar retratos/viaturas de outros países ou outra força policial como se fossem do acontecimento.
-- Sem fotografia segura, produzir **arte editorial original claramente ilustrativa** e segurar para revisão; não simular foto documental de prisão, vítima, acidente ou operação.
-- Os Reels são produzidos de arte original licenciada, não de vídeo copiado de reportagem. Trilhas apenas originais ou licenciadas.
+- Não usar foto genérica para preencher notícia factual. Retrato autêntico da pessoa pode ser usado como FOTO DE ARQUIVO, com contexto e data conferidos; nunca representar outra ocorrência como a atual.
+- Sem fotografia pertinente e autorizada, buscar outra pauta ou reter o item; não produzir fundo genérico como contingência automática.
+- Reels, Shorts e TikTok preservam a fotografia e adaptam a mesma composição para vídeo vertical. Não copiar vídeo de reportagem sem direitos verificados; trilhas somente próprias ou licenciadas.
 - Reels/Shorts nunca exibem botão de play como marca-d’água. Ícones da interface real de aplicativos não fazem parte da arte.
 - Preservar presunção de inocência: `investigado`, `suspeito` e `preso` conforme situação documentada; não converter suspeitas em condenações.
 
@@ -35,7 +35,7 @@ Versão editorial: 10/10/2026. Referências aprovadas pelo responsável: artes c
 7. Não republicar pautas concluídas, não recriar linhas para contornar erro e não substituir mídia de post histórico publicado.
 
 
-## Referência visual específica aprovada (10/10/2026) — prioridade máxima
+## Referência visual anterior (10/10/2026) — composição substituída em 18/10/2026
 
 O layout de **foto realista de abastecimento, logo grande circular, categoria amarela ECONOMIA, manchete em branco/amarelo e panorama do Rio Madeira no rodapé** compartilhado pelo responsável é a referência dominante sobre templates antigos. [Veja o guia de composição e o prompt mestre](REFERENCIA_CAPA_OFICIAL.md).
 
@@ -54,3 +54,10 @@ O responsável aprovou a segunda prévia fotográfica da matéria sobre Victor S
 - Fonte e crédito na legenda; preservar atribuições exigidas pela licença. Prévia não comprova permissão de republicação.
 - NÃO aprovar automaticamente arte abstrata/simbólica genérica como substituta dessa composição. Sem fotografia pertinente e autorizada, buscar outra pauta com foto válida ou reter o item; não publicar fundo genérico.
 - Aprovação depende de inspeção da saída final. Documentação e HTTP 200 não comprovam qualidade nem publicação.
+
+
+## Busca de fotos conectada — 18/10/2026
+
+O catálogo contém 34 fontes. O módulo compartilhado `supabase/functions/_shared/photo-registry.ts` oferece descoberta em páginas públicas de 25 fontes; isso não significa busca integral de cada acervo nem licença automática. Consulta até oito por preparação, alternando lotes por hora e priorizando o domínio original quando cadastrado. As nove fontes restantes exigem acesso ou adaptador específico e continuam explicitamente pendentes. Relatar por fonte `candidate_found`, `no_match` ou `unavailable`; HTTP 403 e timeout não são ausência de fotografias.
+
+Instagram (Feed/Stories/Reels) chama a busca na preparação quando falta foto aprovada. Shorts e TikTok chamam na etapa `photo_pending`, com filas independentes. Candidatas entram pendentes no registro, com matéria, URL da imagem, crédito e evidências; nenhuma aprovação visual ou de direitos é concedida só por resultado textual. Padronização visual e confirmação de publicação são verificações distintas.
