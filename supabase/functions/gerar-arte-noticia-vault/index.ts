@@ -751,6 +751,33 @@ Deno.serve(async(req)=>{
         notes:"Sem API de IA paga. Usar imagens CC validadas e templates próprios. Sem arte adequada: manter rascunho para revisão."
       }),{headers:H});
     }
+
+    // Authenticated ingest only: evidence is reviewed separately; never grants approval.
+    if(body?.ingest_registry_photo===true){
+      const registryId=Number(body.registry_id);
+      const found=await sb.from("giro_imagens_autorizadas").select("*").eq("id",registryId).single();
+      if(found.error)throw found.error;
+      const p=found.data;
+      if(!p.rights_verified||!p.social_use_allowed||!p.adaptation_allowed||!p.commercial_use_allowed||
+         !p.evidence_url||!p.credit_line||!p.reviewed_at)
+        return new Response(JSON.stringify({success:false,error:"reviewed_rights_required"}),{status:409,headers:H});
+      const origin=new URL(p.original_image_url);
+      if(origin.protocol!=="https:"||!["imagens.ebc.com.br","agenciabrasil.ebc.com.br"].includes(origin.hostname))
+        return new Response(JSON.stringify({success:false,error:"ingest_source_not_allowed"}),{status:422,headers:H});
+      const downloaded=await fetch(origin,{signal:AbortSignal.timeout(15000),redirect:"error"});
+      const ct=String(downloaded.headers.get("content-type")||"").split(";")[0];
+      if(!downloaded.ok||!["image/jpeg","image/png","image/webp"].includes(ct))throw Error("photo_download_failed");
+      const bytes=new Uint8Array(await downloaded.arrayBuffer());
+      if(bytes.length<10000||bytes.length>4*1024*1024)throw Error("photo_size_invalid");
+      const ext=ct==="image/png"?"png":ct==="image/webp"?"webp":"jpg";
+      const path="approved/registry-"+registryId+"."+ext;
+      const uploaded=await sb.storage.from("giro-imagens-autorizadas").upload(path,bytes,{contentType:ct,upsert:true});
+      if(uploaded.error)throw uploaded.error;
+      const saved=await sb.from("giro_imagens_autorizadas").update({storage_path:path}).eq("id",registryId);
+      if(saved.error)throw saved.error;
+      return new Response(JSON.stringify({success:true,registry_id:registryId,storage_path:path,approval_not_changed:true,publication_not_attempted:true}),{headers:H});
+    }
+
     const autoPipeline=body?.auto_pipeline===true;
     const channel=String(body?.channel||'legacy');
     if(!['legacy','feed','stories','reels'].includes(channel))return new Response(JSON.stringify({success:false,error:'invalid_channel'}),{status:400,headers:H});
