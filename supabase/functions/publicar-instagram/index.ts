@@ -200,11 +200,11 @@ async function incrementQuota(sb:any){
     await sb.from(RATE_TABLE).update({quota_usage:q+1,updated_at:new Date().toISOString()}).eq("id",STATE_ID);
   }
 }
-async function preflight(sb:any,token:string,accountId:string,mediaType:MediaType,refreshQuota=true){
+async function preflight(sb:any,token:string,accountId:string,mediaType:MediaType,refreshQuota=true,manualTest=false){
   let st=await getState(sb);
   // Semáforo editorial centralizado: consulta somente o banco, sem enviar à Meta.
   const {data:semaforo,error:semaforoErro}=await sb.rpc("giro_instagram_semaforo_gate",{p_media_type:mediaType});
-  if(semaforoErro||!semaforo||semaforo.allowed!==true){
+  if(semaforoErro||!semaforo||(semaforo.allowed!==true&&!(manualTest&&semaforo.reason==="Fora da janela editorial de Porto Velho (06h às 23h30)."))){
     return {allowed:false,retry_at:semaforo?.retry_at??isoAfter(180),
       reason:semaforoErro?"Semáforo indisponível: bloquear por segurança.":String(semaforo?.reason||"Publicação adiada pelo semáforo."),
       state:st,integrity_hold:st?.integrity_hold===true,semaforo:semaforo?.semaforo??"vermelho"};
@@ -301,7 +301,7 @@ async function confirmAmbiguousPublishOnce(token:string,caption:string,mediaType
   }catch{return null}
 }
 
-async function tryCandidate(sb:any,base:string,token:string,accountId:string,mediaType:MediaType,imageUrl:string,videoUrl:string,caption:string,shareToFeed:boolean){
+async function tryCandidate(sb:any,base:string,token:string,accountId:string,mediaType:MediaType,imageUrl:string,videoUrl:string,caption:string,shareToFeed:boolean,manualTest=false){
   let params:URLSearchParams;
   try{
     params=buildCreateParams({mediaType,imageUrl,videoUrl,caption,token,shareToFeed});
@@ -330,7 +330,7 @@ async function tryCandidate(sb:any,base:string,token:string,accountId:string,med
     const waits=mediaType==="IMAGE"?[3000,6000,10000]:[20000,40000];
     for(const wait of waits){
       await new Promise(resolve=>setTimeout(resolve,wait));
-      const gate=await preflight(sb,token,accountId,mediaType,false);
+      const gate=await preflight(sb,token,accountId,mediaType,false,manualTest);
       if(!gate.allowed){
         return {success:false,terminal:true,rate_limited:true,retry_at:gate.retry_at,diagnostics:[{api:base,stage:"pre_publish_gate",error:{message:gate.reason}}]};
       }
@@ -360,7 +360,7 @@ async function tryCandidate(sb:any,base:string,token:string,accountId:string,med
     };
   }
 
-  const gate=await preflight(sb,token,accountId,mediaType,false);
+  const gate=await preflight(sb,token,accountId,mediaType,false,manualTest);
   if(!gate.allowed){
     return {success:false,terminal:true,rate_limited:true,retry_at:gate.retry_at,diagnostics:[{api:base,stage:"publish_gate",error:{message:gate.reason}}]};
   }
@@ -377,7 +377,7 @@ async function tryCandidate(sb:any,base:string,token:string,accountId:string,med
     const msg=String(pub.data?.error?.message??"").toLowerCase();
     if(!/media id is not available|media.*not available/.test(msg))break;
     await new Promise(resolve=>setTimeout(resolve,attempt===0?5000:10000));
-    const gateRetry=await preflight(sb,token,accountId,mediaType,false);
+    const gateRetry=await preflight(sb,token,accountId,mediaType,false,manualTest);
     if(!gateRetry.allowed)break;
     pub=await metaFetch(sb,base+"/"+accountId+"/media_publish",{
       method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},
@@ -441,11 +441,11 @@ async function tryCandidate(sb:any,base:string,token:string,accountId:string,med
   return {success:true,instagram_media_id:String(pub.data.id),media_type:mediaType,api_used:base,diagnostics:[]};
 }
 
-async function tryPublish(sb:any,token:string,accountId:string,mediaType:MediaType,imageUrl:string,videoUrl:string,caption:string,shareToFeed:boolean){
+async function tryPublish(sb:any,token:string,accountId:string,mediaType:MediaType,imageUrl:string,videoUrl:string,caption:string,shareToFeed:boolean,manualTest=false){
   const candidates=["https://graph.instagram.com/v26.0","https://graph.facebook.com/v26.0"];
   const diagnostics:any[]=[];
   for(const base of candidates){
-    const res:any=await tryCandidate(sb,base,token,accountId,mediaType,imageUrl,videoUrl,caption,shareToFeed);
+    const res:any=await tryCandidate(sb,base,token,accountId,mediaType,imageUrl,videoUrl,caption,shareToFeed,manualTest);
     diagnostics.push(...(res.diagnostics??[]));
     if(res.success)return {...res,diagnostics};
     if(res.rate_limited||res.deferred_processing||res.terminal)return {...res,diagnostics};
@@ -462,6 +462,7 @@ Deno.serve(async(req)=>{
 
   try{
     const body=await req.json();
+    const manualTest=body?.manual_test===true&&req.headers.get("authorization")==="Bearer "+role&&Date.now()<Date.parse("2026-10-19T04:30:00Z");
     const accountId=String(body?.instagram_account_id??"");
     if(!accountId)return new Response(JSON.stringify({success:false,error:"Envie instagram_account_id."}),{status:400,headers:H});
 
@@ -480,7 +481,7 @@ Deno.serve(async(req)=>{
       const requested=String(body?.media_type??"IMAGE").toUpperCase();
       const requestedType:MediaType=requested==="REELS"?"REELS":requested==="STORIES"?"STORIES":"IMAGE";
       const {data:traffic,error:trafficError}=await sb.rpc("giro_instagram_semaforo_gate",{p_media_type:requestedType});
-      if(trafficError||!traffic||traffic.allowed!==true){
+      if(trafficError||!traffic||(traffic.allowed!==true&&!(manualTest&&traffic.reason==="Fora da janela editorial de Porto Velho (06h às 23h30)."))){
         return new Response(JSON.stringify({success:false,deferred:true,rate_guard:true,
           semaforo:traffic?.semaforo??"vermelho",
           error:trafficError?"Semáforo editorial indisponível; envio suspenso.":traffic?.reason??"Envio suspenso pelo semáforo.",
@@ -510,7 +511,7 @@ Deno.serve(async(req)=>{
     if(mediaType==="REELS"&&!videoUrl)return new Response(JSON.stringify({success:false,error:"REELS exige video_url."}),{status:400,headers:H});
     if(mediaType==="STORIES"&&!imageUrl&&!videoUrl)return new Response(JSON.stringify({success:false,error:"STORIES exige image_url ou video_url."}),{status:400,headers:H});
 
-    const gate=await preflight(sb,token,accountId,mediaType,true);
+    const gate=await preflight(sb,token,accountId,mediaType,true,manualTest);
     if(!gate.allowed){
       return new Response(JSON.stringify({
         success:false,
@@ -526,13 +527,13 @@ Deno.serve(async(req)=>{
       }),{status:429,headers:H});
     }
 
-    let result:any=await tryPublish(sb,token,accountId,mediaType,imageUrl,videoUrl,caption,shareToFeed);
+    let result:any=await tryPublish(sb,token,accountId,mediaType,imageUrl,videoUrl,caption,shareToFeed,manualTest);
     if(!result.success&&!result.terminal){
       const refreshed=await refreshAndPersist(sb,token);
       if(refreshed.ok&&refreshed.token){
         token=refreshed.token;
-        const gate2=await preflight(sb,token,accountId,mediaType,false);
-        if(gate2.allowed)result=await tryPublish(sb,token,accountId,mediaType,imageUrl,videoUrl,caption,shareToFeed);
+        const gate2=await preflight(sb,token,accountId,mediaType,false,manualTest);
+        if(gate2.allowed)result=await tryPublish(sb,token,accountId,mediaType,imageUrl,videoUrl,caption,shareToFeed,manualTest);
       }
     }
 
