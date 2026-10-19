@@ -15,7 +15,7 @@ Deno.serve(async req=>{
   const body=await req.json().catch(()=>({})),channel=String(body.channel||"");
   if(!Object.hasOwn(types,channel))return response({success:false,error:"invalid_channel"},400);
   // Explicit owner-authorized test on 18 October; expires automatically.
-  const manualTest=body.manual_test===true && Date.now()<Date.parse("2026-10-19T03:30:00Z");
+  const manualTest=body.manual_test===true && Date.now()<Date.parse("2026-10-19T04:30:00Z");
   const cfg=await db.from('giro_channel_settings').select('publication_enabled').eq('channel',channel).single();
   if(cfg.error)throw cfg.error;
   const gate=await db.rpc('giro_instagram_semaforo_gate',{p_media_type:types[channel]});
@@ -64,12 +64,14 @@ Deno.serve(async req=>{
     .or('status.eq.publicando,erro.eq.reconcile_provider_before_resend').limit(1).maybeSingle();
   if(uncertain.error)throw uncertain.error;
   if(uncertain.data)return response({success:true,channel,no_publish:true,reason:'reconciliation_required',publication_id:uncertain.data.id});
-  const found=await db.from(table).select('*').eq('status','aprovada').eq('visual_approved',true).gte('media_pipeline_version',channel==='feed'?6:5)
-   .is(ids[channel],null).or('legenda.like.%Foto do acontecimento:%,legenda.like.%ILUSTRAÇÃO EDITORIAL ORIGINAL%')
+  let eligible=db.from(table).select('*').eq('status','aprovada').eq('visual_approved',true).gte('media_pipeline_version',channel==='feed'?6:5)
+   .is(ids[channel],null).or('legenda.like.%Foto do acontecimento:%,legenda.like.%Foto de arquivo:%,legenda.like.%ILUSTRAÇÃO EDITORIAL ORIGINAL%')
     .gte('created_at',new Date(Date.now()-36*3600000).toISOString())
     .gt('editorial_expires_at',new Date().toISOString())
     .or('scheduled_at.is.null,scheduled_at.lte.'+new Date().toISOString())
-   .order('urgente',{ascending:false}).order('created_at',{ascending:true}).limit(1).maybeSingle();
+;
+  if(manualTest&&Number.isSafeInteger(Number(body.publication_id))&&Number(body.publication_id)>0)eligible=eligible.eq('id',Number(body.publication_id));
+  const found=await eligible.order('urgente',{ascending:false}).order('created_at',{ascending:true}).limit(1).maybeSingle();
   if(found.error)throw found.error;
   const item=found.data;
   if(!item)return response({success:true,channel,processed:0,no_publish:true,reason:"no_fresh_verified_media_eligible"});
@@ -81,7 +83,7 @@ Deno.serve(async req=>{
   // Media_status must be set by an authorized editorial review; this worker
   // NEVER changes an unreviewed draft to approved.
   const originalArt=String(item.legenda||'').includes('ILUSTRAÇÃO EDITORIAL ORIGINAL');
-  const photoProof=String(item.legenda||'').includes('Foto do acontecimento: ');
+  const photoProof=/Foto (?:do acontecimento|de arquivo): /.test(String(item.legenda||''));
   const artReviewed=originalArt &&
     item.media_status===(channel==='feed'?'feed_ilustracao_revisada':
                           channel==='reels'?'reel_ilustracao_revisada':'stories_ilustracao_revisada');
