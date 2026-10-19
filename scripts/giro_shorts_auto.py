@@ -644,6 +644,7 @@ def fetch_picture(url):
 def fonts():
     heavy="/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed-Bold.ttf"
     regular="/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+    if not Path(heavy).exists():heavy="/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
     if not (Path(heavy).exists() and Path(regular).exists()):raise RuntimeError("Required free font missing")
     return heavy,regular
 
@@ -672,8 +673,7 @@ def make_frame(photo,river,logo,claim,scene,idx,credit,path):
     Text/category/location/figures come only from vetted news data.
     """
     img=cover(photo,W,H,x=[.42,.52,.62][idx],y=.45).convert("RGB")
-    img=ImageEnhance.Contrast(img).enhance(1.13)
-    img=ImageEnhance.Color(img).enhance(1.09).convert("RGBA")
+    img=img.convert("RGBA")  # Preserve the source photograph; no synthetic face/detail edits.
 
     # Full-bleed photographic news backdrop with a readable navy gradient.
     overlay=Image.new("RGBA",(W,H),(0,0,0,0))
@@ -691,9 +691,9 @@ def make_frame(photo,river,logo,claim,scene,idx,credit,path):
 
     # Big original round logo, upper-left, over the photo. NO extra GIRO/MADEIRA.
     mark=logo.convert("RGBA")
-    mark.thumbnail((295,295),Image.Resampling.LANCZOS)
+    mark.thumbnail((170,170),Image.Resampling.LANCZOS)
     logo_x,logo_y=58,62
-    img.alpha_composite(mark,(logo_x+(295-mark.width)//2,logo_y+(295-mark.height)//2))
+    img.alpha_composite(mark,(logo_x+(170-mark.width)//2,logo_y+(170-mark.height)//2))
     d=ImageDraw.Draw(img)
 
     # Yellow editorial topic flag with clean horizontal rule (screenshot style).
@@ -704,7 +704,7 @@ def make_frame(photo,river,logo,claim,scene,idx,credit,path):
     while d.textbbox((0,0),category,font=tagfont)[2]>620 and tagfont.size>30:
         tagfont=ImageFont.truetype(heavy,tagfont.size-2)
     tag_right=min(760,98+d.textbbox((0,0),category,font=tagfont)[2]+58)
-    tag_top=864
+    tag_top=1100
     d.polygon([(55,tag_top),(tag_right+28,tag_top),(tag_right,tag_top+74),(55,tag_top+74)],fill=YELLOW)
     d.text((85,tag_top+9),category,font=tagfont,fill=NAVY)
     d.line((tag_right+29,tag_top+69,1015,tag_top+69),fill=YELLOW,width=5)
@@ -719,17 +719,17 @@ def make_frame(photo,river,logo,claim,scene,idx,credit,path):
     provenance_width=d.textbbox((0,0),photo_label,font=provenance_font)[2]
     if provenance_width>925:
         raise RuntimeError("Visual provenance label too wide for news frame")
-    d.rounded_rectangle((58,790,95+provenance_width,838),radius=4,fill=(3,16,36,232))
-    d.text((74,802),photo_label,font=provenance_font,fill=WHITE)
+    d.rounded_rectangle((58,1010,95+provenance_width,1058),radius=4,fill=(3,16,36,232))
+    d.text((74,1022),photo_label,font=provenance_font,fill=WHITE)
     if claim.get("urgent") is True:
         d.rounded_rectangle((785,45,1034,117),radius=6,fill=(222,31,45,255))
         d.text((800,55),"URGENTE",font=ImageFont.truetype(heavy,43),fill=WHITE)
 
     # Strong center-lower headline. Fit the whole verified text or fail closed.
     head=clean(claim["title"].split("|")[0]) if idx==0 else clean(scene)
-    start=974
+    start=1220
     for requested_size in (124,112,101,90,80,70,60):
-        rows,tf=lines_for(d,head,requested_size,944,maxlines=5)
+        rows,tf=lines_for(d,head,requested_size,944,maxlines=3)
         leading=int(tf.size*1.13)
         bottom=start+(len(rows)-1)*leading+tf.size
         if bottom<=1518:break
@@ -1069,8 +1069,6 @@ def main():
                 picture,credit,file_title=approved_registry_photo(
                     registered,result["source_url"],result["title"])
                 registered_image_id=registered["id"]
-            elif (original:=cleared_editorial_contingency(result)) is not None:
-                picture,credit,file_title=original
             else:
                 bridge(token,"photo_pending",queue_id=qid)
                 report_render_outcome({"state":"awaiting_licensed_event_photo","queue_id":qid,
