@@ -87,7 +87,18 @@ Deno.serve(async req=>{
    .gt("editorial_expires_at",new Date(minExpiry).toISOString())
    .order("created_at",{ascending:false}).limit(5);
   if(error){results.push({channel,status:"error",reason:"queue_read_failed"});continue;}
+  // Plano C: retain a small candidate reserve but approve no more than one per
+  // channel/day. Never reuse a previous post or approve a stale source.
+  const dayStart=new Date(Date.UTC(Number(local.year),Number(local.month)-1,Number(local.day),4,0)).toISOString();
+  const dayEnd=new Date(Date.UTC(Number(local.year),Number(local.month)-1,Number(local.day)+1,4,0)).toISOString();
+  const {data:existing,error:existingError}=await db.from(spec.table).select("id")
+    .gte("scheduled_at",dayStart).lt("scheduled_at",dayEnd)
+    .in("status",["aprovada","publicada","publicando"]).limit(1);
+  if(existingError){results.push({channel,status:"error",reason:"daily_quota_check_failed"});continue;}
+  if((existing||[]).length){results.push({channel,status:"held",reason:"daily_candidate_already_approved"});continue;}
+  let approvedThisRun=false;
   for(const item of data||[]){
+    if(approvedThisRun)break;
     const hold=(reason:string)=>results.push({channel,id:item.id,status:"held",reason});
     const day=(v:string|number|Date)=>new Intl.DateTimeFormat("en-CA",{
       timeZone:"America/Porto_Velho",year:"numeric",month:"2-digit",day:"2-digit"
@@ -128,6 +139,7 @@ Deno.serve(async req=>{
       .eq("media_pipeline_version",spec.version).is(spec.idField,null)
       .gt("editorial_expires_at",new Date(minExpiry).toISOString()).select("id").maybeSingle();
     if(ue||!updated){hold("database_approval_conflict");continue;}
+    approvedThisRun=true;
     results.push({channel,id:item.id,status:"approved",reason:"machine_verified_original_abstract_art_v1"});
   }
  }
