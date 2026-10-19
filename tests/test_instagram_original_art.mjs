@@ -11,7 +11,9 @@ assert.ok(gen.includes('const bg=photo?photo.dataUri:"original_editorial_illustr
 assert.ok(!gen.includes('const photo=registeredPhoto||'));
 assert.ok(gen.includes('ILUSTRAÇÃO EDITORIAL ORIGINAL — representação gráfica simbólica'));
 assert.ok(gen.includes('awaiting_visual_approval:true,publication_not_attempted:true'));
-assert.ok(gen.includes('const credit=isEventPhoto?"FOTO DO ACONTECIMENTO":"ILUSTRAÇÃO EDITORIAL — NÃO É FOTO"'));
+assert.ok(gen.includes('const credit=previewLabel||(isEventPhoto?"FOTO DA NOTÍCIA"'));
+assert.ok(gen.includes('if(!photo){'));
+assert.ok(gen.includes('photographic_layout_requires_verified_photo'));
 assert.ok(!gen.includes("M540 '+(cy-245)"),'Rejected generic police shield cannot return');
 
 assert.ok(prep.includes('verifiedPhoto=registryReady(registered.data)'));
