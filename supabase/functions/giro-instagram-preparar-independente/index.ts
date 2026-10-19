@@ -15,19 +15,42 @@ Deno.serve(async req=>{
   const table="giro_publicacoes_"+channel;
   const {data:cfg,error:ce}=await db.from("giro_channel_settings").select("*").eq("channel",channel).single();
   if(ce)throw ce;
-  const {data:pending,error:pe}=await db.from(table).select("*")
-    // Allow one extra, safe art-generation attempt after the original-art upgrade.
-    // Previously blocked items remain drafts and still require editorial approval.
+  const now=new Date(),cutoff=new Date(Date.now()-36*3600000).toISOString();
+  const {data:fresh,error:pe}=await db.from(table).select("*")
     .eq("status","pendente").eq("visual_approved",false).lt("preparation_attempts",3)
-    // Completed media awaits review; it is not a render failure to regenerate.
     .not("media_status","in","(aguardando_revisao_visual,aguardando_verificacao_foto_e_licenca)")
-    .or("preparation_retry_at.is.null,preparation_retry_at.lte."+new Date().toISOString())
-    .gte("created_at",new Date(Date.now()-36*3600000).toISOString())
-    .gt("editorial_expires_at",new Date().toISOString())
-    // New, fresh stories first. Repeatedly failing old sources must not starve the queue.
+    .or("preparation_retry_at.is.null,preparation_retry_at.lte."+now.toISOString())
+    .gte("created_at",cutoff).gt("editorial_expires_at",now.toISOString())
     .order("preparation_attempts",{ascending:true}).order("urgente",{ascending:false})
     .order("created_at",{ascending:false}).limit(1).maybeSingle();
   if(pe)throw pe;
+  // Photo-waiting stories must not get stuck forever. Resume when a verified,
+  // event-matched, rights-approved photo has actually been registered.
+  const {data:photoWait,error:we}=await db.from(table).select("*")
+    .eq("status","pendente").eq("visual_approved",false)
+    .eq("media_status","aguardando_verificacao_foto_e_licenca")
+    .gte("created_at",cutoff).gt("editorial_expires_at",now.toISOString())
+    .order("created_at",{ascending:false}).limit(24);
+  if(we)throw we;
+  let pending:any=null;
+  const waiting=photoWait||[];
+  if(waiting.length){
+    const urls=[...new Set(waiting.map((v:any)=>String(v.fonte_url||"")).filter(Boolean))];
+    if(urls.length){
+      const {data:verified,error:ve}=await db.from("giro_imagens_autorizadas")
+        .select(PHOTO_FIELDS).eq("approval_status","approved")
+        .in("article_url",urls).limit(80);
+      if(ve)throw ve;
+      pending=waiting.find((item:any)=>(verified||[]).some((photo:any)=>
+        photo.article_url===item.fonte_url&&photo.headline===item.titulo&&registryReady(photo)))||null;
+    }
+  }
+  // Two additional bounded source-discovery passes, at least six hours apart.
+  // Discovery alone NEVER marks a photograph as licensed or publishes a post.
+  if(!pending&&!fresh)pending=waiting.find((v:any)=>
+    Number(v.preparation_attempts||0)<3&&
+    (!v.preparation_retry_at||Date.parse(v.preparation_retry_at)<=Date.now()))||null;
+  if(!pending)pending=fresh;
   if(body.dry_run===true||!cfg.preparation_enabled)return response({success:true,dry_run:body.dry_run===true,channel,no_publish:true,preparation_enabled:cfg.preparation_enabled,pending_id:pending?.id||null,visual_contract:cfg.visual_contract});
   // Old PRF illustrative-photo recovery disabled: topic match cannot prove an image depicts the event.
   let item=pending;
