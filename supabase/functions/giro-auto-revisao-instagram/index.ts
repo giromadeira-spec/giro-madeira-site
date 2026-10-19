@@ -24,7 +24,7 @@ async function sourceCheck(item:any){
   const finalUrl=allowed(r.url);
   if(!finalUrl)return {ok:false,reason:"source_redirect_outside_allowlist"};
   const raw=(await r.text()).slice(0,1250000);
-  const metaTags=raw.match(/<meta\\b[^>]*>/gi)||[];
+  const metaTags=raw.match(/<meta\b[^>]*>/gi)||[];
   const ogTag=metaTags.find((tag:string)=>/(?:property|name)=["']og:title["']/i.test(tag));
   const metaTitle=ogTag?.match(/content=["']([^"']+)/i)?.[1]||"";
   const title=norm(metaTitle||raw.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]||"");
@@ -102,10 +102,12 @@ Deno.serve(async req=>{
     }
     const hasIllustration=String(item.legenda||"").includes("ILUSTRAÇÃO EDITORIAL ORIGINAL")&&
      String(item.legenda||"").includes("NÃO É FOTO DO ACONTECIMENTO");
-    // Owner-approved photographic standard, 18 October 2026.
-    // This reviewer verifies abstract assets, not authentic photographs.
-    // Generic symbolic art must no longer receive automatic approval.
-    if(hasIllustration){hold("photographic_layout_required_generic_art_not_approved");continue;}
+    // An original factual news card contains no third-party event photograph.
+    // It may be machine-reviewed only after its caption is grounded in the
+    // source, the media is served from our own channel-specific storage,
+    // and it clearly says it is NOT a photograph of the event.
+    // Photos themselves still require event-specific rights verification.
+    if(!hasIllustration){hold("requires_photo_rights_or_factual_card_label");continue;}
     const expectedUrl="Matéria original: "+String(item.fonte_url||"");
     if(item.media_pipeline_version!==spec.version||!hasIllustration||
       !String(item.legenda||"").includes(expectedUrl)||
@@ -126,17 +128,17 @@ Deno.serve(async req=>{
     }
     const check=await sourceCheck(item);
     if(!check.ok){hold(check.reason);continue;}
-    if(dry){results.push({channel,id:item.id,status:"eligible",reason:"machine_verified_abstract_illustration"});continue;}
+    if(dry){results.push({channel,id:item.id,status:"eligible",reason:"machine_verified_factual_news_card"});continue;}
     const {data:updated,error:ue}=await db.from(spec.table).update({
       status:"aprovada",visual_approved:true,media_status:spec.state,
-      auto_review_basis:"machine_verified_original_abstract_art_v1",
+      auto_review_basis:"machine_verified_original_factual_card_v2",
       auto_review_at:new Date().toISOString(),
       scheduled_at:new Date().toISOString(),erro:null
     }).eq("id",item.id).eq("status","pendente").eq("visual_approved",false)
       .eq("media_pipeline_version",spec.version).is(spec.idField,null)
       .gt("editorial_expires_at",new Date(minExpiry).toISOString()).select("id").maybeSingle();
     if(ue||!updated){hold("database_approval_conflict");continue;}
-    results.push({channel,id:item.id,status:"approved",reason:"machine_verified_original_abstract_art_v1"});
+    results.push({channel,id:item.id,status:"approved",reason:"machine_verified_original_factual_card_v2"});
   }
  }
  return respond({success:true,dry_run:dry,results,public_posts_attempted:false});
