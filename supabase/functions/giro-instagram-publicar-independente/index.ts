@@ -14,6 +14,8 @@ Deno.serve(async req=>{
   if(auth.error||auth.data!==true)return response({success:false,error:"unauthorized"},401);
   const body=await req.json().catch(()=>({})),channel=String(body.channel||"");
   if(!Object.hasOwn(types,channel))return response({success:false,error:"invalid_channel"},400);
+  // Explicit owner-authorized test on 18 October; expires automatically.
+  const manualTest=body.manual_test===true && Date.now()<Date.parse("2026-10-19T03:30:00Z");
   const cfg=await db.from('giro_channel_settings').select('publication_enabled').eq('channel',channel).single();
   if(cfg.error)throw cfg.error;
   const gate=await db.rpc('giro_instagram_semaforo_gate',{p_media_type:types[channel]});
@@ -40,10 +42,12 @@ Deno.serve(async req=>{
     meta.data.traffic_light_target==='amarelo'&&meta.data.traffic_light_story_test_enabled===true;
   const channelAllowed=channel==='feed'||meta.data.rollout_stage==='full'||
     (channel==='reels'&&reelsRecovery)||(channel==='stories'&&storiesRecovery);
+  const sequencingOnly=gate.data?.reason==="Stories aguardam Feed e Reel recentes confirmados pela Meta.";
+  const gateDenied=gate.data?.allowed!==true && !(manualTest&&sequencingOnly);
   const blocked=!cfg.data.publication_enabled||meta.data.integrity_hold===true||
-    gate.data?.allowed!==true||!channelAllowed||
-    (channel==='feed'&&!feedNoon)||(channel==='reels'&&!reelsAfterNoon)||
-    (channel==='stories'&&!storiesAfterNoon);
+    gateDenied||(!manualTest&&!channelAllowed)||
+    (!manualTest&&((channel==='feed'&&!feedNoon)||(channel==='reels'&&!reelsAfterNoon)||
+    (channel==='stories'&&!storiesAfterNoon)));
   const blockedReasons=[
     !cfg.data.publication_enabled?"channel_publication_disabled":null,
     meta.data.integrity_hold===true?"meta_integrity_hold":null,
