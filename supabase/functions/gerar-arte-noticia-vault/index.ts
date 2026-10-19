@@ -694,15 +694,36 @@ async function render(svg:string,_font:Uint8Array){
  const sb=createClient(u,k);
  const {data:key,error}=await sb.rpc("giro_reels_worker_key_get");
  if(error||!key)throw new Error("render_worker_key_missing");
- const r=await fetch("https://giro-reels-worker-production.up.railway.app/render-art",{
-  method:"POST",headers:{"Content-Type":"application/json","x-giro-worker-key":String(key)},
-  body:JSON.stringify({svg}),signal:AbortSignal.timeout(85000)
- });
- if(!r.ok)throw new Error("render_art_worker_http_"+r.status+":"+(await r.text()).slice(0,220));
- if(!(r.headers.get("content-type")||"").includes("image/png"))throw new Error("render_worker_wrong_content_type");
- const b=new Uint8Array(await r.arrayBuffer());
- if(b.length<10000||b.length>16000000)throw new Error("render_worker_invalid_png");
- return b;
+ // Plano B: retry only transient worker/network errors; never bypass editorial gates.
+ // Same SVG and authentication are reused, and no publishing is attempted here.
+ for(let attempt=1;attempt<=2;attempt++){
+  try{
+   const r=await fetch("https://giro-reels-worker-production.up.railway.app/render-art",{
+    method:"POST",headers:{"Content-Type":"application/json","x-giro-worker-key":String(key)},
+    body:JSON.stringify({svg}),signal:AbortSignal.timeout(30000)
+   });
+   if(!r.ok){
+    const detail=(await r.text()).slice(0,220);
+    if((r.status===429||r.status>=500)&&attempt<2){
+     console.warn("giro_render_transient_http",r.status,"attempt",attempt);
+     await new Promise(resolve=>setTimeout(resolve,1200));
+     continue;
+    }
+    throw new Error("render_art_worker_http_"+r.status+":"+detail);
+   }
+   if(!(r.headers.get("content-type")||"").includes("image/png"))throw new Error("render_worker_wrong_content_type");
+   const b=new Uint8Array(await r.arrayBuffer());
+   if(b.length<10000||b.length>16000000)throw new Error("render_worker_invalid_png");
+   return b;
+  }catch(e){
+   const message=e instanceof Error?e.message:String(e);
+   const retryable=/AbortError|TimeoutError|network|fetch failed/i.test(message);
+   if(!retryable||attempt===2)throw e;
+   console.warn("giro_render_transient_network","attempt",attempt);
+   await new Promise(resolve=>setTimeout(resolve,1200));
+  }
+ }
+ throw new Error("render_worker_retries_exhausted");
 }
 async function maybeCopyVideo(sb:any,raw:string,id:number,channel='legacy'){
   if(!raw) return {source:"",publicUrl:""};
