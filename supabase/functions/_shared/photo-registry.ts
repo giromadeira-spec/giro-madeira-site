@@ -73,6 +73,23 @@ export async function searchRegisteredPhotoSources(db:any,article:string,headlin
   {home:'https://www.portovelho.ro.gov.br/galerias',host:'www.portovelho.ro.gov.br',index:'https://www.portovelho.ro.gov.br/busca?busca='+encodeURIComponent(headline.split(/\s+/).slice(0,5).join(' ')),path:/\/artigo\/\d+/},
   {home:'https://www.al.ro.leg.br/',host:'www.al.ro.leg.br',index:'https://www.al.ro.leg.br/noticias/?q='+encodeURIComponent(headline.split(/\s+/).slice(0,5).join(' ')),path:/\/noticias\/[^/?]{10,}/}
  ];
+
+ // Public HTML discovery adapters. These inspect public source pages, not whole archives.
+ const extraHomes=["https://www.fotospublicas.com/","https://www.cnj.jus.br/agencia-cnj/banco-de-imagens/","https://www.al.sp.gov.br/alesp/banco-imagens/","https://www.cbm.ro.gov.br/","https://www.tre-ro.jus.br/","https://fieam.org.br/","https://www.defesacivil.sp.gov.br/sec_defesa_civil","https://agenciadenoticias.ibge.gov.br/agencia-banco-de-midia","https://www.embrapa.br/","https://www.gov.br/prf/pt-br/imagens","https://www.gov.br/pf/pt-br/assuntos/noticias","https://www.noaa.gov/","https://www.usgs.gov/","https://www.agenciaminas.mg.gov.br/","https://www.agenciapara.com.br/","https://www.agenciaamazonas.am.gov.br/","https://agencia.ac.gov.br/","https://www.aen.pr.gov.br/aen","https://bancodeimagens.iphan.gov.br/"];
+ for(const home of extraHomes){
+  const u=new URL(home);
+  definitions.push({home,host:u.hostname,index:home,path:/^\/(?!.*(?:login|signin|account|privacidade|contato|termos|search|busca))[^?#]{15,}$/i});
+ }
+ const available=definitions.filter(d=>catalog.sources?.some((s:any)=>s.home===d.home));
+ // Rotate bounded batches hourly; always prioritize the original publisher.
+ const hour=Math.floor(Date.now()/3600000);
+ const offset=available.length?(hour*8)%available.length:0;
+ const rotated=[...available.slice(offset),...available.slice(0,offset)];
+ let originalHost='';try{originalHost=new URL(article).hostname}catch{}
+ rotated.sort((a,b)=>Number(b.host===originalHost)-Number(a.host===originalHost));
+ const selected=rotated.slice(0,8);
+ Object.assign(result,{eligible_sources:available.length,deferred_sources:Math.max(0,available.length-selected.length),
+  batch_hour:hour,provider_results:[] as any[]});
  async function page(url:string,host:string){
   const r=await request(url,{signal:AbortSignal.timeout(6500),redirect:'error',headers:{'User-Agent':'GiroMadeiraBot/3.2 (editorial photo discovery)'}});
   if(!r.ok)throw Error('http_'+r.status);
@@ -81,9 +98,10 @@ export async function searchRegisteredPhotoSources(db:any,article:string,headlin
   const html=await r.text();if(html.length>2000000)throw Error('page_too_large');
   return parse(html);
  }
- await Promise.all(definitions.map(async def=>{
+ await Promise.all(selected.map(async def=>{
   const source=catalog.sources?.find((s:any)=>s.home===def.home);if(!source)return;
   result.searched++;
+  let found=0;
   try{
    const $=await page(def.index,def.host),links=new Map<string,string>();
    // The original report itself is the strongest discovery lead when hosted by this provider.
@@ -112,9 +130,11 @@ export async function searchRegisteredPhotoSources(db:any,article:string,headlin
       review_required:'Confirmar mesma pessoa/ocorrência, data, crédito, licença individual e autorização de adaptação. Busca textual não comprova pertinência nem aprova publicação.'})
     },{onConflict:'article_url,headline,original_image_url',ignoreDuplicates:true});
     if(saved.error)throw Error('candidate_save_failed');
-    result.candidates++;
+    result.candidates++;found++;
    }
-  }catch(e){result.errors.push(def.host+':'+(e instanceof Error?e.message:'search_failed'));}
+   (result as any).provider_results.push({source:source.name,status:found?'candidate_found':'no_match',candidates:found});
+  }catch(e){const error=e instanceof Error?e.message:'search_failed';result.errors.push(def.host+':'+error);
+   (result as any).provider_results.push({source:source.name,status:'unavailable',error});}
  }));
  return result;
 }
