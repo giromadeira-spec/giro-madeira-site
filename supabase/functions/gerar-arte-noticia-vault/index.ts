@@ -645,7 +645,7 @@ function makeSvg(kind:"feed"|"story",title:string,summary:string,source:string,c
   if(!originalArt&&!bg.startsWith("data:image/"))throw new Error("visual_contract_media_required");
   const pad=portrait?66:58;
   const categoryY=portrait?1100:580,titleY=portrait?1250:710,maxBaseline=portrait?1585:884;
-  const layout=fitHeadline(title,W-2*pad,3,portrait?84:64,portrait?43:37,
+  const layout=fitHeadline(title,W-2*pad,4,portrait?84:64,portrait?39:35,
     maxBaseline-titleY,portrait?1.12:1.12);
   const lineHeight=Math.round(layout.size*1.12);
   const last=titleY+(layout.lines.length-1)*lineHeight;
@@ -937,17 +937,26 @@ Deno.serve(async(req)=>{
     // Exact registered evidence is required for an actual event photograph.
     // Without it, prepare original art with an explicit illustration label for editorial review.
     const photo=registeredPhoto;
-    // Owner-approved photo-first production: discovery is automatic, rights are evidence-based.
-    // Do not spend render time on the generic fallback rejected on 18 October.
+    // Photo-first, verified-rights only. When no event photo is licensed,
+    // the independent daily channel may use an ORIGINAL TYPOGRAPHIC NEWS CARD.
+    // This is not a photo, photomontage or reenactment; the art says so.
+    // Captions and claims are subsequently checked against the source before
+    // any publication. Never silently reproduce an article's OG image.
+    const factualCard=channel!=='legacy'&&autoPipeline===true&&
+      /^https:\/\//i.test(sourceLink)&&originalText.length>=190;
     if(!photo){
-      const sourceSearch=await searchRegisteredPhotoSources(sb,sourceLink,title,load);
-      await sb.from(publicationTable).update({
-        media_status:"aguardando_verificacao_foto_e_licenca",visual_approved:false,
-        source_image_url:imageUrl||null,erro:"photographic_layout_requires_verified_photo"
-      }).eq("id",id).eq("status","pendente").eq("visual_approved",false);
-      return new Response(JSON.stringify({success:true,id,needs_approved_art:true,
-        visual_mode:"photo_pending",source_image_url:imageUrl||null,source_search:sourceSearch,
-        reason:"photographic_layout_requires_verified_photo",publication_not_attempted:true}),{headers:H});
+      const sourceSearch=withinBudget()
+        ?await searchRegisteredPhotoSources(sb,sourceLink,title,load)
+        :{searched:0,candidates:0,errors:["bounded_time_budget"]};
+      if(!factualCard){
+        await sb.from(publicationTable).update({
+          media_status:"aguardando_verificacao_foto_e_licenca",visual_approved:false,
+          source_image_url:imageUrl||null,erro:"photographic_layout_requires_verified_photo"
+        }).eq("id",id).eq("status","pendente").eq("visual_approved",false);
+        return new Response(JSON.stringify({success:true,id,needs_approved_art:true,
+          visual_mode:"photo_pending",source_image_url:imageUrl||null,source_search:sourceSearch,
+          reason:"photographic_layout_requires_verified_photo",publication_not_attempted:true}),{headers:H});
+      }
     }
 
     const archivePhoto=/foto de arquivo/i.test(String(registered?.record?.event_description||""));
@@ -975,11 +984,11 @@ Deno.serve(async(req)=>{
       titulo:title,resumo:desc||item.resumo||null,categoria:category,legenda,
       image_url:feedUrl,feed_image_url:feedUrl,story_image_url:storyUrl,
       source_image_url:imageUrl||null,source_video_url:vid.source||null,
-      publicar_story:true,publicar_reel:reelRecommended,reel_interesse_ro:reelInterestRo,video_url:item.video_url||null,
+      publicar_story:channel==="reels"?false:true,publicar_reel:reelRecommended,reel_interesse_ro:reelInterestRo,video_url:item.video_url||null,
       status:"pendente",erro:null,story_erro:null,reel_erro:null,media_pipeline_version:channel==="feed"?6:5,media_status:"feed_pronto"
     };
     const up=await sb.from(publicationTable).update(upd).eq("id",id); if(up.error) throw up.error;
-    return new Response(JSON.stringify({success:true,id,feed_image_url:feedUrl,story_image_url:storyUrl,reel_ready:Boolean(item.video_url),reel_recommended:reelRecommended,reel_interesse_ro:reelInterestRo,reel_generated:false,source_image_url:imageUrl||null,visual_mode:photo?"registered_event_photo":"original_illustration",registered_image_id:photo?.registryId||null,illustrative_photo_credit:photo?{creator:photo.creator,license:photo.license,source:photo.source}:null,awaiting_visual_approval:true,publication_not_attempted:true}),{headers:H});
+    return new Response(JSON.stringify({success:true,id,feed_image_url:feedUrl,story_image_url:storyUrl,reel_ready:Boolean(item.video_url),reel_recommended:reelRecommended,reel_interesse_ro:reelInterestRo,reel_generated:false,source_image_url:imageUrl||null,visual_mode:photo?"registered_event_photo":"original_factual_card",registered_image_id:photo?.registryId||null,illustrative_photo_credit:photo?{creator:photo.creator,license:photo.license,source:photo.source}:null,awaiting_visual_approval:true,publication_not_attempted:true}),{headers:H});
   }catch(e){
     return new Response(JSON.stringify({success:false,error:e instanceof Error?e.message:String(e)}),{status:500,headers:H});
   }
