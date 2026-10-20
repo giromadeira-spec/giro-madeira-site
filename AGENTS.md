@@ -80,3 +80,9 @@ O responsável aprovou a segunda prévia fotográfica da matéria sobre Victor S
 - Fonte e crédito na legenda; preservar atribuições exigidas pela licença. Prévia não comprova permissão de republicação.
 - NÃO aprovar automaticamente arte abstrata/simbólica genérica como substituta dessa composição. Sem fotografia pertinente e autorizada, buscar outra pauta com foto válida ou reter o item; não publicar fundo genérico.
 - Aprovação depende de inspeção da saída final. Documentação e HTTP 200 não comprovam qualidade nem publicação.
+
+## Fotografia ilustrativa licenciada — 20/10/2026
+
+A autorização posterior do responsável permite preparação de artes com **fotos temáticas licenciadas** em Feed/Stories/Reels mesmo sem foto factual do evento, desde que a foto seja rotulada no próprio quadro como **IMAGEM ILUSTRATIVA — NÃO É FOTO DO FATO**, creditada na legenda e nunca tratada como prova de ocorrência. Consultar `docs/FONTES_IMAGENS_ILUSTRATIVAS_2026_10_20.md`. A verificação individual do arquivo (CC0 ou CC BY com autoria/crédito), a pertinência e a revisão por canal continuam obrigatórias; pautas sensíveis não aceitam troca por pessoas fotografadas em outro contexto. Fotos da matéria permanecem condicionadas ao cadastro de direito + pertinência `giro_imagens_autorizadas`.
+
+Shorts e TikTok podem preparar **arte vetorial original específica e rotulada** quando faltar foto factual, apenas com o gate `allow_original_editorial_illustration` da ponte própria, seguindo a assinatura de proveniência `original_editorial_labeled_v2_`. A arte preparada segue para revisão, e não equivale a autorização de publicação. Não liberar publicação, não mascarar erros, nem alterar filas/cadências dos demais canais.
