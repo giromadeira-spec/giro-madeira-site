@@ -34,7 +34,7 @@ for(const w of workflows){
   'video rendering must prepare only before 17h PV, no legacy 08h/22h');
 }
 const transcode=[...transcoder.matchAll(/^\s+- cron: '([^']+)'\s*$/gm)].map(x=>x[1]);
-assert.deepEqual(transcode,['25,40 20 * * *','10,25 21 * * *'],'TikTok 30fps fallback at 16:25/16:40/17:10/17:25 PV; no publication or out-of-window recovery');
+assert.deepEqual(transcode,['25,55 19 * * *','25,40 20 * * *','10,25 21 * * *'],'TikTok 30fps includes 15:25/15:55 early fallback before 17h plus bounded 16h/17h checks; no publishing by this workflow');
 assert.ok(monitor.includes("cron: '50 21 * * *'"),'late delivery check at 17:50 PV');
 assert.ok(monitor.includes("cron: '0 19,20 * * *'"),'15/16h PV preview');
 assert.ok(docs.includes('**17:00**')&&docs.includes('daily_limit=1'));
