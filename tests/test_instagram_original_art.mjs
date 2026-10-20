@@ -5,10 +5,15 @@ const gen=readFileSync(new URL('../supabase/functions/gerar-arte-noticia-vault/i
 const prep=readFileSync(new URL('../supabase/functions/giro-instagram-preparar-independente/index.ts',import.meta.url),'utf8');
 const publish=readFileSync(new URL('../supabase/functions/giro-instagram-publicar-independente/index.ts',import.meta.url),'utf8');
 
-assert.ok(gen.includes('const photo=registeredPhoto;'),
-  'Real event photos must come from the rights AND event-matching registry');
+assert.ok(gen.includes('const photo=registeredPhoto||illustrativeStockPhoto;'),
+  'The event-photo registry remains first priority; licensed stock is only illustrative');
+assert.ok(gen.includes('!!registeredPhoto,archivePhoto?'),
+  'Illustrative images must never receive the event-photo overlay');
+assert.ok(gen.includes('IMAGEM ILUSTRATIVA — NÃO É FOTO DO FATO'));
+assert.ok(gen.includes('sensitiveIllustrativeSubject'));
+assert.ok(gen.includes('illustrativeStockPhoto.creator+" ("+illustrativeStockPhoto.license+'));
 assert.ok(gen.includes('const bg=photo?photo.dataUri:"original_editorial_illustration";'));
-assert.ok(!gen.includes('const photo=registeredPhoto||'));
+assert.ok(gen.includes('visual_mode:registeredPhoto?"registered_event_photo":illustrativeStockPhoto?"licensed_illustrative_photo"'));
 assert.ok(gen.includes('ILUSTRAÇÃO EDITORIAL ORIGINAL — representação gráfica simbólica'));
 assert.ok(gen.includes('awaiting_visual_approval:true,publication_not_attempted:true'));
 assert.ok(gen.includes('const credit=previewLabel||(isEventPhoto?"FOTO DA NOTÍCIA"'));

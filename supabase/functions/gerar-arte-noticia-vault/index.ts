@@ -406,9 +406,10 @@ async function linkedEventPhoto(articleHtml:string,originalImage:string,title:st
   }catch{return null}
 }
 
-async function licensedEditorialPhoto(title:string,category:string):Promise<EditorialPhoto|null>{
+async function licensedEditorialPhoto(title:string,category:string,remaining:()=>boolean=()=>true):Promise<EditorialPhoto|null>{
   // Article OG photographs are not automatically reusable. Search file-level Wikimedia licenses.
   for(const term of licensingTopic(title,category)){
+    if(!remaining())return null;
     try{
       const api=new URL("https://commons.wikimedia.org/w/api.php");
       for(const [k,v] of Object.entries({
@@ -421,6 +422,7 @@ async function licensedEditorialPhoto(title:string,category:string):Promise<Edit
       const results=await index.json().catch(()=>({}));
       const pages=Array.isArray(results?.query?.pages)?results.query.pages:[];
       for(const page of pages){
+        if(!remaining())return null;
         const info=page?.imageinfo?.[0],meta=info?.extmetadata||{};
         const lic=stripPhotoMarkup(meta?.LicenseShortName?.value);
         const licURL=stripPhotoMarkup(meta?.LicenseUrl?.value);
@@ -472,11 +474,11 @@ async function licensedEditorialPhoto(title:string,category:string):Promise<Edit
     }catch{/* license not verifiable: leave photo absent */}
   }
   // Openverse is a secondary source; metadata, regionality, and license still must pass.
-  return await licensedOpenversePhoto(title,category);
+  return remaining()?await licensedOpenversePhoto(title,category,remaining):null;
 }
 
 
-async function licensedOpenversePhoto(title:string,category:string):Promise<EditorialPhoto|null>{
+async function licensedOpenversePhoto(title:string,category:string,remaining:()=>boolean=()=>true):Promise<EditorialPhoto|null>{
   // Secondary source with file-level CC0/CC-BY metadata. Not a license for any news-site OG image.
   const t=(title+" "+category).toLowerCase();
   let terms=licensingTopic(title,category);
@@ -484,6 +486,7 @@ async function licensedOpenversePhoto(title:string,category:string):Promise<Edit
   if(!timberTopic&&/pol[ií]cia|pris[aã]o|tr[aá]fico|homic|opera[cç][aã]o/.test(t))
     terms=["Brazilian police car","blue red emergency vehicle lights close up"];
   for(const term of terms){
+    if(!remaining())return null;
     try{
       const api=new URL("https://api.openverse.org/v1/images/");
       api.searchParams.set("q",term);
@@ -494,6 +497,7 @@ async function licensedOpenversePhoto(title:string,category:string):Promise<Edit
       if(!found.ok)continue;
       const response=await found.json().catch(()=>({}));
       for(const photo of Array.isArray(response?.results)?response.results:[]){
+        if(!remaining())return null;
         const lic=String(photo?.license||"").toLowerCase();
         if(lic!=="cc0"&&lic!=="by"||photo?.mature===true)continue;
         const licUrl=String(photo?.license_url||"");
@@ -936,7 +940,15 @@ Deno.serve(async(req)=>{
     }:null;
     // Exact registered evidence is required for an actual event photograph.
     // Without it, prepare original art with an explicit illustration label for editorial review.
-    const photo=registeredPhoto;
+    // A separately licensed topical image may illustrate a story but never prove the event.
+    // Sensitive subjects retain original symbolic art or wait for a verified event photo.
+    const sensitiveIllustrativeSubject=/homic|feminic|estupr|sequest|v[ií]tima|ferid|morto|morte|assassin|pris[aã]o|suspeit|opera[cç][aã]o|pol[ií]cia|pol[ií]tica|presidente|deputad|senador|governador|vereador|elei[cç][aã]o/i.test(title+" "+category);
+    const illustrativeStockPhoto=!registeredPhoto&&!sensitiveIllustrativeSubject&&withinBudget()&&licensingTopic(title,category).length>0
+      ? await licensedEditorialPhoto(title,category,withinBudget)
+      : null;
+    // Only registeredPhoto is evidence of this actual event. The illustrative
+    // photo remains visually labeled and must pass per-channel human review.
+    const photo=registeredPhoto||illustrativeStockPhoto;
     // Photo-first, verified-rights only. When no event photo is licensed,
     // the independent daily channel may use an ORIGINAL TYPOGRAPHIC NEWS CARD.
     // This is not a photo, photomontage or reenactment; the art says so.
@@ -963,8 +975,8 @@ Deno.serve(async(req)=>{
     const attribution=photo?photo.creator+" • "+photo.license:"";
     const bg=photo?photo.dataUri:"original_editorial_illustration";
     await prepareBrandLogo(); const font=new Uint8Array();
-    const feed=await render(makeSvg("feed",title,desc,source,category,bg,item.urgente===true,attribution,!!photo,archivePhoto?"FOTO DE ARQUIVO":""),font);
-    const story=await render(makeSvg("story",title,desc,source,category,bg,item.urgente===true,attribution,!!photo),font);
+    const feed=await render(makeSvg("feed",title,desc,source,category,bg,item.urgente===true,attribution,!!registeredPhoto,archivePhoto?"FOTO DE ARQUIVO":illustrativeStockPhoto?"IMAGEM ILUSTRATIVA — NÃO É FOTO DO FATO":""),font);
+    const story=await render(makeSvg("story",title,desc,source,category,bg,item.urgente===true,attribution,!!registeredPhoto,illustrativeStockPhoto?"IMAGEM ILUSTRATIVA — NÃO É FOTO DO FATO":""),font);
         const feedPath=`auto/feed/${channel}/${id}-${Date.now()}.png`,storyPath=`auto/story/${channel}/${id}-${Date.now()}.png`;
     const [uf,us]=await Promise.all([
       sb.storage.from("news-images").upload(feedPath,feed,{contentType:"image/png",upsert:false}),
@@ -976,8 +988,10 @@ Deno.serve(async(req)=>{
     // A publisher's embedded video is not automatically licensed for republication.
     // Keep its source URL only; original Reel media is made by the approved worker.
     const vid={source:videoRaw,publicUrl:""};
-    const photoCredit=photo
-      ?("\n"+(archivePhoto?"Foto de arquivo: ":"Foto do acontecimento: "))+photo.creator+" ("+photo.license+") — "+photo.source
+    const photoCredit=registeredPhoto
+      ?("\n"+(archivePhoto?"Foto de arquivo: ":"Foto do acontecimento: "))+registeredPhoto.creator+" ("+registeredPhoto.license+") — "+registeredPhoto.source
+      :illustrativeStockPhoto
+      ?"\nImagem ilustrativa (NÃO retrata o acontecimento): "+illustrativeStockPhoto.creator+" ("+illustrativeStockPhoto.license+") — "+illustrativeStockPhoto.source
       :"\nILUSTRAÇÃO EDITORIAL ORIGINAL — representação gráfica simbólica, NÃO É FOTO DO ACONTECIMENTO.";
     const legenda=`${originalText}\n\nFonte: ${source}\nMatéria original: ${sourceLink}${photoCredit}\n\n#GiroMadeira #PortoVelho #Rondônia`;
     const upd:any={
@@ -988,7 +1002,7 @@ Deno.serve(async(req)=>{
       status:"pendente",erro:null,story_erro:null,reel_erro:null,media_pipeline_version:channel==="feed"?6:5,media_status:"feed_pronto"
     };
     const up=await sb.from(publicationTable).update(upd).eq("id",id); if(up.error) throw up.error;
-    return new Response(JSON.stringify({success:true,id,feed_image_url:feedUrl,story_image_url:storyUrl,reel_ready:Boolean(item.video_url),reel_recommended:reelRecommended,reel_interesse_ro:reelInterestRo,reel_generated:false,source_image_url:imageUrl||null,visual_mode:photo?"registered_event_photo":"original_factual_card",registered_image_id:photo?.registryId||null,illustrative_photo_credit:photo?{creator:photo.creator,license:photo.license,source:photo.source}:null,awaiting_visual_approval:true,publication_not_attempted:true}),{headers:H});
+    return new Response(JSON.stringify({success:true,id,feed_image_url:feedUrl,story_image_url:storyUrl,reel_ready:Boolean(item.video_url),reel_recommended:reelRecommended,reel_interesse_ro:reelInterestRo,reel_generated:false,source_image_url:imageUrl||null,visual_mode:registeredPhoto?"registered_event_photo":illustrativeStockPhoto?"licensed_illustrative_photo":"original_factual_card",registered_image_id:registeredPhoto?.registryId||null,illustrative_photo_credit:illustrativeStockPhoto?{creator:illustrativeStockPhoto.creator,license:illustrativeStockPhoto.license,source:illustrativeStockPhoto.source}:null,awaiting_visual_approval:true,publication_not_attempted:true}),{headers:H});
   }catch(e){
     return new Response(JSON.stringify({success:false,error:e instanceof Error?e.message:String(e)}),{status:500,headers:H});
   }
