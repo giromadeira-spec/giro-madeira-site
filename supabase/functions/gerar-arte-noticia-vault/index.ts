@@ -972,7 +972,7 @@ Deno.serve(async(req)=>{
     const bg=photo?photo.dataUri:"original_editorial_illustration";
     await prepareBrandLogo(); const font=new Uint8Array();
     const feed=await render(makeSvg("feed",title,desc,source,category,bg,item.urgente===true,attribution,!!registeredPhoto,archivePhoto?"FOTO DE ARQUIVO":illustrativeStockPhoto?"IMAGEM ILUSTRATIVA — NÃO É FOTO DO FATO":""),font);
-    const story=await render(makeSvg("story",title,desc,source,category,bg,item.urgente===true,attribution,!!registeredPhoto,"",illustrativeStockPhoto?"IMAGEM ILUSTRATIVA — NÃO É FOTO DO FATO":""),font);
+    const story=await render(makeSvg("story",title,desc,source,category,bg,item.urgente===true,attribution,!!registeredPhoto,illustrativeStockPhoto?"IMAGEM ILUSTRATIVA — NÃO É FOTO DO FATO":""),font);
         const feedPath=`auto/feed/${channel}/${id}-${Date.now()}.png`,storyPath=`auto/story/${channel}/${id}-${Date.now()}.png`;
     const [uf,us]=await Promise.all([
       sb.storage.from("news-images").upload(feedPath,feed,{contentType:"image/png",upsert:false}),

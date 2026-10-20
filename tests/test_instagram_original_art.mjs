@@ -11,7 +11,7 @@ assert.ok(gen.includes('!!registeredPhoto,archivePhoto?'),
   'Illustrative images must never receive the event-photo overlay');
 assert.ok(gen.includes('IMAGEM ILUSTRATIVA — NÃO É FOTO DO FATO'));
 assert.ok(gen.includes('sensitiveIllustrativeSubject'));
-assert.ok(gen.includes('illustrativeStockPhoto.creator+" ("+illustrativeStockPhoto.license+')
+assert.ok(gen.includes('illustrativeStockPhoto.creator+" ("+illustrativeStockPhoto.license+'));
 assert.ok(gen.includes('const bg=photo?photo.dataUri:"original_editorial_illustration";'));
 assert.ok(gen.includes('visual_mode:registeredPhoto?"registered_event_photo":illustrativeStockPhoto?"licensed_illustrative_photo"'));
 assert.ok(gen.includes('ILUSTRAÇÃO EDITORIAL ORIGINAL — representação gráfica simbólica'));
