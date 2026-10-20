@@ -35,13 +35,16 @@ jobs:
           assert 'const originalArt=bg==="original_editorial_illustration"' in gen
           assert 'originalArt?originalGraphicHero(' in gen
           assert 'ILUSTRAÇÃO EDITORIAL — NÃO É FOTO' in gen
-          assert 'const photo=registeredPhoto;' in gen, 'Only proven event photos may be treated as factual'
+          assert 'const photo=registeredPhoto||illustrativeStockPhoto;' in gen, 'Factual photos still require event-matching registry proof'
+          assert '!!registeredPhoto,archivePhoto?' in gen
+          assert 'IMAGEM ILUSTRATIVA — NÃO É FOTO DO FATO' in gen
           assert 'const bg=photo?photo.dataUri:"original_editorial_illustration"' in gen
           assert 'ILUSTRAÇÃO EDITORIAL ORIGINAL — representação gráfica simbólica' in gen
-          assert 'visual_mode:photo?"registered_event_photo":"original_factual_card"' in gen
+          assert 'visual_mode:registeredPhoto?"registered_event_photo":illustrativeStockPhoto?"licensed_illustrative_photo":"original_factual_card"' in gen
           assert 'awaiting_visual_approval:true,publication_not_attempted:true' in gen
           assert 'needs_approved_art:true' in gen and 'visual_mode:"photo_pending"' in gen and 'publication_not_attempted:true' in gen, 'Photo pending is a safe block, never publication'
-          assert 'const photo=registeredPhoto||' not in gen
+          assert 'sensitiveIllustrativeSubject' in gen
+          assert 'Imagem ilustrativa (NÃO retrata o acontecimento)' in gen
           assert 'approvedRegistryPhoto(sb,url,sourceLink,title)' in gen
           assert 'feed_ilustracao_revisada' in publish
           assert 'reel_ilustracao_revisada' in publish

@@ -1070,10 +1070,17 @@ def main():
                     registered,result["source_url"],result["title"])
                 registered_image_id=registered["id"]
             else:
-                bridge(token,"photo_pending",queue_id=qid)
-                report_render_outcome({"state":"awaiting_licensed_event_photo","queue_id":qid,
-                                       "ready_to_publish":False,"reason":"event_photo_rights_review_required"})
-                return
+                # Photo-rights failure cannot justify copying a news-site image.
+                # A topic-specific, self-authored illustration is permitted only
+                # when this independent channel explicitly enables the fallback.
+                contingency=cleared_editorial_contingency(result)
+                if contingency is None:
+                    bridge(token,"photo_pending",queue_id=qid)
+                    report_render_outcome({"state":"awaiting_licensed_event_photo","queue_id":qid,
+                                           "ready_to_publish":False,"reason":"event_photo_rights_review_required"})
+                    return
+                picture,credit,file_title=contingency
+                print("No cleared event photo; rendering clearly labeled original editorial art for review.")
         visual_origin_valid=is_acceptable_visual_credit(
             credit,result["source_url"],result["title"])
         if not visual_origin_valid:
@@ -1098,8 +1105,8 @@ def main():
         video=folder/"giro_short.mp4";render_frames(frames,video,soundtrack)
         preview_dir=ROOT/"shorts-test-preview"
         preview_dir.mkdir(exist_ok=True)
-        # Checagem de qualidade estrutural: não confundir renderização concluída
-        # com conformidade visual. Fotografia ligada à pauta é condição obrigatória.
+        # Checagem estrutural é distinta de aprovação editorial. Arte original
+        # claramente rotulada permanece pendente, nunca comprova a ocorrência.
         visual_origin_valid=is_acceptable_visual_credit(
             credit,result["source_url"],result["title"])
         if len(frames)!=3 or not visual_origin_valid:
