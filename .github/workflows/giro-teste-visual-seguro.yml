@@ -17,6 +17,8 @@ concurrency:
 
 jobs:
   validar-renderizador:
+    # Standby requested by owner on 2026-10-21; resume only on explicit order.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:

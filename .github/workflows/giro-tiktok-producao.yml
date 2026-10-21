@@ -1,12 +1,12 @@
 name: Giro Madeira - TikTok independente
 on:
-  schedule:
-    # 1 TikTok/dia às 17:00 Porto Velho (21:00 UTC).
-    # Preparation 11:15, 13:30, 15:15, 16:15, 16:35 PV; NO publishing here.
-    - cron: '15 15 * * *'
-    - cron: '30 17 * * *'
-    - cron: '15 19 * * *'
-    - cron: '15,35 20 * * *'
+# PAUSED 2026-10-21:   schedule:
+# PAUSED 2026-10-21:     # 1 TikTok/dia às 17:00 Porto Velho (21:00 UTC).
+# PAUSED 2026-10-21:     # Preparation 11:15, 13:30, 15:15, 16:15, 16:35 PV; NO publishing here.
+# PAUSED 2026-10-21:     - cron: '15 15 * * *'
+# PAUSED 2026-10-21:     - cron: '30 17 * * *'
+# PAUSED 2026-10-21:     - cron: '15 19 * * *'
+# PAUSED 2026-10-21:     - cron: '15,35 20 * * *'
   workflow_dispatch:
 permissions:
   contents: read
@@ -16,7 +16,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   preparar-tiktok:
-    if: github.repository == 'giromadeira-spec/giro-madeira-site' && github.ref == 'refs/heads/main'
+    # Before standby: if: github.repository == 'giromadeira-spec/giro-madeira-site' && github.ref == 'refs/heads/main'
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 18
     steps:

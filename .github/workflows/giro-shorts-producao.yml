@@ -6,14 +6,14 @@ on:
     paths:
       - scripts/giro_shorts_auto.py
       - .github/workflows/giro-shorts-producao.yml
-  schedule:
-    # 1 Shorts/dia às 17:00 Porto Velho (21:00 UTC); these are ONLY render passes.
-    # 11:15, 13:30, 15:15, 16:15, 16:35 PV: preparation before editorial review.
-    # The Supabase uploader alone may post inside the 17:00–17:44 PV window.
-    - cron: '15 15 * * *'
-    - cron: '30 17 * * *'
-    - cron: '15 19 * * *'
-    - cron: '15,35 20 * * *'
+# PAUSED 2026-10-21:   schedule:
+# PAUSED 2026-10-21:     # 1 Shorts/dia às 17:00 Porto Velho (21:00 UTC); these are ONLY render passes.
+# PAUSED 2026-10-21:     # 11:15, 13:30, 15:15, 16:15, 16:35 PV: preparation before editorial review.
+# PAUSED 2026-10-21:     # The Supabase uploader alone may post inside the 17:00–17:44 PV window.
+# PAUSED 2026-10-21:     - cron: '15 15 * * *'
+# PAUSED 2026-10-21:     - cron: '30 17 * * *'
+# PAUSED 2026-10-21:     - cron: '15 19 * * *'
+# PAUSED 2026-10-21:     - cron: '15,35 20 * * *'
   workflow_dispatch:
 
 permissions:
@@ -26,7 +26,8 @@ concurrency:
 
 jobs:
   verificar-visual-sem-publicar:
-    if: github.event_name == 'push' && github.repository == 'giromadeira-spec/giro-madeira-site' && github.ref == 'refs/heads/main'
+    # Before standby: if: github.event_name == 'push' && github.repository == 'giromadeira-spec/giro-madeira-site' && github.ref == 'refs/heads/main'
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -89,7 +90,8 @@ jobs:
           retention-days: 14
 
   gerar-short:
-    if: github.event_name == 'schedule' && github.repository == 'giromadeira-spec/giro-madeira-site' && github.ref == 'refs/heads/main'
+    # Before standby: if: github.event_name == 'schedule' && github.repository == 'giromadeira-spec/giro-madeira-site' && github.ref == 'refs/heads/main'
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 18
     steps:

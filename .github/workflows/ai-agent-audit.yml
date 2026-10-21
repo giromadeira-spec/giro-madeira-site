@@ -46,9 +46,9 @@ on:
       - 'tests/test_ai_agents_*.py'
       - 'docs/**'
       - 'AGENTS.md'
-  schedule:
-    # 07h17 Porto Velho / 08h17 Sao Paulo. GitHub pode atrasar o inicio.
-    - cron: '17 11 * * *'
+# PAUSED 2026-10-21:   schedule:
+# PAUSED 2026-10-21:     # 07h17 Porto Velho / 08h17 Sao Paulo. GitHub pode atrasar o inicio.
+# PAUSED 2026-10-21:     - cron: '17 11 * * *'
   workflow_dispatch:
 
 permissions:
@@ -60,7 +60,8 @@ concurrency:
 
 jobs:
   auditoria:
-    if: github.repository == 'giromadeira-spec/giro-madeira-site'
+    # Before standby: if: github.repository == 'giromadeira-spec/giro-madeira-site'
+    if: ${{ false }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
