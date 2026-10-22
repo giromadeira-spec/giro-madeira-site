@@ -1,0 +1,64 @@
+{
+  "project": "GIRO MADEIRA",
+  "status": "in_validation",
+  "production_enabled": false,
+  "canva_folder": "https://www.canva.com/folder/FAHYMEBHwtk",
+  "templates": {
+    "feed": {
+      "design_id": "DAHYMP20-oM",
+      "edit_url": "https://www.canva.com/d/PPzPLdKhSAhZ0EJ",
+      "view_url": "https://www.canva.com/d/LKcRcsN8W_rsWP2",
+      "width": 1080,
+      "height": 1080,
+      "pages": 5,
+      "autofill_configured": true
+    },
+    "master": {
+      "design_id": "DAHYMKfoY6M",
+      "edit_url": "https://www.canva.com/d/_5F0u7wsJK820TX",
+      "view_url": "https://www.canva.com/d/oHk_rn8yesLIJYq",
+      "width": 1080,
+      "height": 1920,
+      "pages": 5,
+      "autofill_configured": true
+    },
+    "stories": {
+      "design_id": "DAHYMNEihXM",
+      "edit_url": "https://www.canva.com/d/IIYVQTqu9qvgO_d",
+      "view_url": "https://www.canva.com/d/4IafeQwap-AQOVu",
+      "width": 1080,
+      "height": 1920,
+      "pages": 5,
+      "autofill_configured": true
+    },
+    "reels": {
+      "design_id": "DAHYMB7lg84",
+      "edit_url": "https://www.canva.com/d/OosWx3oPds4AJ7R",
+      "view_url": "https://www.canva.com/d/7FY_kQ3mHCBGd6a",
+      "width": 1080,
+      "height": 1920,
+      "pages": 5,
+      "autofill_configured": true
+    },
+    "tiktok": {
+      "design_id": "DAHYMIzMDmI",
+      "edit_url": "https://www.canva.com/d/ylbLvXLIaMmYMoi",
+      "view_url": "https://www.canva.com/d/4-SJ7e1sTPSS_jk",
+      "width": 1080,
+      "height": 1920,
+      "pages": 5,
+      "autofill_configured": true
+    },
+    "shorts": {
+      "design_id": "DAHYMH4dDaM",
+      "edit_url": "https://www.canva.com/d/FZZtmfH-1OCuciT",
+      "view_url": "https://www.canva.com/d/sfoCh60CGLHGhEs",
+      "width": 1080,
+      "height": 1920,
+      "pages": 5,
+      "autofill_configured": true
+    }
+  },
+  "autofill_execution": "blocked_by_canva_account_plan",
+  "free_rendering": "local_compositor_available"
+}

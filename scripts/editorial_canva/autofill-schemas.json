@@ -1,0 +1,835 @@
+{
+  "status": "configured_in_canva",
+  "execution_test": "blocked_by_account_plan",
+  "paid_upgrade_authorized": false,
+  "schemas": {
+    "feed": {
+      "p05_apoio": {
+        "type": "text"
+      },
+      "p04_local": {
+        "type": "text"
+      },
+      "p01_editoria": {
+        "type": "text"
+      },
+      "p04_apoio": {
+        "type": "text"
+      },
+      "p01_fonte": {
+        "type": "text"
+      },
+      "p02_complemento": {
+        "type": "text"
+      },
+      "p03_manchete": {
+        "type": "text"
+      },
+      "p05_foto": {
+        "type": "image"
+      },
+      "p03_apoio": {
+        "type": "text"
+      },
+      "p05_credito_foto": {
+        "type": "text"
+      },
+      "p03_editoria": {
+        "type": "text"
+      },
+      "p05_complemento": {
+        "type": "text"
+      },
+      "p02_apoio": {
+        "type": "text"
+      },
+      "p05_local": {
+        "type": "text"
+      },
+      "p03_local": {
+        "type": "text"
+      },
+      "p04_fonte": {
+        "type": "text"
+      },
+      "p03_destaque": {
+        "type": "text"
+      },
+      "p02_editoria": {
+        "type": "text"
+      },
+      "p02_manchete": {
+        "type": "text"
+      },
+      "p05_fonte": {
+        "type": "text"
+      },
+      "p04_credito_foto": {
+        "type": "text"
+      },
+      "p02_fonte": {
+        "type": "text"
+      },
+      "p02_destaque": {
+        "type": "text"
+      },
+      "p01_credito_foto": {
+        "type": "text"
+      },
+      "p04_manchete": {
+        "type": "text"
+      },
+      "p02_local": {
+        "type": "text"
+      },
+      "p01_apoio": {
+        "type": "text"
+      },
+      "p03_credito_foto": {
+        "type": "text"
+      },
+      "p02_foto": {
+        "type": "image"
+      },
+      "p03_fonte": {
+        "type": "text"
+      },
+      "p04_destaque": {
+        "type": "text"
+      },
+      "p01_manchete": {
+        "type": "text"
+      },
+      "p05_manchete": {
+        "type": "text"
+      },
+      "p01_foto": {
+        "type": "image"
+      },
+      "p01_local": {
+        "type": "text"
+      },
+      "p04_foto": {
+        "type": "image"
+      },
+      "p02_credito_foto": {
+        "type": "text"
+      },
+      "p04_editoria": {
+        "type": "text"
+      },
+      "p05_numero": {
+        "type": "text"
+      },
+      "p03_foto": {
+        "type": "image"
+      },
+      "p01_destaque": {
+        "type": "text"
+      },
+      "p05_editoria": {
+        "type": "text"
+      }
+    },
+    "master": {
+      "p03_manchete": {
+        "type": "text"
+      },
+      "p02_manchete": {
+        "type": "text"
+      },
+      "p01_editoria": {
+        "type": "text"
+      },
+      "p04_editoria": {
+        "type": "text"
+      },
+      "p02_foto": {
+        "type": "image"
+      },
+      "p05_editoria": {
+        "type": "text"
+      },
+      "p04_manchete": {
+        "type": "text"
+      },
+      "p02_fonte": {
+        "type": "text"
+      },
+      "p05_destaque": {
+        "type": "text"
+      },
+      "p03_apoio": {
+        "type": "text"
+      },
+      "p01_apoio": {
+        "type": "text"
+      },
+      "p02_apoio": {
+        "type": "text"
+      },
+      "p05_credito_foto": {
+        "type": "text"
+      },
+      "p01_cena": {
+        "type": "text"
+      },
+      "p04_destaque": {
+        "type": "text"
+      },
+      "p02_credito_foto": {
+        "type": "text"
+      },
+      "p04_local": {
+        "type": "text"
+      },
+      "p03_fonte": {
+        "type": "text"
+      },
+      "p02_editoria": {
+        "type": "text"
+      },
+      "p04_credito_foto": {
+        "type": "text"
+      },
+      "p03_local": {
+        "type": "text"
+      },
+      "p05_cena": {
+        "type": "text"
+      },
+      "p01_credito_foto": {
+        "type": "text"
+      },
+      "p03_editoria": {
+        "type": "text"
+      },
+      "p01_local": {
+        "type": "text"
+      },
+      "p05_apoio": {
+        "type": "text"
+      },
+      "p02_cena": {
+        "type": "text"
+      },
+      "p03_cena": {
+        "type": "text"
+      },
+      "p03_destaque": {
+        "type": "text"
+      },
+      "p04_apoio": {
+        "type": "text"
+      },
+      "p02_local": {
+        "type": "text"
+      },
+      "p02_destaque": {
+        "type": "text"
+      },
+      "p05_manchete": {
+        "type": "text"
+      },
+      "p01_foto": {
+        "type": "image"
+      },
+      "p05_fonte": {
+        "type": "text"
+      },
+      "p04_cena": {
+        "type": "text"
+      },
+      "p05_foto": {
+        "type": "image"
+      },
+      "p03_foto": {
+        "type": "image"
+      },
+      "p05_local": {
+        "type": "text"
+      },
+      "p04_foto": {
+        "type": "image"
+      },
+      "p01_manchete": {
+        "type": "text"
+      },
+      "p04_fonte": {
+        "type": "text"
+      },
+      "p03_credito_foto": {
+        "type": "text"
+      },
+      "p01_destaque": {
+        "type": "text"
+      },
+      "p01_fonte": {
+        "type": "text"
+      }
+    },
+    "stories": {
+      "p03_fonte": {
+        "type": "text"
+      },
+      "p05_complemento": {
+        "type": "text"
+      },
+      "p03_credito_foto": {
+        "type": "text"
+      },
+      "p04_destaque": {
+        "type": "text"
+      },
+      "p05_foto": {
+        "type": "image"
+      },
+      "p05_apoio": {
+        "type": "text"
+      },
+      "p05_dado": {
+        "type": "text"
+      },
+      "p03_local": {
+        "type": "text"
+      },
+      "p02_fonte": {
+        "type": "text"
+      },
+      "p01_fonte": {
+        "type": "text"
+      },
+      "p01_credito_foto": {
+        "type": "text"
+      },
+      "p05_editoria": {
+        "type": "text"
+      },
+      "p02_apoio": {
+        "type": "text"
+      },
+      "p01_foto": {
+        "type": "image"
+      },
+      "p05_manchete": {
+        "type": "text"
+      },
+      "p04_dado": {
+        "type": "text"
+      },
+      "p01_editoria": {
+        "type": "text"
+      },
+      "p04_apoio": {
+        "type": "text"
+      },
+      "p01_apoio": {
+        "type": "text"
+      },
+      "p04_foto": {
+        "type": "image"
+      },
+      "p03_dado": {
+        "type": "text"
+      },
+      "p01_local": {
+        "type": "text"
+      },
+      "p03_destaque": {
+        "type": "text"
+      },
+      "p03_manchete": {
+        "type": "text"
+      },
+      "p02_foto": {
+        "type": "image"
+      },
+      "p02_editoria": {
+        "type": "text"
+      },
+      "p04_credito_foto": {
+        "type": "text"
+      },
+      "p02_manchete": {
+        "type": "text"
+      },
+      "p03_foto": {
+        "type": "image"
+      },
+      "p02_dado": {
+        "type": "text"
+      },
+      "p02_credito_foto": {
+        "type": "text"
+      },
+      "p05_credito_foto": {
+        "type": "text"
+      },
+      "p02_complemento": {
+        "type": "text"
+      },
+      "p01_dado": {
+        "type": "text"
+      },
+      "p04_local": {
+        "type": "text"
+      },
+      "p01_manchete": {
+        "type": "text"
+      },
+      "p05_local": {
+        "type": "text"
+      },
+      "p02_local": {
+        "type": "text"
+      },
+      "p03_editoria": {
+        "type": "text"
+      },
+      "p01_complemento": {
+        "type": "text"
+      },
+      "p04_manchete": {
+        "type": "text"
+      },
+      "p04_complemento": {
+        "type": "text"
+      },
+      "p05_destaque": {
+        "type": "text"
+      },
+      "p05_fonte": {
+        "type": "text"
+      },
+      "p01_destaque": {
+        "type": "text"
+      },
+      "p04_fonte": {
+        "type": "text"
+      },
+      "p03_complemento": {
+        "type": "text"
+      },
+      "p02_destaque": {
+        "type": "text"
+      },
+      "p04_editoria": {
+        "type": "text"
+      },
+      "p03_apoio": {
+        "type": "text"
+      }
+    },
+    "reels": {
+      "p05_manchete": {
+        "type": "text"
+      },
+      "p01_editoria": {
+        "type": "text"
+      },
+      "p05_destaque": {
+        "type": "text"
+      },
+      "p02_credito_foto": {
+        "type": "text"
+      },
+      "p04_fonte": {
+        "type": "text"
+      },
+      "p02_editoria": {
+        "type": "text"
+      },
+      "p01_credito_foto": {
+        "type": "text"
+      },
+      "p04_manchete": {
+        "type": "text"
+      },
+      "p02_foto": {
+        "type": "image"
+      },
+      "p04_cena": {
+        "type": "text"
+      },
+      "p05_credito_foto": {
+        "type": "text"
+      },
+      "p04_credito_foto": {
+        "type": "text"
+      },
+      "p01_destaque": {
+        "type": "text"
+      },
+      "p02_manchete": {
+        "type": "text"
+      },
+      "p05_apoio": {
+        "type": "text"
+      },
+      "p01_fonte": {
+        "type": "text"
+      },
+      "p02_local": {
+        "type": "text"
+      },
+      "p01_foto": {
+        "type": "image"
+      },
+      "p02_cena": {
+        "type": "text"
+      },
+      "p03_credito_foto": {
+        "type": "text"
+      },
+      "p05_editoria": {
+        "type": "text"
+      },
+      "p04_local": {
+        "type": "text"
+      },
+      "p03_foto": {
+        "type": "image"
+      },
+      "p04_editoria": {
+        "type": "text"
+      },
+      "p05_cena": {
+        "type": "text"
+      },
+      "p02_apoio": {
+        "type": "text"
+      },
+      "p03_fonte": {
+        "type": "text"
+      },
+      "p05_fonte": {
+        "type": "text"
+      },
+      "p01_manchete": {
+        "type": "text"
+      },
+      "p01_apoio": {
+        "type": "text"
+      },
+      "p04_apoio": {
+        "type": "text"
+      },
+      "p03_destaque": {
+        "type": "text"
+      },
+      "p05_foto": {
+        "type": "image"
+      },
+      "p04_destaque": {
+        "type": "text"
+      },
+      "p03_cena": {
+        "type": "text"
+      },
+      "p03_editoria": {
+        "type": "text"
+      },
+      "p02_destaque": {
+        "type": "text"
+      },
+      "p02_fonte": {
+        "type": "text"
+      },
+      "p05_local": {
+        "type": "text"
+      },
+      "p01_cena": {
+        "type": "text"
+      },
+      "p04_foto": {
+        "type": "image"
+      },
+      "p03_numero": {
+        "type": "text"
+      },
+      "p03_apoio": {
+        "type": "text"
+      },
+      "p01_local": {
+        "type": "text"
+      },
+      "p03_local": {
+        "type": "text"
+      }
+    },
+    "tiktok": {
+      "p01_editoria": {
+        "type": "text"
+      },
+      "p04_manchete": {
+        "type": "text"
+      },
+      "p05_manchete": {
+        "type": "text"
+      },
+      "p04_apoio": {
+        "type": "text"
+      },
+      "p05_destaque": {
+        "type": "text"
+      },
+      "p04_fonte": {
+        "type": "text"
+      },
+      "p01_apoio": {
+        "type": "text"
+      },
+      "p05_apoio": {
+        "type": "text"
+      },
+      "p01_cena": {
+        "type": "text"
+      },
+      "p03_cena": {
+        "type": "text"
+      },
+      "p04_credito_foto": {
+        "type": "text"
+      },
+      "p04_editoria": {
+        "type": "text"
+      },
+      "p04_destaque": {
+        "type": "text"
+      },
+      "p01_credito_foto": {
+        "type": "text"
+      },
+      "p02_local": {
+        "type": "text"
+      },
+      "p03_credito_foto": {
+        "type": "text"
+      },
+      "p01_destaque": {
+        "type": "text"
+      },
+      "p03_fonte": {
+        "type": "text"
+      },
+      "p02_manchete": {
+        "type": "text"
+      },
+      "p04_local": {
+        "type": "text"
+      },
+      "p01_manchete": {
+        "type": "text"
+      },
+      "p03_editoria": {
+        "type": "text"
+      },
+      "p03_local": {
+        "type": "text"
+      },
+      "p05_credito_foto": {
+        "type": "text"
+      },
+      "p03_numero": {
+        "type": "text"
+      },
+      "p02_cena": {
+        "type": "text"
+      },
+      "p05_foto": {
+        "type": "image"
+      },
+      "p03_foto": {
+        "type": "image"
+      },
+      "p01_fonte": {
+        "type": "text"
+      },
+      "p02_foto": {
+        "type": "image"
+      },
+      "p02_destaque": {
+        "type": "text"
+      },
+      "p05_fonte": {
+        "type": "text"
+      },
+      "p05_cena": {
+        "type": "text"
+      },
+      "p05_local": {
+        "type": "text"
+      },
+      "p05_editoria": {
+        "type": "text"
+      },
+      "p02_editoria": {
+        "type": "text"
+      },
+      "p04_foto": {
+        "type": "image"
+      },
+      "p01_foto": {
+        "type": "image"
+      },
+      "p03_destaque": {
+        "type": "text"
+      },
+      "p04_cena": {
+        "type": "text"
+      },
+      "p02_fonte": {
+        "type": "text"
+      },
+      "p02_credito_foto": {
+        "type": "text"
+      },
+      "p03_apoio": {
+        "type": "text"
+      },
+      "p02_apoio": {
+        "type": "text"
+      },
+      "p01_local": {
+        "type": "text"
+      }
+    },
+    "shorts": {
+      "p05_foto": {
+        "type": "image"
+      },
+      "p05_destaque": {
+        "type": "text"
+      },
+      "p02_destaque": {
+        "type": "text"
+      },
+      "p03_apoio": {
+        "type": "text"
+      },
+      "p05_credito_foto": {
+        "type": "text"
+      },
+      "p05_apoio": {
+        "type": "text"
+      },
+      "p03_foto": {
+        "type": "image"
+      },
+      "p03_local": {
+        "type": "text"
+      },
+      "p05_fonte": {
+        "type": "text"
+      },
+      "p02_cena": {
+        "type": "text"
+      },
+      "p01_foto": {
+        "type": "image"
+      },
+      "p03_fonte": {
+        "type": "text"
+      },
+      "p01_fonte": {
+        "type": "text"
+      },
+      "p05_editoria": {
+        "type": "text"
+      },
+      "p03_editoria": {
+        "type": "text"
+      },
+      "p01_cena": {
+        "type": "text"
+      },
+      "p02_foto": {
+        "type": "image"
+      },
+      "p04_cena": {
+        "type": "text"
+      },
+      "p01_editoria": {
+        "type": "text"
+      },
+      "p03_cena": {
+        "type": "text"
+      },
+      "p01_destaque": {
+        "type": "text"
+      },
+      "p04_editoria": {
+        "type": "text"
+      },
+      "p04_destaque": {
+        "type": "text"
+      },
+      "p02_manchete": {
+        "type": "text"
+      },
+      "p05_manchete": {
+        "type": "text"
+      },
+      "p02_local": {
+        "type": "text"
+      },
+      "p04_manchete": {
+        "type": "text"
+      },
+      "p03_numero": {
+        "type": "text"
+      },
+      "p01_credito_foto": {
+        "type": "text"
+      },
+      "p04_local": {
+        "type": "text"
+      },
+      "p04_apoio": {
+        "type": "text"
+      },
+      "p02_apoio": {
+        "type": "text"
+      },
+      "p05_local": {
+        "type": "text"
+      },
+      "p02_fonte": {
+        "type": "text"
+      },
+      "p04_fonte": {
+        "type": "text"
+      },
+      "p03_credito_foto": {
+        "type": "text"
+      },
+      "p04_credito_foto": {
+        "type": "text"
+      },
+      "p01_apoio": {
+        "type": "text"
+      },
+      "p03_destaque": {
+        "type": "text"
+      },
+      "p01_manchete": {
+        "type": "text"
+      },
+      "p01_local": {
+        "type": "text"
+      },
+      "p02_credito_foto": {
+        "type": "text"
+      },
+      "p02_editoria": {
+        "type": "text"
+      },
+      "p05_cena": {
+        "type": "text"
+      },
+      "p04_foto": {
+        "type": "image"
+      }
+    }
+  }
+}
