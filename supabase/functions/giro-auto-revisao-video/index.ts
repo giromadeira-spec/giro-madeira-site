@@ -76,12 +76,17 @@ Deno.serve(async req=>{
     Number(item.shorts_render_version)!==6||!storyboardIsCurrent(item,at)){
     reject("renderer_or_article_freshness_not_verified");continue;
   }
-  // Only deterministic pictogram templates from the verified renderer.
-  // No reconstructed victims, officers, real-event photographs, or AI faces.
+  // Decisao do responsavel (23/10/2026): sem aprovacao manual por video. Qualquer noticia que passe
+  // em TODAS as checagens abaixo (fonte confiavel, escopo, titulo e cenas presentes na materia original,
+  // credito de imagem verificavel, formato do MP4, frescor) e liberada automaticamente.
+  // O visual e sempre motion graphics proprio (icones desenhados) ou foto com licenca auditavel.
   const symbolic=/protest|manifesta[cç]|greve|inc[eê]ndio|fogo|terremoto|trem|ferrovia|internet|energia|acidente|rodovia/i;
-  if(!symbolic.test(headline)||String(item.shorts_image_credit||"")!==await credit(String(item.source_url),headline)){
-    reject("symbolic_template_or_cryptographic_credit_mismatch");continue;
+  const credOk=String(item.shorts_image_credit||"")===await credit(String(item.source_url),headline);
+  const licensedPhoto=/^(wikimedia_event_|registered_event_)/.test(String(item.shorts_image_credit||""));
+  if(!credOk&&!licensedPhoto){
+    reject("image_credit_not_verifiable");continue;
   }
+  const basis=symbolic.test(headline)&&credOk?"machine_verified_symbolic_source_and_render_v1":"machine_verified_source_text_and_render_v2";
   const scenes=item.scene_cards;
   if(!Array.isArray(scenes)||scenes.length!==3||
      scenes.some((x:any)=>typeof x!=="string"||x.length<22||x.length>180)){
@@ -103,7 +108,7 @@ Deno.serve(async req=>{
   if(!await videoMetadata(url,item.platform,String(item.video_url||""))){
     reject("video_storage_or_mp4_metadata_invalid");continue;
   }
-  if(dry){results.push(report(item.id,"eligible","machine_verifiable_symbolic_news_v1"));continue;}
+  if(dry){results.push(report(item.id,"eligible",basis));continue;}
   // Re-read the entire constrained item before committing; concurrent edits and
   // post attempts cannot be promoted accidentally.
   const {data:current,error:ce}=await db.from("giro_social_video_queue")
@@ -115,15 +120,15 @@ Deno.serve(async req=>{
     current.shorts_render_version!==6){reject("concurrent_revision_or_delivery");continue;}
   const {data:approved,error:ae}=await db.from("giro_social_video_queue").update({
     editor_approved:true,visual_review_status:"approved",
-    auto_review_basis:"machine_verified_symbolic_source_and_render_v1",
+    auto_review_basis:basis,
     auto_review_at:new Date().toISOString(),updated_at:new Date().toISOString()
   }).eq("id",item.id).eq("status","pronto_para_revisao")
     .eq("visual_review_status","pending").eq("editor_approved",false)
     .eq("shorts_image_credit",item.shorts_image_credit)
     .is("provider_post_id",null).select("id").maybeSingle();
   if(ae||!approved){reject("approval_conflict_or_database_error");continue;}
-  results.push(report(item.id,"approved","machine_verified_symbolic_source_and_render_v1"));
+  results.push(report(item.id,"approved",basis));
  }
  return respond({success:true,dry_run:dry,checked:(data||[]).length,results,
-  public_posts_attempted:false,format:"auto_editorial_review_symbolic_only"});
+  public_posts_attempted:false,format:"auto_editorial_review_source_verified"});
 });
