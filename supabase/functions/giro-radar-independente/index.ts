@@ -171,6 +171,14 @@ Deno.serve(async (req) => {
 
     if (sourcesError) throw sourcesError;
 
+    // Shorts/TikTok = grande impacto nacional ou mundial. Só fontes aceitas pela revisão automática
+    // (CNN Brasil e Agência Brasil), nunca regionais nem gov.br de rotina.
+    const bigChannel = channel === 'shorts' || channel === 'tiktok';
+    const bigDomains = ['www.cnnbrasil.com.br', 'agenciabrasil.ebc.com.br'];
+    const bigImpactRegex = /(guerra|ataque|m[ií]ssil|bomba|terremoto|tsunami|furac[aã]o|tornado|explos[aã]o|massacre|atentado|golpe|presidente|trump|lula|stf|supremo|congresso|senado|c[aâ]mara dos deputados|elei[cç][aã]o|elei[cç][oõ]es|bolsa|d[oó]lar|selic|infla[cç][aã]o|pib|juros|reforma|tarifa|embargo|sanç[aã]o|otan|onu|china|r[uú]ssia|ucr[aâ]nia|israel|ir[aã]|gaza|vacina|pandemia|surto|apag[aã]o nacional|greve|r[eé]cord|hist[oó]ric|bilh[oõ]es|trilh[oõ]es|morre|morte de|renuncia|demiss[aã]o|operaç[aã]o da pf|corrup[cç][aã]o|nasa|espacial)/i;
+    const routineRegex = /(incinera|apreende|apreens[aã]o|prende foragido|pris[aã]o de foragido|cumpre mandado|capacita|homenagem|campanha de|inaugura|visita)/i;
+    const activeSources = bigChannel ? (sources || []).filter((x: any) => bigDomains.includes(String(x.dominio || ''))) : (sources || []);
+
     // Collection never excludes a story because another channel consumed it.
     const alreadyInFlow = new Set<string>();
 
@@ -184,7 +192,7 @@ Deno.serve(async (req) => {
     const lowValueRegex = /(transmiss[aã]o ao vivo|estagi[aá]rios|reuni[aã]o interna|capacita[cç][aã]o interna|homenagem|sess[aã]o solene)/i;
     const lightRegex = /(vila kids|parque de infl[aá]veis|pr[eé]-show|show infantil|sorteio.*crian|espet[aá]culo infantil)/i;
 
-    for (const source of sources || []) {
+    for (const source of activeSources) {
       try {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), 15000);
@@ -328,6 +336,14 @@ Deno.serve(async (req) => {
             reasons.push("data da fonte não identificada");
           }
 
+          if (bigChannel) {
+            // impacto amplo: sem bônus local/serviço; só vale o que é grande e não rotina policial/institucional
+            const isBig = bigImpactRegex.test(title);
+            score = Number(source.prioridade || 5) * 3 + (isBig ? 35 : 0) - (routineRegex.test(title) ? 30 : 0) - (localMatch ? 15 : 0);
+            if (isBig) reasons.push("grande impacto nacional/mundial");
+            if (!isBig) reasons.push("sem sinal de grande impacto");
+            if (sourceDate) { const h = Math.max(0, (runStarted.getTime() - sourceDate.getTime()) / 3600000); score += h <= 6 ? 12 : 6; }
+          }
           score = Math.max(0, Math.min(100, score));
 
           seenHere.add(canonical);
