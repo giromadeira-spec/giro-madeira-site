@@ -20,27 +20,27 @@ PERSON = re.compile(r"\b(presidente|ministr[oa]|senador[a]?|deputad[oa]|governad
 
 # (regex em PT sem acento, consulta em ingles)
 KEYWORDS = [
-    (r"\b(estrada|rodovia|br-\d+|asfalto|pista)\b", "highway road"),
-    (r"\b(aviao|aeronave|aeroporto|voo|voos|companhia aerea)\b", "airplane"),
-    (r"\b(foguete|lancamento espacial|satelite|espaco|nasa|astronauta)\b", "rocket launch"),
-    (r"\b(carro|carros|veiculo|veiculos|automovel|automoveis|montadora)\b", "car"),
-    (r"\b(onibus|transporte publico)\b", "city bus"),
-    (r"\b(caminhao|caminhoes|carga|frete)\b", "truck"),
-    (r"\b(navio|barco|porto|balsa|embarcacao)\b", "cargo ship"),
-    (r"\b(trem|ferrovia|locomotiva)\b", "train"),
-    (r"\b(hospital|saude|sus|vacina|vacinacao|medico|medicos)\b", "hospital"),
-    (r"\b(dinheiro|economia|inflacao|juros|salario|reais|bilhoes|milhoes|imposto|banco)\b", "money banknotes"),
-    (r"\b(chuva|chuvas|temporal|tempestade|previsao do tempo)\b", "rain storm"),
-    (r"\b(seca|calor|temperatura|onda de calor)\b", "dry land heat"),
-    (r"\b(queimada|queimadas|fogo|floresta|desmatamento|amazonia)\b", "amazon rainforest"),
-    (r"\b(rio madeira|rio|enchente|cheia)\b", "river"),
-    (r"\b(ponte)\b", "bridge"),
-    (r"\b(escola|alunos|estudantes|educacao|enem|universidade)\b", "school classroom"),
-    (r"\b(energia|eletrica|usina|hidreletrica|petroleo|combustivel|gasolina|diesel)\b", "power plant"),
-    (r"\b(agro|agricultura|soja|milho|gado|bovino|boi|pecuaria|colheita|safra)\b", "farm harvest"),
-    (r"\b(eleicao|eleicoes|urna|voto|votacao|eleitores)\b", "ballot box voting"),
-    (r"\b(futebol|jogo|campeonato|gol|estadio)\b", "football stadium"),
-    (r"\b(internet|tecnologia|celular|aplicativo|inteligencia artificial|robo)\b", "smartphone technology"),
+    (r"\b(estrada|rodovia|br-\d+|asfalto|pista)\b", "highway road|road|highway|street"),
+    (r"\b(aviao|aeronave|aeroporto|voo|voos|companhia aerea)\b", "airplane flying sky|airplane|aircraft|jet|airliner"),
+    (r"\b(foguete|lancamento espacial|satelite|espaco|nasa|astronauta)\b", "rocket launch|rocket|launch"),
+    (r"\b(carro|carros|veiculo|veiculos|automovel|automoveis|montadora)\b", "car on road|car|automobile|sedan|vehicle"),
+    (r"\b(onibus|transporte publico)\b", "city bus|bus"),
+    (r"\b(caminhao|caminhoes|carga|frete)\b", "truck on highway|truck|lorry"),
+    (r"\b(navio|barco|porto|balsa|embarcacao)\b", "cargo ship|ship|vessel|boat|port"),
+    (r"\b(trem|ferrovia|locomotiva)\b", "train railway|train|railway|locomotive"),
+    (r"\b(hospital|saude|sus|vacina|vacinacao|medico|medicos)\b", "hospital building|hospital|clinic|ambulance"),
+    (r"\b(dinheiro|economia|inflacao|juros|salario|reais|bilhoes|milhoes|imposto|banco)\b", "brazilian real banknotes|banknote|banknotes|money|currency|real"),
+    (r"\b(chuva|chuvas|temporal|tempestade|previsao do tempo)\b", "heavy rain storm clouds|rain|storm|thunderstorm|clouds"),
+    (r"\b(seca|calor|temperatura|onda de calor)\b", "drought dry land|drought|dry|cracked"),
+    (r"\b(queimada|queimadas|fogo|floresta|desmatamento|amazonia)\b", "amazon rainforest|rainforest|amazon|forest"),
+    (r"\b(rio madeira|rio|enchente|cheia)\b", "river landscape|river"),
+    (r"\b(ponte)\b", "bridge|bridge"),
+    (r"\b(escola|alunos|estudantes|educacao|enem|universidade)\b", "school classroom|classroom|school|students"),
+    (r"\b(energia|eletrica|usina|hidreletrica|petroleo|combustivel|gasolina|diesel)\b", "power plant|power|dam|hydroelectric|energy"),
+    (r"\b(agro|agricultura|soja|milho|gado|bovino|boi|pecuaria|colheita|safra)\b", "farm harvest|harvest|farm|soybean|cattle|crop"),
+    (r"\b(eleicao|eleicoes|urna|voto|votacao|eleitores)\b", "ballot box voting|ballot|voting|election"),
+    (r"\b(futebol|jogo|campeonato|gol|estadio)\b", "football stadium|stadium|football|soccer"),
+    (r"\b(internet|tecnologia|celular|aplicativo|inteligencia artificial|robo)\b", "smartphone technology|smartphone|phone|technology"),
 ]
 
 
@@ -53,6 +53,16 @@ def keyword_for(text):
     for rx, q in KEYWORDS:
         if re.search(rx, t): return q
     return ""
+
+
+def _split(q):
+    parts = q.split("|")
+    return parts[0], [w.lower() for w in parts[1:]]
+
+
+def _relevant(text, must):
+    t = _norm(text)
+    return (not must) or any(re.search(r"\b" + re.escape(_norm(w)), t) for w in must)
 
 
 def allowed_context(title, scenes):
@@ -72,13 +82,15 @@ def _download(url):
 
 
 def from_openverse(query, skip=()):
+    query, must = _split(query)
     r = requests.get("https://api.openverse.org/v1/images/", headers=UA, timeout=25, params={
         "q": query, "license": "cc0,pdm,by", "license_type": "commercial", "size": "large",
-        "aspect_ratio": "tall,square", "mature": "false", "page_size": 12})
+        "aspect_ratio": "tall,square", "mature": "false", "page_size": 20})
     r.raise_for_status()
     for it in r.json().get("results", []):
         lic = str(it.get("license", "")).lower()
         if lic not in OK_LIC or it.get("id") in skip: continue
+        if not _relevant((it.get("title") or "") + " " + " ".join(t.get("name", "") for t in (it.get("tags") or [])), must): continue
         url = it.get("url")
         if not url or not str(url).lower().split("?")[0].endswith((".jpg", ".jpeg", ".png", ".webp")): continue
         try: im = _download(url)
@@ -90,6 +102,7 @@ def from_openverse(query, skip=()):
 
 
 def from_commons(query, skip=()):
+    query, must = _split(query)
     r = requests.get("https://commons.wikimedia.org/w/api.php", headers=UA, timeout=25, params={
         "action": "query", "format": "json", "generator": "search", "gsrsearch": query + " filetype:bitmap", "gsrnamespace": 6, "gsrlimit": 12,
         "prop": "imageinfo", "iiprop": "url|extmetadata|size", "iiurlwidth": 1600})
@@ -101,6 +114,7 @@ def from_commons(query, skip=()):
         if "sa" in lic.split() or "nc" in lic or "nd" in lic: continue
         url = ii.get("thumburl") or ii.get("url")
         if not url or pg.get("title") in skip: continue
+        if not _relevant(pg.get("title", "") + " " + re.sub(r"<[^>]+>", "", (md.get("ImageDescription") or {}).get("value", "")), must): continue
         try: im = _download(url)
         except Exception: continue
         artist = re.sub(r"<[^>]+>", "", (md.get("Artist") or {}).get("value", "autor desconhecido"))[:40].strip()
@@ -140,10 +154,10 @@ def attach(beats, title, scenes, category=""):
 if __name__ == "__main__":  # autoteste: python giro_broll.py pasta_saida
     import os
     out = sys.argv[1] if len(sys.argv) > 1 else "broll-teste"; os.makedirs(out, exist_ok=True); rep = []
-    for q in ("highway road", "airplane", "rocket launch", "car", "hospital", "money banknotes", "rain storm"):
+    for q in [k[1] for k in KEYWORDS if k[1].split("|")[0] in ("highway road", "airplane flying sky", "rocket launch", "car on road", "hospital building", "brazilian real banknotes", "heavy rain storm clouds", "farm harvest", "cargo ship", "drought dry land")]:
         got = find(q)
         if got:
-            got["img"].save(os.path.join(out, q.replace(" ", "_") + ".jpg"), quality=85)
+            got["img"].save(os.path.join(out, q.split("|")[0].replace(" ", "_") + ".jpg"), quality=85)
             rep.append({"q": q, "credit": got["credit"], "source": got["source"], "page": got["page"]})
         else: rep.append({"q": q, "credit": None})
     json.dump(rep, open(os.path.join(out, "relatorio.json"), "w"), ensure_ascii=False, indent=1); print(json.dumps(rep, ensure_ascii=False, indent=1))
