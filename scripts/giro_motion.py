@@ -297,9 +297,10 @@ class V:
         if t >= self.total - self.OUT: return self.outro(t - (self.total - self.OUT))
         i = max(j for j, s in enumerate(self.starts) if s <= t); bt = self.b[i]; lt = t - self.starts[i]; dur = self.durs[i]
         dark = bt.get("bg", "paper") != "paper"; fg = WHITE if dark else INK
-        if bt["kind"] == "photo" and self.photo is not None: dark = True; fg = WHITE
-        cv = (self.photo_bg(bt, lt, dur) if (bt["kind"] == "photo" and self.photo is not None) else bg(bt.get("bg", "paper"), t).convert("RGBA"))
-        if bt["kind"] == "photo" and self.photo is None: bt = dict(bt, kind="serif", bg="dark")
+        hasimg = bt["kind"] == "photo" and (bt.get("img") is not None or self.photo is not None)
+        if hasimg: dark = True; fg = WHITE
+        cv = (self.photo_bg(bt, lt, dur) if hasimg else bg(bt.get("bg", "paper"), t).convert("RGBA"))
+        if bt["kind"] == "photo" and not hasimg: bt = dict(bt, kind="serif", bg="dark")
         getattr(self, "k_" + bt["kind"])(cv, bt, lt, dur, fg, dark)
         # molduras fixas
         d = ImageDraw.Draw(cv)
@@ -335,7 +336,7 @@ class V:
 
     def photo_bg(self, bt, lt, dur):
         """Foto do fato em tela cheia: zoom lento (Ken Burns), gradiente azul-marinho para leitura."""
-        im = self.photo; k = 1.0 + 0.10 * clamp(lt / max(dur, 0.1)); idx = bt.get("pidx", 0)
+        im = bt.get("img") if bt.get("img") is not None else self.photo; k = 1.0 + 0.10 * clamp(lt / max(dur, 0.1)); idx = bt.get("pidx", 0)
         sc = max(W / im.width, H / im.height) * k; w, h = int(im.width * sc), int(im.height * sc)
         r = im.resize((w, h), Image.LANCZOS); px = [.35, .5, .65][idx % 3]
         x = int((w - W) * px); y = int((h - H) * .45); cv = r.crop((x, y, x + W, y + H)).convert("RGBA")
@@ -355,8 +356,9 @@ class V:
                 vis = txt[shown:shown + len(w)] if shown < n else ""; vis = vis[: max(0, n - shown)]
                 if vis: d.text((x, y), vis, font=f, fill=YEL if li == len(lines) - 1 and len(lines) > 1 else WHITE, stroke_width=3, stroke_fill=(1, 7, 18))
                 x += f.getlength(w + " "); shown += len(w) + 1
-        if self.photo_credit:
-            cf = font(FM, 26); lab = "Foto: " + self.photo_credit; d.text((W - 50 - cf.getlength(lab), H - 200), lab, font=cf, fill=WHITE, stroke_width=2, stroke_fill=(0, 5, 14))
+        lab_src = ("Imagem ilustrativa: " + bt["img_credit"]) if bt.get("img_credit") else (("Foto: " + self.photo_credit) if self.photo_credit else "")
+        if lab_src:
+            cf = font(FM, 26); lab = lab_src; d.text((W - 50 - cf.getlength(lab), H - 200), lab, font=cf, fill=WHITE, stroke_width=2, stroke_fill=(0, 5, 14))
 
     def k_serif(self, cv, bt, lt, dur, fg, dark):
         words = bt["txt"].split(); f = font(SERIF, 110); f.set_variation_by_axes([700]) if hasattr(f, "set_variation_by_axes") else None
