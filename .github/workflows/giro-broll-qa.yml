@@ -2,6 +2,9 @@ name: Giro Madeira - QA das imagens ilustrativas (manual, sem publicar)
 
 on:
   workflow_dispatch:
+  push:
+    branches: [giro-capa-impacto]
+    paths: [scripts/giro_broll.py, .github/workflows/giro-broll-qa.yml]
 
 permissions:
   contents: read
