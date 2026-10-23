@@ -7,7 +7,7 @@ Regras (decididas pelo Gilson em 23/10/2026):
 - Sempre rotuladas como IMAGEM ILUSTRATIVA, com autor e licenca no credito.
 - Nao usar em tragedia/crime/violencia (a foto pareceria a cena real) nem para pessoas (direito de imagem).
 - Qualquer falha devolve vazio e o video segue como antes (icones/ilustracao).
-Fontes sem chave: Openverse e Wikimedia Commons."""
+Fontes: Pexels e Pixabay (so se houver chave gratuita nas variaveis PEXELS_API_KEY / PIXABAY_API_KEY; licenca livre para uso comercial), Openverse e Wikimedia Commons (sem chave)."""
 import io, re, sys, json, unicodedata, urllib.parse
 import requests
 from PIL import Image
@@ -60,8 +60,12 @@ def _split(q):
     return parts[0], [w.lower() for w in parts[1:]]
 
 
+BAD = re.compile(r"\b(1[89]\d\d|vintage|historic\w*|archive|antique|retro|snow\w*|winter|painting|drawing|illustration|sketch|map|poster|logo|diagram|toy|model|cartoon|black and white|sepia)\b")
+
+
 def _relevant(text, must):
     t = _norm(text)
+    if BAD.search(t): return False
     return (not must) or any(re.search(r"\b" + re.escape(_norm(w)), t) for w in must)
 
 
@@ -123,8 +127,43 @@ def from_commons(query, skip=()):
     return None
 
 
+def from_pexels(query, skip=()):
+    import os
+    key = os.environ.get("PEXELS_API_KEY", "").strip()
+    if not key: return None
+    query, must = _split(query)
+    r = requests.get("https://api.pexels.com/v1/search", headers=dict(UA, Authorization=key), timeout=25,
+                     params={"query": query, "orientation": "portrait", "size": "large", "per_page": 15, "locale": "en-US"})
+    r.raise_for_status()
+    for it in r.json().get("photos", []):
+        if ("pexels" + str(it.get("id"))) in skip: continue
+        if BAD.search(_norm(it.get("alt") or "")): continue
+        url = (it.get("src") or {}).get("large2x") or (it.get("src") or {}).get("large")
+        try: im = _download(url)
+        except Exception: continue
+        return {"id": "pexels" + str(it.get("id")), "img": im, "credit": "%s / Pexels" % (it.get("photographer") or "fotografo")[:40], "source": "pexels", "page": it.get("url") or ""}
+    return None
+
+
+def from_pixabay(query, skip=()):
+    import os
+    key = os.environ.get("PIXABAY_API_KEY", "").strip()
+    if not key: return None
+    query, must = _split(query)
+    r = requests.get("https://pixabay.com/api/", headers=UA, timeout=25, params={
+        "key": key, "q": query, "image_type": "photo", "orientation": "vertical", "safesearch": "true", "min_height": 1200, "per_page": 15})
+    r.raise_for_status()
+    for it in r.json().get("hits", []):
+        if ("pixabay" + str(it.get("id"))) in skip: continue
+        if not _relevant(it.get("tags") or "", must): continue
+        try: im = _download(it.get("largeImageURL"))
+        except Exception: continue
+        return {"id": "pixabay" + str(it.get("id")), "img": im, "credit": "%s / Pixabay" % (it.get("user") or "autor")[:40], "source": "pixabay", "page": it.get("pageURL") or ""}
+    return None
+
+
 def find(query, skip=()):
-    for fn in (from_openverse, from_commons):
+    for fn in (from_pexels, from_pixabay, from_openverse, from_commons):
         try:
             got = fn(query, skip)
             if got: return got
