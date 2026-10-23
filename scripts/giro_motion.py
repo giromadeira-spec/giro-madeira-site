@@ -13,6 +13,7 @@ FM = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "
 FB = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "fonts", "InterDisplay-Bold.otf")
 HERE = os.path.dirname(os.path.abspath(__file__)); ASSETS = os.path.join(os.path.dirname(HERE), "assets")
 SCENE, OUTRO = 5.0, 3.0
+COVER_T = 0.20  # a capa ocupa os 6 primeiros frames (o audio nao muda); TikTok/Shorts usam o 1o quadro como capa
 
 def clamp(x): return min(1.0, max(0.0, x))
 def ease(x): x = clamp(x); return 1 - (1 - x) ** 3
@@ -256,7 +257,43 @@ class V:
     def icon(self, k, p):
         return draw_icon(k, p, 360).resize((520, 520), Image.LANCZOS)
 
+    def cover(self):
+        """Capa/thumb: quadro mostrado nos primeiros frames (e salvo como PNG). Manchete completa, grande e dentro das margens seguras."""
+        bt0 = self.b[0]; head = re.sub(r"\s+", " ", str(self.c.get("title") or bt0["txt"]).split("|")[0]).strip().upper(); words = head.split()
+        if self.photo is not None:
+            cv = self.photo_bg({"pidx": 0}, 0, 1)
+            sh = Image.new("RGBA", (W, H), (1, 10, 24, 0)); ImageDraw.Draw(sh).rectangle([0, 520, W, 1500], fill=(1, 10, 24, 120)); cv.alpha_composite(sh)
+        else:
+            cv = bg("navy", 0).convert("RGBA")
+            g = np.zeros((H, W, 4), np.uint8); g[..., 2] = 40; g[..., 3] = (np.linspace(0, 1, H)[:, None] * 70).astype(np.uint8).repeat(W, 1)
+            cv.alpha_composite(Image.fromarray(g, "RGBA"))
+        d = ImageDraw.Draw(cv, "RGBA")
+        size = 168
+        while size > 72:
+            f = font(FD, size); lines = wrap(words, f, 940)
+            if len(lines) <= 5 and all(f.getlength(w) <= 940 for w in words): break
+            size -= 6
+        f = font(FD, size); lh = int(size * 1.08); hi = (bt0.get("hi") or "").upper()
+        IMPACT = re.compile(r"^(MORT[OA]S?|FERID[OA]S?|PRES[OA]S?|\d[\d.,]*%?|R\$|BILH|MILH|ALERTA|URGENTE|EXPLOS|ATAQUE|CRISE|RECORDE|GUERRA|TIRO|TEMPORAL)")
+        hits = [i for i, w in enumerate(words) if IMPACT.match(re.sub(r"[^\wÀ-Ú$%.,]", "", w))]
+        hi_i = hits[0] if hits else (max(range(len(words)), key=lambda i: len(re.sub(r"\W", "", words[i]))) if words else 0)
+        y0 = 940 - len(lines) * lh // 2; idx = 0
+        for li, line in enumerate(lines):
+            x = 70
+            for w in line:
+                col = YEL if (idx == hi_i or (idx == hi_i + 1 and re.match(r"^[\d.,%]+$", re.sub(r"[^\w.,%]", "", words[hi_i])))) else WHITE
+                d.text((x, y0 + li * lh), w, font=f, fill=col, stroke_width=max(4, size // 28), stroke_fill=(1, 7, 18))
+                x += f.getlength(w + " "); idx += 1
+        d.rectangle([70, y0 + len(lines) * lh + 18, 70 + 360, y0 + len(lines) * lh + 34], fill=YEL)
+        tag = bt0.get("tag") or self.c.get("tag") or "Giro Madeira"
+        tb = tagbox(str(tag), 48); cv.alpha_composite(tb, (70, y0 - 150))
+        big = self.selo.resize((260, 260), Image.LANCZOS); cv.alpha_composite(big, (50, 110))
+        bar = Image.new("RGBA", (W, 150), (253, 220, 1, 255)); cv.alpha_composite(bar, (0, 1560))
+        ImageDraw.Draw(cv).text((W // 2, 1635), "@GIRO_MADEIRA  \u00b7  NOT\u00cdCIAS", font=font(FD, 58), fill=(1, 29, 65), anchor="mm")
+        return cv.convert("RGB")
+
     def frame(self, t):
+        if t < COVER_T: return self.cover()
         if t >= self.total - self.OUT: return self.outro(t - (self.total - self.OUT))
         i = max(j for j, s in enumerate(self.starts) if s <= t); bt = self.b[i]; lt = t - self.starts[i]; dur = self.durs[i]
         dark = bt.get("bg", "paper") != "paper"; fg = WHITE if dark else INK
@@ -400,6 +437,8 @@ def render_video(cfg, out):
     cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgb24", "-s", "%dx%d" % (W, H), "-r", str(FPS), "-i", "-", "-i", wp,
            "-shortest", "-c:v", "libx264", "-preset", "veryfast", "-crf", "25", "-pix_fmt", "yuv420p", "-r", str(FPS), "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", str(out)]
     p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
+    try: v.cover().save(str(out) + ".cover.png")
+    except Exception as e: print("capa nao salva:", e)
     for i in range(int(v.total * FPS)): p.stdin.write(v.frame(i / FPS).tobytes())
     p.stdin.close()
     if p.wait() != 0: raise RuntimeError("ffmpeg falhou no render motion")

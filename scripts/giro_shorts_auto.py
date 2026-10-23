@@ -1068,7 +1068,7 @@ def render_motion(result,category,folder,credit,picture=None,photo_label=""):
     if voices:
         for b,v in zip(beats,voices):
             if v: b["voz"]=str(v)
-    cfg={"tag":category,"fonte":clean(result.get("source_name") or "FONTE"),"teste":False,"beats":beats,"photo":picture,"photo_credit":photo_label}
+    cfg={"tag":category,"title":result["title"],"fonte":clean(result.get("source_name") or "FONTE"),"teste":False,"beats":beats,"photo":picture,"photo_credit":photo_label}
     video=Path(folder)/"giro_short.mp4"
     total=giro_motion.render_video(cfg,video)
     if not (100000<video.stat().st_size<30*1024*1024):raise RuntimeError("Motion output out of bounds")
