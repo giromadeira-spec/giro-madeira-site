@@ -1059,16 +1059,16 @@ def report_render_outcome(outcome):
             f.write("\n### Render "+PLATFORM+"\n\n```json\n"+json.dumps(outcome,ensure_ascii=False,indent=2)+"\n```\n")
 
 
-def render_motion(result,category,folder,credit):
+def render_motion(result,category,folder,credit,picture=None,photo_label=""):
     """Motion graphics + narracao gratuita. Texto vem so da pauta verificada. Devolve (video, duracao)."""
     sys.path.insert(0,str(ROOT/"scripts"))
     import giro_motion, giro_voz
-    beats=giro_motion.build_beats(result["title"],result["scenes"],category)
+    beats=giro_motion.build_beats(result["title"],result["scenes"],category,has_photo=picture is not None)
     voices=giro_voz.narrate([b["txt"] for b in beats],folder)
     if voices:
         for b,v in zip(beats,voices):
             if v: b["voz"]=str(v)
-    cfg={"tag":category,"fonte":clean(result.get("source_name") or "FONTE"),"teste":False,"beats":beats}
+    cfg={"tag":category,"fonte":clean(result.get("source_name") or "FONTE"),"teste":False,"beats":beats,"photo":picture,"photo_credit":photo_label}
     video=Path(folder)/"giro_short.mp4"
     total=giro_motion.render_video(cfg,video)
     if not (100000<video.stat().st_size<30*1024*1024):raise RuntimeError("Motion output out of bounds")
@@ -1104,11 +1104,26 @@ def main():
         if not isinstance(result.get("scenes"),list) or len(result["scenes"])!=3:
             raise RuntimeError("Verified three-scene storyboard required")
         if STYLE=="motion":
-            # Motion graphics proprios: sem fotografia externa, sem direitos de terceiros.
-            credit=original_illustration_credit(result["source_url"],result["title"])
+            # Motion graphics com foto do fato SOMENTE quando houver cadeia de licenca auditavel
+            # (foto Commons ligada a reportagem ou arquivo autorizado do Supabase). Sem isso: icones proprios.
+            picture=None;credit="";registered_image_id=0;file_title=""
+            try:
+                picture,credit,file_title=licensed_event_photo(result["source_url"],result["title"])
+            except Exception:
+                registered=result.get("registered_image")
+                if registered:
+                    try:
+                        picture,credit,file_title=approved_registry_photo(registered,result["source_url"],result["title"])
+                        registered_image_id=registered["id"]
+                    except Exception:
+                        picture=None
+            if picture is None:
+                credit=original_illustration_credit(result["source_url"],result["title"])
             if not is_acceptable_visual_credit(credit,result["source_url"],result["title"]):
                 raise RuntimeError("Visual origin verification failed")
-            video,dur,has_voice=render_motion(result,category,folder,credit)
+            import giro_motion as _gm  # noqa
+            label=_gm.photo_credit_label(credit) if picture is not None else ""
+            video,dur,has_voice=render_motion(result,category,folder,credit,picture,label)
             preview_dir=ROOT/"shorts-test-preview";preview_dir.mkdir(exist_ok=True)
             subprocess.run(["ffmpeg","-hide_banner","-loglevel","error","-y","-ss","1.2","-i",str(video),"-frames:v","1",
                             str(preview_dir/("fila-"+str(qid)+".png"))],check=True,timeout=60)
@@ -1117,10 +1132,10 @@ def main():
             if response.status_code not in (200,201):
                 raise RuntimeError("Supabase signed upload failed with HTTP "+str(response.status_code))
             confirmed=bridge(token,"complete",queue_id=qid,storage_path=result["storage_path"],
-                     quality_passed=True,image_credit=credit,visual_kind="illustration",registered_image_id=0)
+                     quality_passed=True,image_credit=credit,visual_kind=("illustration" if picture is None else "event_photo"),registered_image_id=registered_image_id)
             report_render_outcome({"state":"ready_for_publication" if confirmed.get("ready_to_publish") is True else "awaiting_editorial_visual_review",
                                   "queue_id":confirmed["queue_id"],"ready_to_publish":confirmed.get("ready_to_publish") is True,
-                                  "visual_kind":"motion_graphics","narration":has_voice,"duration_s":round(dur,1)})
+                                  "visual_kind":("motion_graphics" if picture is None else "motion_graphics_event_photo"),"narration":has_voice,"duration_s":round(dur,1)})
             print("Motion graphics renderizado:",round(dur,1),"s; narracao:",has_voice)
             return
         # Event photo or individually cleared private image. Missing rights stays
@@ -1211,7 +1226,7 @@ def render_self_test_motion():
         claim["scenes"]=claim["scenes"]+["Fique atento à origem do que você compra."] if len(claim["scenes"])<3 else claim["scenes"]
         claim["scenes"]=claim["scenes"][:3]
         query,category=article_subject(claim["title"])
-        video,dur,has_voice=render_motion(claim,"SAÚDE",tmp,"qa")
+        video,dur,has_voice=render_motion(claim,"SAÚDE",tmp,"qa",render_clean_madeira_illustration(),"Arte original do QA")
         out=ROOT/"shorts-test-preview";out.mkdir(exist_ok=True)
         from shutil import copyfile
         copyfile(video,out/"auto-qa-video.mp4")

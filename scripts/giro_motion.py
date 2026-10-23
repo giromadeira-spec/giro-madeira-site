@@ -252,6 +252,7 @@ class V:
         lg = Image.open(os.path.join(ASSETS, "logo-oficial.webp")).convert("RGBA"); m = Image.new("L", lg.size, 0)
         ImageDraw.Draw(m).ellipse([1, 1, lg.width - 2, lg.height - 2], fill=255); lg.putalpha(m); self.selo = lg
         self.icons = {}
+        self.photo = c.get("photo"); self.photo_credit = c.get("photo_credit") or ""
     def icon(self, k, p):
         return draw_icon(k, p, 360).resize((520, 520), Image.LANCZOS)
 
@@ -259,7 +260,9 @@ class V:
         if t >= self.total - self.OUT: return self.outro(t - (self.total - self.OUT))
         i = max(j for j, s in enumerate(self.starts) if s <= t); bt = self.b[i]; lt = t - self.starts[i]; dur = self.durs[i]
         dark = bt.get("bg", "paper") != "paper"; fg = WHITE if dark else INK
-        cv = bg(bt.get("bg", "paper"), t).convert("RGBA")
+        if bt["kind"] == "photo" and self.photo is not None: dark = True; fg = WHITE
+        cv = (self.photo_bg(bt, lt, dur) if (bt["kind"] == "photo" and self.photo is not None) else bg(bt.get("bg", "paper"), t).convert("RGBA"))
+        if bt["kind"] == "photo" and self.photo is None: bt = dict(bt, kind="serif", bg="dark")
         getattr(self, "k_" + bt["kind"])(cv, bt, lt, dur, fg, dark)
         # molduras fixas
         d = ImageDraw.Draw(cv)
@@ -292,6 +295,31 @@ class V:
                 x += wfull; shown += len(w) + 1
         if bt.get("tag"):
             tb = tagbox(bt["tag"]); k = back((lt - 0.15) / 0.3); cv.alpha_composite(scaled(tb, k), (70, y0 - 130))
+
+    def photo_bg(self, bt, lt, dur):
+        """Foto do fato em tela cheia: zoom lento (Ken Burns), gradiente azul-marinho para leitura."""
+        im = self.photo; k = 1.0 + 0.10 * clamp(lt / max(dur, 0.1)); idx = bt.get("pidx", 0)
+        sc = max(W / im.width, H / im.height) * k; w, h = int(im.width * sc), int(im.height * sc)
+        r = im.resize((w, h), Image.LANCZOS); px = [.35, .5, .65][idx % 3]
+        x = int((w - W) * px); y = int((h - H) * .45); cv = r.crop((x, y, x + W, y + H)).convert("RGBA")
+        g = np.zeros((H, W, 4), np.uint8); yy = np.linspace(0, 1, H)[:, None]
+        g[..., 0] = 1; g[..., 1] = 10; g[..., 2] = 24; g[..., 3] = (np.clip(0.18 + 0.78 * np.clip((yy - 0.35) / 0.55, 0, 1) ** 1.2, 0, 0.95) * 255).astype(np.uint8)[:, :1].repeat(W, 1)
+        cv.alpha_composite(Image.fromarray(g, "RGBA")); return cv
+
+    def k_photo(self, cv, bt, lt, dur, fg, dark):
+        d = ImageDraw.Draw(cv, "RGBA"); words = bt["txt"].split(); f = font(FD, 84); lines = wrap(words, f, 940)
+        txt = " ".join(" ".join(l) for l in lines); n = int(min(len(txt), max(0, lt - 0.1) * 46)); shown = 0
+        y0 = 1260 - (len(lines) - 1) * 50
+        if bt.get("tag"):
+            tb = tagbox(bt["tag"], 38); cv.alpha_composite(scaled(tb, back((lt - 0.1) / 0.3)), (70, y0 - 110))
+        for li, line in enumerate(lines):
+            x = 70; y = y0 + li * 102
+            for w in line:
+                vis = txt[shown:shown + len(w)] if shown < n else ""; vis = vis[: max(0, n - shown)]
+                if vis: d.text((x, y), vis, font=f, fill=YEL if li == len(lines) - 1 and len(lines) > 1 else WHITE, stroke_width=3, stroke_fill=(1, 7, 18))
+                x += f.getlength(w + " "); shown += len(w) + 1
+        if self.photo_credit:
+            cf = font(FM, 26); lab = "Foto: " + self.photo_credit; d.text((W - 50 - cf.getlength(lab), H - 200), lab, font=cf, fill=WHITE, stroke_width=2, stroke_fill=(0, 5, 14))
 
     def k_serif(self, cv, bt, lt, dur, fg, dark):
         words = bt["txt"].split(); f = font(SERIF, 110); f.set_variation_by_axes([700]) if hasattr(f, "set_variation_by_axes") else None
@@ -412,11 +440,12 @@ def split_phrases(title, scenes):
             if words: out.append(" ".join(words))
     return [x for x in out if len(x.split()) >= 2] or out
 
-def build_beats(title, scenes, category=""):
-    ph = split_phrases(title, scenes); beats = []; bgs = ["paper", "dark", "navy", "dark"]; used_big = 0
+def build_beats(title, scenes, category="", has_photo=False):
+    ph = split_phrases(title, scenes); beats = []; bgs = ["paper", "dark", "navy", "dark"]; used_big = 0; pidx = 0
     for i, t in enumerate(ph):
         fig = FIG.search(t); icon = pick_icon(t, category)
         if i == 0: kind = "type"
+        elif has_photo and i % 2 == 1: kind = "photo"
         elif fig and used_big < 3: kind = "num"; used_big += 1
         elif i % 3 == 1: kind = "serif"
         elif i % 3 == 2: kind = "icon"
@@ -429,6 +458,16 @@ def build_beats(title, scenes, category=""):
         if kind == "num":
             big = re.sub(r"\s+", " ", fig.group(1)).strip()
             b.update(big=big, icone=icon, tag=(category.title() if category else "Dado"))
+        if kind == "photo": b.update(pidx=pidx, bg="dark"); pidx += 1
         if kind == "icon": b.update(icone=icon, tag=(category.title() if category else "Giro Madeira"))
         beats.append(b)
     return beats
+
+def photo_credit_label(credit):
+    """Rotulo curto e verdadeiro a partir do credito auditavel (Commons ou arquivo autorizado)."""
+    parts = [x.strip() for x in str(credit).split(" — ")]
+    if str(credit).startswith("wikimedia_event_") and len(parts) >= 3:
+        return "%s / Wikimedia Commons (%s)" % (parts[1][:50], parts[2][:20])
+    if str(credit).startswith("registered_event_"):
+        return (parts[1] if len(parts) > 1 else "arquivo autorizado")[:70]
+    return ""
