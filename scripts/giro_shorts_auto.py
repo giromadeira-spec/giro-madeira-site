@@ -12,6 +12,8 @@ from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
 
 SUPABASE="https://dsihvbdhocbqscaypraw.supabase.co"
 PLATFORM="tiktok" if "--tiktok" in sys.argv else "shorts"
+# Estilo de video: "motion" (motion graphics com narracao, padrao atual) ou "legacy" (foto + manchete).
+STYLE=os.environ.get("GIRO_VIDEO_STYLE","motion")
 BRIDGE=SUPABASE+"/functions/v1/giro-"+PLATFORM+"-github-bridge"
 AUD=BRIDGE
 ROOT=Path(__file__).resolve().parents[1]
@@ -1056,6 +1058,31 @@ def report_render_outcome(outcome):
         with open(os.environ["GITHUB_STEP_SUMMARY"],"a") as f:
             f.write("\n### Render "+PLATFORM+"\n\n```json\n"+json.dumps(outcome,ensure_ascii=False,indent=2)+"\n```\n")
 
+
+def render_motion(result,category,folder,credit):
+    """Motion graphics + narracao gratuita. Texto vem so da pauta verificada. Devolve (video, duracao)."""
+    sys.path.insert(0,str(ROOT/"scripts"))
+    import giro_motion, giro_voz
+    beats=giro_motion.build_beats(result["title"],result["scenes"],category)
+    voices=giro_voz.narrate([b["txt"] for b in beats],folder)
+    if voices:
+        for b,v in zip(beats,voices):
+            if v: b["voz"]=str(v)
+    cfg={"tag":category,"fonte":clean(result.get("source_name") or "FONTE"),"teste":False,"beats":beats}
+    video=Path(folder)/"giro_short.mp4"
+    total=giro_motion.render_video(cfg,video)
+    if not (100000<video.stat().st_size<30*1024*1024):raise RuntimeError("Motion output out of bounds")
+    probe=subprocess.run(["ffprobe","-v","error","-show_entries","format=duration:stream=codec_type,codec_name,width,height,avg_frame_rate",
+        "-of","json",str(video)],capture_output=True,text=True,check=True)
+    meta=json.loads(probe.stdout); streams=meta["streams"]; dur=float(meta["format"]["duration"])
+    vs=[x for x in streams if x["codec_type"]=="video"][0]
+    from fractions import Fraction
+    if vs["codec_name"]!="h264" or vs["width"]!=1080 or vs["height"]!=1920 or Fraction(vs["avg_frame_rate"])!=30:
+        raise RuntimeError("Motion video format invalid")
+    if not any(x["codec_type"]=="audio" and x["codec_name"]=="aac" for x in streams):raise RuntimeError("Motion video without AAC audio")
+    if not 8.0<=dur<=59.0:raise RuntimeError("Motion video duration outside Shorts range")
+    return video,dur,bool(voices)
+
 def main():
     # Never claim or publish during a git push, even if old flags are present.
     # The --self-test mode below renders locally, without credentials or uploads.
@@ -1076,6 +1103,26 @@ def main():
             raise RuntimeError("Verified news title and original source required")
         if not isinstance(result.get("scenes"),list) or len(result["scenes"])!=3:
             raise RuntimeError("Verified three-scene storyboard required")
+        if STYLE=="motion":
+            # Motion graphics proprios: sem fotografia externa, sem direitos de terceiros.
+            credit=original_illustration_credit(result["source_url"],result["title"])
+            if not is_acceptable_visual_credit(credit,result["source_url"],result["title"]):
+                raise RuntimeError("Visual origin verification failed")
+            video,dur,has_voice=render_motion(result,category,folder,credit)
+            preview_dir=ROOT/"shorts-test-preview";preview_dir.mkdir(exist_ok=True)
+            subprocess.run(["ffmpeg","-hide_banner","-loglevel","error","-y","-ss","1.2","-i",str(video),"-frames:v","1",
+                            str(preview_dir/("fila-"+str(qid)+".png"))],check=True,timeout=60)
+            with video.open("rb") as f:
+                response=requests.put(result["upload_url"],data=f,headers={"Content-Type":"video/mp4","x-upsert":"false"},timeout=130)
+            if response.status_code not in (200,201):
+                raise RuntimeError("Supabase signed upload failed with HTTP "+str(response.status_code))
+            confirmed=bridge(token,"complete",queue_id=qid,storage_path=result["storage_path"],
+                     quality_passed=True,image_credit=credit,visual_kind="illustration",registered_image_id=0)
+            report_render_outcome({"state":"ready_for_publication" if confirmed.get("ready_to_publish") is True else "awaiting_editorial_visual_review",
+                                  "queue_id":confirmed["queue_id"],"ready_to_publish":confirmed.get("ready_to_publish") is True,
+                                  "visual_kind":"motion_graphics","narration":has_voice,"duration_s":round(dur,1)})
+            print("Motion graphics renderizado:",round(dur,1),"s; narracao:",has_voice)
+            return
         # Event photo or individually cleared private image. Missing rights stays
         # on the same item for review; no generic shield substitutes for the event.
         registered_image_id=0
@@ -1156,8 +1203,26 @@ def main():
         except Exception: print("Could not update queue error status.")
         raise RuntimeError("Render failed safely without publishing: "+str(e)[:150]) from e
 
+def render_self_test_motion():
+    """QA offline do estilo motion + narracao (sem Supabase, sem redes sociais)."""
+    with tempfile.TemporaryDirectory(prefix="giro-motion-qa-") as tmp:
+        claim={"title":"Anvisa proíbe venda de tiras de glicemia falsificadas na Amazon | Saúde","source_name":"SIMULAÇÃO TÉCNICA — NÃO PUBLICAR",
+               "scenes":["A resolução saiu no Diário Oficial nesta quinta-feira. Dois anúncios foram barrados.","Os produtos não podem ser distribuídos, importados nem usados."]+[]}
+        claim["scenes"]=claim["scenes"]+["Fique atento à origem do que você compra."] if len(claim["scenes"])<3 else claim["scenes"]
+        claim["scenes"]=claim["scenes"][:3]
+        query,category=article_subject(claim["title"])
+        video,dur,has_voice=render_motion(claim,"SAÚDE",tmp,"qa")
+        out=ROOT/"shorts-test-preview";out.mkdir(exist_ok=True)
+        from shutil import copyfile
+        copyfile(video,out/"auto-qa-video.mp4")
+        print(json.dumps({"success":True,"mode":"offline_motion_self_test_no_upload","duration_s":round(dur,1),"narration":has_voice}))
+        if os.environ.get("GIRO_QA_VOICE")=="1" and not has_voice:
+            raise RuntimeError("Narração exigida no QA, mas indisponível")
+
 if __name__=="__main__":
-    if "--self-test" in sys.argv:
+    if "--self-test-motion" in sys.argv:
+        render_self_test_motion()
+    elif "--self-test" in sys.argv:
         render_self_test()
     else:
         main()

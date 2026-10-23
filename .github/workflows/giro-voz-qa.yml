@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches: [voz-kokoro]
-    paths: [scripts/giro_voz.py, .github/workflows/giro-voz-qa.yml]
+    paths: [scripts/giro_voz.py, scripts/giro_motion.py, scripts/giro_shorts_auto.py, .github/workflows/giro-voz-qa.yml]
 
 permissions:
   contents: write
@@ -29,8 +29,8 @@ jobs:
         env:
           GIRO_QA_VOICE: '1'
         run: |
-          python scripts/giro_shorts_auto.py --self-test 2>&1 | tee qa-log.txt
-          grep -q "Narração Kokoro (pm_santa) aplicada em 3 cenas" qa-log.txt
+          python scripts/giro_shorts_auto.py --self-test-motion 2>&1 | tee qa-log.txt
+          grep -q '"narration": true' qa-log.txt
       - name: Confirmar que há áudio de voz no vídeo
         run: |
           ffprobe -v error -show_entries format=duration:stream=codec_name,codec_type -of json shorts-test-preview/auto-qa-video.mp4
