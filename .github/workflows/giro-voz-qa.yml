@@ -2,6 +2,9 @@ name: Giro Madeira - QA da narração (manual, sem publicar)
 
 on:
   workflow_dispatch:
+  push:
+    branches: [voz-kokoro]
+    paths: [scripts/giro_voz.py, .github/workflows/giro-voz-qa.yml]
 
 permissions:
   contents: read
