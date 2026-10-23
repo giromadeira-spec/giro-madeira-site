@@ -1,0 +1,37 @@
+name: Giro Madeira - QA da narração (manual, sem publicar)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  voz-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Dependências gratuitas
+        run: |
+          python -m pip install --disable-pip-version-check "Pillow>=11,<13" "requests>=2.31,<3"
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ffmpeg fonts-dejavu-core espeak-ng
+          python -m pip install --disable-pip-version-check torch --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install --disable-pip-version-check kokoro soundfile numpy
+      - name: Gerar vídeo de teste com narração (sem rede social, sem Supabase)
+        env:
+          GIRO_QA_VOICE: '1'
+        run: python scripts/giro_shorts_auto.py --self-test
+      - name: Confirmar que há áudio de voz no vídeo
+        run: |
+          ffprobe -v error -show_entries format=duration:stream=codec_name,codec_type -of json shorts-test-preview/auto-qa-video.mp4
+          ffmpeg -hide_banner -i shorts-test-preview/auto-qa-video.mp4 -af volumedetect -vn -f null - 2>&1 | grep -E "mean_volume|max_volume"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: giro-voz-qa-video
+          path: shorts-test-preview/auto-qa-video.mp4
+          retention-days: 7

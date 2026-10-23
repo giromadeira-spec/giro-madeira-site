@@ -832,6 +832,22 @@ def make_music(out,duration):
             buf.extend(int(max(-1,min(1,wavevalue))*28000).to_bytes(2,"little",signed=True))
         f.writeframes(buf)
 
+def add_narration(texts,folder,music):
+    """Acrescenta a narração gratuita (Kokoro) à trilha. Sem voz disponível, mantém a trilha original."""
+    try:
+        sys.path.insert(0,str(ROOT/"scripts"))
+        import giro_voz
+        voices=giro_voz.narrate(texts,folder)
+        if not voices or not any(voices):
+            return music
+        mixed=Path(folder)/"sound_voz.wav"
+        giro_voz.mix_into_music(music,voices,mixed)
+        print("Narração Kokoro (pm_santa) aplicada em",sum(1 for v in voices if v),"cenas.")
+        return mixed
+    except Exception as exc:
+        print("Narração ignorada:",type(exc).__name__,str(exc)[:120])
+        return music
+
 def render_frames(frames,out,music):
     fps=30 if PLATFORM=="shorts" else 15  # TikTok managed by its independent pipeline.
     concat=[]
@@ -1015,6 +1031,8 @@ def render_self_test():
         copyfile(images[0],out/"auto-qa-cover.png")
         audio=folder/"qa-music.wav"
         make_music(audio,27)
+        if os.environ.get("GIRO_QA_VOICE")=="1":
+            audio=add_narration(["Simulação interna do novo padrão visual.","Validação de manchete, créditos e logo.","Validação do Rio Madeira e do formato vertical."],folder,audio)
         video=out/"auto-qa-video.mp4"
         render_frames(images,video,audio)
         print(json.dumps({
@@ -1102,6 +1120,8 @@ def main():
             make_frame(picture,river,logo,result,scene,i,credit,file)
             frames.append(file)
         soundtrack=folder/"sound.wav";make_music(soundtrack,27)
+        narration_texts=[clean(result["title"].split("|")[0])+(". "+clean(result["scenes"][0]) if clean(result["scenes"][0]) else "")]+[clean(t) for t in result["scenes"][1:]]
+        soundtrack=add_narration(narration_texts,folder,soundtrack)
         video=folder/"giro_short.mp4";render_frames(frames,video,soundtrack)
         preview_dir=ROOT/"shorts-test-preview"
         preview_dir.mkdir(exist_ok=True)

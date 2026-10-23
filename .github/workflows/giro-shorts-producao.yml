@@ -93,7 +93,7 @@ jobs:
     # Before standby: if: github.event_name == 'schedule' && github.repository == 'giromadeira-spec/giro-madeira-site' && github.ref == 'refs/heads/main'
     if: ${{ false }}
     runs-on: ubuntu-latest
-    timeout-minutes: 18
+    timeout-minutes: 25
     steps:
       - name: Obter somente os arquivos do repositorio
         uses: actions/checkout@v4
@@ -109,6 +109,12 @@ jobs:
           command -v ffmpeg
           command -v ffprobe
           python -m py_compile scripts/giro_shorts_auto.py
+      - name: Instalar narração gratuita Kokoro (opcional; sem ela o vídeo segue só com trilha)
+        continue-on-error: true
+        run: |
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq espeak-ng
+          python -m pip install --disable-pip-version-check torch --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install --disable-pip-version-check kokoro soundfile numpy
       - name: Gerar Short apenas quando o Supabase autorizar
         env:
           PYTHONUNBUFFERED: '1'
