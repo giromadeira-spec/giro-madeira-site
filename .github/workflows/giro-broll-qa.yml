@@ -7,7 +7,7 @@ on:
     paths: [scripts/giro_broll.py, .github/workflows/giro-broll-qa.yml]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   broll-qa:
@@ -21,7 +21,12 @@ jobs:
       - run: python -m pip install --disable-pip-version-check "Pillow>=11,<13" "requests>=2.31,<3"
       - name: Buscar imagens de licença aberta (teste, sem publicar)
         run: python scripts/giro_broll.py broll-teste
-      - uses: actions/upload-artifact@v4
-        with:
-          name: giro-broll-qa
-          path: broll-teste
+      - name: Guardar resultado num ramo de teste (para conferir)
+        run: |
+          git config user.name "giro-qa"; git config user.email "qa@users.noreply.github.com"
+          git checkout --orphan giro-broll-qa-out
+          git rm -rf -q . || true
+          cp -r broll-teste/* . 
+          git add relatorio.json *.jpg 2>/dev/null || git add relatorio.json
+          git commit -q -m "resultado QA broll"
+          git push -f origin giro-broll-qa-out
