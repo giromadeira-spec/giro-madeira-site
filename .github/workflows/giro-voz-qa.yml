@@ -7,7 +7,7 @@ on:
     paths: [scripts/giro_voz.py, .github/workflows/giro-voz-qa.yml]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   voz-qa:
@@ -28,7 +28,9 @@ jobs:
       - name: Gerar vídeo de teste com narração (sem rede social, sem Supabase)
         env:
           GIRO_QA_VOICE: '1'
-        run: python scripts/giro_shorts_auto.py --self-test
+        run: |
+          python scripts/giro_shorts_auto.py --self-test 2>&1 | tee qa-log.txt
+          grep -q "Narração Kokoro (pm_santa) aplicada em 3 cenas" qa-log.txt
       - name: Confirmar que há áudio de voz no vídeo
         run: |
           ffprobe -v error -show_entries format=duration:stream=codec_name,codec_type -of json shorts-test-preview/auto-qa-video.mp4
@@ -38,3 +40,14 @@ jobs:
           name: giro-voz-qa-video
           path: shorts-test-preview/auto-qa-video.mp4
           retention-days: 7
+      - name: Publicar vídeo de teste numa branch de QA (para inspeção)
+        run: |
+          git config user.name "giro-qa"; git config user.email "qa@users.noreply.github.com"
+          git checkout --orphan qa-voz
+          git rm -rf --cached . >/dev/null 2>&1 || true
+          mkdir -p /tmp/qa && cp shorts-test-preview/auto-qa-video.mp4 /tmp/qa/
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp /tmp/qa/auto-qa-video.mp4 .
+          git add auto-qa-video.mp4
+          git commit -q -m "Vídeo de QA com narração (não é publicação)"
+          git push -f origin qa-voz
