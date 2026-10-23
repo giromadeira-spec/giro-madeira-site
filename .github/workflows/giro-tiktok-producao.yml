@@ -36,6 +36,9 @@ jobs:
           python -m pip install --disable-pip-version-check torch --index-url https://download.pytorch.org/whl/cpu
           python -m pip install --disable-pip-version-check kokoro soundfile numpy
       - name: Produzir vídeo da fila TikTok sem depender de Shorts
+        env:
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
         run: python scripts/giro_shorts_auto.py --tiktok
       - name: Preparar cópia 30 fps da fila TikTok
         run: python scripts/buffer/giro_tiktok_30fps.py
