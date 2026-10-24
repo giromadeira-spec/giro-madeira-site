@@ -138,7 +138,10 @@ Deno.serve(async req=>{
   if(reserved.error)throw reserved.error;
   if(!reserved.data)return response({success:true,channel,processed:0,reason:'already_reserved'});
   const payload:any={instagram_account_id:account,media_type:types[channel],manual_test:manualTest};
-  if(channel==='reels'){payload.video_url=media;payload.caption=item.legenda;payload.share_to_feed=false;}
+  if(channel==='reels'){payload.video_url=media;payload.caption=item.legenda;payload.share_to_feed=false;
+   // Capa do Reel: arte vertical propria (foto do fato + manchete). Somente JPEG do nosso storage; sem capa valida o Reel segue com o quadro do video.
+   const cover=String(item.story_image_url||'');
+   if(asset(cover,url,'news-images')&&/\.jpe?g$/i.test(new URL(cover).pathname))payload.cover_url=cover;}
   else {payload.image_url=media;if(channel==='feed')payload.caption=item.legenda;}
   try{
    const sent=await fetch(url+'/functions/v1/publicar-instagram',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+role},body:JSON.stringify(payload),signal:AbortSignal.timeout(130000)});
