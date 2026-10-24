@@ -251,6 +251,8 @@ async function preflight(sb:any,token:string,accountId:string,mediaType:MediaTyp
   return {allowed:true,state:st};
 }
 
+// Capa opcional do Reel (JPEG do proprio storage), definida por requisicao apos validacao.
+let REEL_COVER_URL="";
 function buildCreateParams(args:{mediaType:MediaType,imageUrl:string,videoUrl:string,caption:string,token:string,shareToFeed:boolean}){
   const p=new URLSearchParams();
   p.set("access_token",args.token);
@@ -266,6 +268,7 @@ function buildCreateParams(args:{mediaType:MediaType,imageUrl:string,videoUrl:st
     p.set("video_url",args.videoUrl);
     if(args.caption)p.set("caption",args.caption);
     p.set("share_to_feed",args.shareToFeed?"true":"false");
+    if(REEL_COVER_URL)p.set("cover_url",REEL_COVER_URL);
     return p;
   }
   p.set("media_type","STORIES");
@@ -505,6 +508,11 @@ Deno.serve(async(req)=>{
     const caption=String(body?.caption??"");
     const requestedType=String(body?.media_type??"IMAGE").toUpperCase();
     const shareToFeed=body?.share_to_feed===true;
+    REEL_COVER_URL="";
+    try{
+      const cu=new URL(String(body?.cover_url??""));
+      if(cu.origin===new URL(String(Deno.env.get("SUPABASE_URL")||"")).origin&&cu.pathname.startsWith("/storage/v1/object/public/news-images/")&&/\.jpe?g$/i.test(cu.pathname))REEL_COVER_URL=cu.toString();
+    }catch{}
     const mediaType:MediaType=requestedType==="REELS"?"REELS":requestedType==="STORIES"?"STORIES":"IMAGE";
 
     if(mediaType==="IMAGE"&&!imageUrl)return new Response(JSON.stringify({success:false,error:"IMAGE exige image_url."}),{status:400,headers:H});

@@ -99,7 +99,8 @@ def from_openverse(query, skip=()):
         if not url or not str(url).lower().split("?")[0].endswith((".jpg", ".jpeg", ".png", ".webp")): continue
         try: im = _download(url)
         except Exception: continue
-        by = (it.get("creator") or "autor desconhecido")[:40]
+        by = re.sub(r"^(.{3,}?)\1$", r"\1", (it.get("creator") or "autor desconhecido").strip())
+        by = ("autor desconhecido" if "unknown" in by.lower() else by)[:40]
         label = "%s (%s%s)" % (by, "CC0" if lic == "cc0" else "Dominio publico" if lic == "pdm" else "CC BY", "" if lic != "by" else " " + str(it.get("license_version") or ""))
         return {"id": it.get("id"), "img": im, "credit": label.strip(), "source": "openverse", "page": it.get("foreign_landing_url") or ""}
     return None
@@ -182,7 +183,7 @@ def from_cloudflare_ai(query, skip=()):
 
 
 def find(query, skip=()):
-    for fn in (from_pexels, from_pixabay, from_openverse, from_commons, from_cloudflare_ai):
+    for fn in (from_cloudflare_ai, from_pexels, from_pixabay, from_openverse, from_commons):  # IA primeiro (sob medida e consistente), depois bancos livres
         try:
             got = fn(query, skip)
             if got: return got
