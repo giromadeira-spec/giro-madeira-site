@@ -3,10 +3,9 @@ on:
   schedule:
     # 1 TikTok/dia às 17:00 Porto Velho (21:00 UTC).
     # Preparation 11:15, 13:30, 15:15, 16:15, 16:35 PV; NO publishing here.
-    - cron: '15 15 * * *'
-    - cron: '30 17 * * *'
-    - cron: '15 19 * * *'
-    - cron: '15,35 20 * * *'
+    # Render somente perto das 17h: a revisao automatica exige render com no maximo 4 h (render_not_recent).
+    # 16:15, 16:35 e 16:50 PV (20:15, 20:35 e 20:50 UTC); a ultima passada serve de repeticao.
+    - cron: '15,35,50 20 * * *'
   workflow_dispatch:
 permissions:
   contents: read
