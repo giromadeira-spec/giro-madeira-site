@@ -211,6 +211,15 @@ def attach(beats, title, scenes, category=""):
 
 if __name__ == "__main__":  # autoteste: python giro_broll.py pasta_saida
     import os
+    if len(sys.argv) > 2 and sys.argv[2] == "ia":  # teste so da imagem gerada por IA
+        out = sys.argv[1]; os.makedirs(out, exist_ok=True); rep = []
+        for q in ("highway road", "airplane flying sky", "farm harvest"):
+            try:
+                g = from_cloudflare_ai(q)
+                if g: g["img"].save(os.path.join(out, "ia_" + q.replace(" ", "_") + ".jpg"), quality=85); rep.append({"q": q, "ok": True, "size": list(g["img"].size)})
+                else: rep.append({"q": q, "ok": False, "erro": "sem chave ou sem imagem"})
+            except Exception as e: rep.append({"q": q, "ok": False, "erro": str(e)[:300]})
+        json.dump(rep, open(os.path.join(out, "relatorio.json"), "w"), ensure_ascii=False, indent=1); print(json.dumps(rep, ensure_ascii=False)); sys.exit(0)
     out = sys.argv[1] if len(sys.argv) > 1 else "broll-teste"; os.makedirs(out, exist_ok=True); rep = []
     for q in [k[1] for k in KEYWORDS if k[1].split("|")[0] in ("highway road", "airplane flying sky", "rocket launch", "car on road", "hospital building", "brazilian real banknotes", "heavy rain storm clouds", "farm harvest", "cargo ship", "drought dry land")]:
         got = find(q)
