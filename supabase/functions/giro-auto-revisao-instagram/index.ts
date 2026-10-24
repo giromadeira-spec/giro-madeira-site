@@ -7,7 +7,13 @@ function allowed(url:string){
  try{const u=new URL(url);
   const hosts=["www.cnnbrasil.com.br","cnnbrasil.com.br","www.rondoniadinamica.com","rondoniadinamica.com",
    "portaljipa.com.br","www.portaljipa.com.br","www.rondoniaovivo.com","rondoniaovivo.com",
-   "agenciabrasil.ebc.com.br","g1.globo.com","www.g1.globo.com","www.nahoraonline.com","nahoraonline.com","newsrondonia.com.br","www.newsrondonia.com.br"];
+   "agenciabrasil.ebc.com.br","g1.globo.com","www.g1.globo.com","www.nahoraonline.com","nahoraonline.com","newsrondonia.com.br","www.newsrondonia.com.br",
+   // Portais regionais do radar. A revisao continua exigindo manchete e fatos presentes na materia original.
+   "www.rondoniagora.com","rondoniagora.com","www.tudorondonia.com","tudorondonia.com","rondonoticias.com.br","www.rondonoticias.com.br",
+   "extraderondonia.com.br","www.extraderondonia.com.br","jhnoticias.com.br","www.jhnoticias.com.br","rotapolicialnews.com.br","www.rotapolicialnews.com.br",
+   "sgc.com.br","www.sgc.com.br","www.euideal.com","euideal.com","www.alertarolim.com.br","rolimnoticias.com.br","www.rolimnoticias.com.br",
+   "ariquemes190.com.br","www.ariquemes190.com.br","jaruonline.com.br","www.jaruonline.com.br","folhadosulonline.com.br","www.folhadosulonline.com.br",
+   "www.gentedeopiniao.com.br","gentedeopiniao.com.br","www.rondoniadigital.com","rondoniadigital.com","www.sictv.com.br","sictv.com.br","ge.globo.com"];
   if(u.protocol!=="https:"||u.username||u.password||u.port||u.pathname.length<17)return null;
   if(!hosts.includes(u.hostname)&&!u.hostname.endsWith(".gov.br"))return null;
   if(["cnnbrasil.com.br","www.cnnbrasil.com.br"].includes(u.hostname)&&!u.pathname.endsWith("/"))u.pathname+="/";
