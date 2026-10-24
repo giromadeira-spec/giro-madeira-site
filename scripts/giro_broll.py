@@ -29,7 +29,7 @@ KEYWORDS = [
     (r"\b(navio|barco|porto|balsa|embarcacao)\b", "cargo ship|ship|vessel|boat|port"),
     (r"\b(trem|ferrovia|locomotiva)\b", "train railway|train|railway|locomotive"),
     (r"\b(hospital|saude|sus|vacina|vacinacao|medico|medicos)\b", "hospital building|hospital|clinic|ambulance"),
-    (r"\b(dinheiro|economia|inflacao|juros|salario|reais|bilhoes|milhoes|imposto|banco)\b", "brazilian real banknotes|banknote|banknotes|money|currency|real"),
+    (r"\b(dinheiro|economia|inflacao|juros|salario|imposto|banco)\b", "brazilian real banknotes|banknote|banknotes|money|currency|real"),
     (r"\b(chuva|chuvas|temporal|tempestade|previsao do tempo)\b", "heavy rain storm clouds|rain|storm|thunderstorm|clouds"),
     (r"\b(seca|calor|temperatura|onda de calor)\b", "drought dry land|drought|dry|cracked"),
     (r"\b(queimada|queimadas|fogo|floresta|desmatamento|amazonia)\b", "amazon rainforest|rainforest|amazon|forest"),
