@@ -162,8 +162,27 @@ def from_pixabay(query, skip=()):
     return None
 
 
+def from_cloudflare_ai(query, skip=()):
+    """Ultimo recurso: imagem gerada por IA (Flux schnell, Cloudflare Workers AI, cota gratuita diaria).
+    So roda com CLOUDFLARE_ACCOUNT_ID e CLOUDFLARE_API_TOKEN. Sempre rotulada como gerada por IA e so para tema generico."""
+    import os, base64
+    acc = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "").strip(); tok = os.environ.get("CLOUDFLARE_API_TOKEN", "").strip()
+    if not acc or not tok: return None
+    query, _ = _split(query)
+    if ("ia:" + query) in skip: return None
+    prompt = ("Photorealistic editorial photograph, %s, natural light, wide composition, no text, no logos, no watermark, no close-up faces" % query)
+    r = requests.post("https://api.cloudflare.com/client/v4/accounts/%s/ai/run/@cf/black-forest-labs/flux-1-schnell" % acc,
+                      headers={"Authorization": "Bearer " + tok, "Content-Type": "application/json"}, json={"prompt": prompt, "steps": 4}, timeout=60)
+    r.raise_for_status()
+    b64 = ((r.json() or {}).get("result") or {}).get("image")
+    if not b64: return None
+    im = Image.open(io.BytesIO(base64.b64decode(b64))); im.load(); im = im.convert("RGB")
+    if min(im.size) < 512: return None
+    return {"id": "ia:" + query, "img": im, "credit": "Gerada por IA (Flux)", "source": "cloudflare_ai", "page": "", "ai": True}
+
+
 def find(query, skip=()):
-    for fn in (from_pexels, from_pixabay, from_openverse, from_commons):
+    for fn in (from_pexels, from_pixabay, from_openverse, from_commons, from_cloudflare_ai):
         try:
             got = fn(query, skip)
             if got: return got
@@ -185,7 +204,7 @@ def attach(beats, title, scenes, category=""):
         got = find(q, skip)
         if not got: continue
         seen_q.add(q); skip.add(got["id"])
-        b.update(kind="photo", bg="dark", img=got["img"], img_credit=got["credit"], pidx=len(used))
+        b.update(kind="photo", bg="dark", img=got["img"], img_credit=got["credit"], pidx=len(used), img_ai=bool(got.get("ai")))
         used.append({"beat": i, "query": q, "credit": got["credit"], "source": got["source"], "page": got["page"]})
     return used
 
