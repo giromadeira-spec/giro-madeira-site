@@ -171,14 +171,6 @@ Deno.serve(async (req) => {
 
     if (sourcesError) throw sourcesError;
 
-    // Shorts/TikTok = grande impacto nacional ou mundial. Só fontes aceitas pela revisão automática
-    // (CNN Brasil e Agência Brasil), nunca regionais nem gov.br de rotina.
-    const bigChannel = channel === 'shorts' || channel === 'tiktok';
-    const bigDomains = ['www.cnnbrasil.com.br', 'agenciabrasil.ebc.com.br'];
-    const bigImpactRegex = /(guerra|ataque|m[ií]ssil|bomba|terremoto|tsunami|furac[aã]o|tornado|explos[aã]o|massacre|atentado|golpe|presidente|trump|lula|stf|supremo|congresso|senado|c[aâ]mara dos deputados|elei[cç][aã]o|elei[cç][oõ]es|bolsa|d[oó]lar|selic|infla[cç][aã]o|pib|juros|reforma|tarifa|embargo|sanç[aã]o|otan|onu|china|r[uú]ssia|ucr[aâ]nia|israel|ir[aã]|gaza|vacina|pandemia|surto|apag[aã]o nacional|greve|r[eé]cord|hist[oó]ric|bilh[oõ]es|trilh[oõ]es|morre|morte de|renuncia|demiss[aã]o|operaç[aã]o da pf|corrup[cç][aã]o|nasa|espacial)/i;
-    const routineRegex = /(incinera|apreende|apreens[aã]o|prende foragido|pris[aã]o de foragido|cumpre mandado|capacita|homenagem|campanha de|inaugura|visita)/i;
-    const activeSources = bigChannel ? (sources || []).filter((x: any) => bigDomains.includes(String(x.dominio || ''))) : (sources || []);
-
     // Collection never excludes a story because another channel consumed it.
     const alreadyInFlow = new Set<string>();
 
@@ -192,10 +184,30 @@ Deno.serve(async (req) => {
     const lowValueRegex = /(transmiss[aã]o ao vivo|estagi[aá]rios|reuni[aã]o interna|capacita[cç][aã]o interna|homenagem|sess[aã]o solene)/i;
     const lightRegex = /(vila kids|parque de infl[aá]veis|pr[eé]-show|show infantil|sorteio.*crian|espet[aá]culo infantil)/i;
 
-    for (const source of activeSources) {
+    // Rotate source priority across runs and cap work to avoid Edge Function timeout 546.
+    // Each channel has its own rotation; unprocessed sources remain eligible next run.
+    const instagramRegionalOnly = ['feed','stories','reels'].includes(channel);
+    const instagramLocalHeadline = new RegExp("porto velho|rond[oô]nia|capital rondoniense|madeira.mamor[eé]|abun[aã]|alta floresta d.oeste|alto alegre dos parecis|alto para[ií]so|alvorada d.oeste|ariquemes|buritis|cabixi|cacaul[aâ]ndia|cacoal|campo novo de rond[oô]nia|candeias do jamari|castanheiras|cerejeiras|chupinguaia|colorado do oeste|corumbiara|costa marques|cujubim|espig[aã]o d.oeste|governador jorge teixeira|guajar[aá].mirim|itapu[aã] do oeste|jaru|ji.paran[aá]|machadinho d.oeste|ministro andreazza|mirante da serra|monte negro|nova brasil[aâ]ndia d.oeste|nova mamor[eé]|nova uni[aã]o|novo horizonte do oeste|ouro preto do oeste|parecis|pimenta bueno|pimenteiras do oeste|presidente m[eé]dici|primavera de rond[oô]nia|rio crespo|rolim de moura|santa luzia d.oeste|s[aã]o felipe d.oeste|s[aã]o francisco do guapor[eé]|s[aã]o miguel do guapor[eé]|seringueiras|teixeir[oó]polis|theobroma|urup[aá]|vale do anari|vale do para[ií]so|vilhena", 'i');
+    // Shorts/TikTok = grande impacto nacional ou mundial. So fontes aceitas pela revisao automatica
+    // (CNN Brasil e Agencia Brasil), nunca regionais nem gov.br de rotina.
+    const bigChannel = channel === 'shorts' || channel === 'tiktok';
+    const bigDomains = ['www.cnnbrasil.com.br', 'agenciabrasil.ebc.com.br'];
+    const bigImpactRegex = /(guerra|ataque|m[ií]ssil|bomba|terremoto|tsunami|furac[aã]o|tornado|explos[aã]o|massacre|atentado|golpe|presidente|trump|lula|stf|supremo|congresso|senado|c[aâ]mara dos deputados|elei[cç][aã]o|elei[cç][oõ]es|bolsa|d[oó]lar|selic|infla[cç][aã]o|pib|juros|reforma|tarifa|embargo|san[cç][aã]o|otan|onu|china|r[uú]ssia|ucr[aâ]nia|israel|ir[aã]|gaza|vacina|pandemia|surto|apag[aã]o nacional|greve|r[eé]cord|hist[oó]ric|bilh[oõ]es|trilh[oõ]es|morre|morte de|renuncia|demiss[aã]o|opera[cç][aã]o da pf|corrup[cç][aã]o|nasa|espacial)/i;
+    const routineRegex = /(incinera|apreende|apreens[aã]o|prende foragido|pris[aã]o de foragido|cumpre mandado|capacita|homenagem|campanha de|inaugura|visita)/i;
+    const sourceList = instagramRegionalOnly
+      ? (sources || []).filter((source:any) => ['porto_velho','rondonia','interior'].includes(source.escopo))
+      : bigChannel
+        ? (sources || []).filter((source:any) => bigDomains.includes(String(source.dominio || '')))
+        : (sources || []);
+    const rotation = sourceList.length ? Math.floor(runStarted.getTime() / 600000) % sourceList.length : 0;
+    const orderedSources = [...sourceList.slice(rotation), ...sourceList.slice(0, rotation)];
+    let scannedSources = 0;
+    for (const source of orderedSources) {
+      if (scannedSources >= 8 || Date.now() - runStarted.getTime() > 42000) break;
+      scannedSources++;
       try {
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 15000);
+        const timer = setTimeout(() => controller.abort(), 6500);
 
         let response: Response;
         try {
@@ -228,6 +240,7 @@ Deno.serve(async (req) => {
 
           const title = extractTitle($, el);
           if (!likelyHeadline(title)) return;
+          if (instagramRegionalOnly && !instagramLocalHeadline.test(title)) return;
           if (isPublisherPromo(String(source.nome || ""), title)) return;
 
           const href = $(el).attr("href") || "";
@@ -337,7 +350,6 @@ Deno.serve(async (req) => {
           }
 
           if (bigChannel) {
-            // impacto amplo: sem bônus local/serviço; só vale o que é grande e não rotina policial/institucional
             const isBig = bigImpactRegex.test(title);
             score = Number(source.prioridade || 5) * 3 + (isBig ? 35 : 0) - (routineRegex.test(title) ? 30 : 0) - (localMatch ? 15 : 0);
             if (isBig) reasons.push("grande impacto nacional/mundial");
@@ -362,6 +374,23 @@ Deno.serve(async (req) => {
           const previous = all.get(canonical);
           if (!previous || previous.score < score) all.set(canonical, candidate);
         });
+
+        // Segunda checagem de data: candidato sem data na lista tem a data lida dentro da propria materia.
+        try{
+          const undated=[...all.values()].filter((c:any)=>c.fonte_id===source.id&&!c.source_published_at).sort((a:any,b:any)=>b.score-a.score).slice(0,4);
+          await Promise.all(undated.map(async (c:any)=>{
+            try{
+              const r=await fetch(c.url,{signal:AbortSignal.timeout(5000),headers:{"User-Agent":"Mozilla/5.0 (compatible; GiroMadeiraRadar/2.0)","Accept":"text/html"}});
+              if(!r.ok)return;
+              const h=(await r.text()).slice(0,400000);
+              const m=h.match(/property=["']article:published_time["'][^>]*content=["']([^"']+)/i)||h.match(/content=["']([^"']+)["'][^>]*property=["']article:published_time["']/i)||h.match(/"datePublished"\s*:\s*"([^"]+)"/i)||h.match(/<time[^>]*datetime=["']([^"']+)/i);
+              const d=m?new Date(m[1]):null;
+              if(!d||!Number.isFinite(d.getTime()))return;
+              if(runStarted.getTime()-d.getTime()>24*60*60*1000){all.delete(c.url);staleSkipped++;accepted--;return;}
+              if(d.getTime()-runStarted.getTime()<=24*60*60*1000){const cur:any=all.get(c.url);if(cur)cur.source_published_at=d.toISOString();}
+            }catch{}
+          }));
+        }catch{}
 
         await sb
           .from("giro_madeira_fontes")
@@ -402,6 +431,9 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({
       success: true,channel,
       started_at: runStartedIso,
+      fontes_consultadas: scannedSources,
+      fontes_total: sourceList.length,
+      varredura_parcial: scannedSources < sourceList.length,
       fontes: sourceResults,
       candidatos_processados: items.length,
       registros_afetados: affected,
