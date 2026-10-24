@@ -356,7 +356,7 @@ class V:
                 vis = txt[shown:shown + len(w)] if shown < n else ""; vis = vis[: max(0, n - shown)]
                 if vis: d.text((x, y), vis, font=f, fill=YEL if li == len(lines) - 1 and len(lines) > 1 else WHITE, stroke_width=3, stroke_fill=(1, 7, 18))
                 x += f.getlength(w + " "); shown += len(w) + 1
-        lab_src = ("Imagem ilustrativa: " + bt["img_credit"]) if bt.get("img_credit") else (("Foto: " + self.photo_credit) if self.photo_credit else "")
+        lab_src = (("Imagem gerada por IA, ilustrativa" if bt.get("img_ai") else "Imagem ilustrativa: " + bt["img_credit"]) if bt.get("img_credit") else (("Foto: " + self.photo_credit) if self.photo_credit else "")
         if lab_src:
             cf = font(FM, 26); lab = lab_src; d.text((W - 50 - cf.getlength(lab), H - 200), lab, font=cf, fill=WHITE, stroke_width=2, stroke_fill=(0, 5, 14))
 
