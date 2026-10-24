@@ -1,0 +1,20 @@
+{
+ "duracao_s": 41.3,
+ "narracao": true,
+ "broll": [
+  {
+   "beat": 2,
+   "query": "ballot box voting|ballot|voting|election",
+   "credit": "Gerada por IA (Flux)",
+   "source": "cloudflare_ai",
+   "page": ""
+  },
+  {
+   "beat": 10,
+   "query": "smartphone technology|smartphone|phone|technology",
+   "credit": "Gerada por IA (Flux)",
+   "source": "cloudflare_ai",
+   "page": ""
+  }
+ ]
+}
