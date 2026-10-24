@@ -117,6 +117,8 @@ jobs:
       - name: Gerar Short apenas quando o Supabase autorizar
         env:
           PYTHONUNBUFFERED: '1'
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
         run: python scripts/giro_shorts_auto.py
 
       - name: Guardar prévia visual para revisão
