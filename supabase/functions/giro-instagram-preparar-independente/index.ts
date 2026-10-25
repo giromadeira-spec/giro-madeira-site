@@ -63,13 +63,9 @@ Deno.serve(async req=>{
    if(found.error)throw found.error;
    item=found.data;
   }
-  // Reels: noticia de morte, tragedia ou crime grave nao usa foto generica (pode parecer a vitima ou o suspeito).
-  // O item e descartado e o radar escolhe outra pauta no proximo ciclo.
-  if(channel==="reels"&&/(morre|morreu|morrem|morte|mortos?\b|assassin|homic[ií]dio|feminic[ií]dio|estupr|suic[ií]d|afog|atropel|tomba|tombou|acidente fatal|cad[aá]ver|corpo encontrado|esfaque|baleado|executad)/i.test(String(item.titulo||""))){
-    await db.from(table).update({status:"descartada",erro:"reel_tragedia_sem_arte_adequada",media_status:"descartada_tragedia"})
-      .eq("id",item.id).eq("status","pendente").eq("visual_approved",false);
-    return response({success:true,channel,publication_id:item.id,no_publish:true,reason:"reel_tragedy_skipped"});
-  }
+  // Reels: noticia de morte, tragedia ou crime grave nunca usa foto (pode parecer a vitima ou o suspeito).
+  // Em vez de descartar, a arte e feita em capa neutra (cartao tipografico sem pessoa/foto) pela funcao de arte.
+  const neutralCover=channel==="reels"&&/(morre|morreu|morrem|morte|mortos?\b|assassin|homic[ií]dio|feminic[ií]dio|estupr|suic[ií]d|afog|atropel|tomba|tombou|acidente fatal|cad[aá]ver|corpo encontrado|esfaque|baleado|executad)/i.test(String(item.titulo||""));
   const attempts=Number(item.preparation_attempts||0);
   const reserved=await db.from(table).update({preparation_attempts:attempts+1,preparation_retry_at:new Date(Date.now()+6*3600000).toISOString()})
     .eq("id",item.id).eq("preparation_attempts",attempts).eq("status","pendente").eq("visual_approved",false).select("id").maybeSingle();
@@ -77,7 +73,7 @@ Deno.serve(async req=>{
   if(!reserved.data)return response({success:true,channel,processed:0,no_publish:true,reason:"already_reserved"});
   const render=await fetch(url+"/functions/v1/gerar-arte-noticia-vault",{
    method:"POST",headers:{"Content-Type":"application/json","x-giro-db-key":key},
-   body:JSON.stringify({publication_id:item.id,channel,auto_pipeline:true}),signal:AbortSignal.timeout(120000)
+   body:JSON.stringify({publication_id:item.id,channel,auto_pipeline:true,neutral_cover:neutralCover}),signal:AbortSignal.timeout(120000)
   });
   const result=await render.json().catch(()=>({}));
   if(!render.ok||result.success!==true){
