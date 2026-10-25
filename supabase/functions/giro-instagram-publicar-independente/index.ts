@@ -74,7 +74,7 @@ Deno.serve(async req=>{
     .or('scheduled_at.is.null,scheduled_at.lte.'+new Date().toISOString())
 ;
   // An additional evening window cannot release old radar drafts or visual tests.
-  if(lateCatchup&&!normalWindow)eligible=eligible.eq('auto_review_basis','chatgpt_asset_qa_v1');
+  if(lateCatchup&&!normalWindow)eligible=eligible.in('auto_review_basis',['chatgpt_asset_qa_v1','dono_manual_v1']);
   if(manualTest&&Number.isSafeInteger(Number(body.publication_id))&&Number(body.publication_id)>0)eligible=eligible.eq('id',Number(body.publication_id));
   const found=await eligible.order('urgente',{ascending:false}).order('created_at',{ascending:true}).limit(1).maybeSingle();
   if(found.error)throw found.error;
