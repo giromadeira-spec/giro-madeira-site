@@ -1,0 +1,23 @@
+name: teste-voz-supertonic
+on:
+  push:
+    branches: [voz-teste-supertonic]
+    paths: ['teste-voz/**', '.github/workflows/teste-voz-supertonic.yml']
+permissions:
+  contents: write
+jobs:
+  voz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install supertonic==1.3.1 huggingface_hub numpy
+      - run: mkdir -p teste-voz/saida && python teste-voz/gerar.py
+      - name: Publicar resultado em branch própria
+        run: |
+          sudo apt-get install -y ffmpeg >/dev/null
+          cd teste-voz/saida && for f in *.wav; do ffmpeg -loglevel error -y -i "$f" "${f%.wav}.mp3"; done && rm *.wav
+          cd "$GITHUB_WORKSPACE" && git config user.name giro-bot && git config user.email bot@users.noreply.github.com
+          git checkout --orphan voz-teste-resultado && git rm -rf -q . && git add -f teste-voz/saida && git commit -qm "resultado teste voz" && git push -f origin voz-teste-resultado
