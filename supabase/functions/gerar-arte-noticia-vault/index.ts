@@ -783,6 +783,7 @@ Deno.serve(async(req)=>{
     }
 
     const autoPipeline=body?.auto_pipeline===true;
+    const neutralCover=body?.neutral_cover===true;
     const channel=String(body?.channel||'legacy');
     if(!['legacy','feed','stories','reels'].includes(channel))return new Response(JSON.stringify({success:false,error:'invalid_channel'}),{status:400,headers:H});
     const publicationTable=channel==='legacy'?'giro_madeira_publicacoes':'giro_publicacoes_'+channel;
@@ -931,7 +932,7 @@ Deno.serve(async(req)=>{
       /(?:hist[oó]ria de porto velho|anivers[aá]rio de porto velho|rio madeira|locomotiva|cidade de porto velho|capital de rond[oô]nia)/i.test(title)&&
       !/(?:acidente|homic[ií]dio|pris[aã]o|inc[eê]ndio|v[ií]tima|suspeito|morte|opera[cç][aã]o|pol[ií]cia)/i.test(title);
     if(imageUrl)await discoverPhotoCandidate(sb,sourceLink,title,imageUrl,desc);
-    const registered=await approvedRegistryPhoto(sb,url,sourceLink,title);
+    const registered=neutralCover?null:await approvedRegistryPhoto(sb,url,sourceLink,title);
     const registeredData=registered?await imageDataUri(registered.image_url):"";
     const registeredPhoto:EditorialPhoto|null=registered&&registeredData?{
       dataUri:registeredData,creator:String(registered.record.credit_line),
@@ -943,7 +944,7 @@ Deno.serve(async(req)=>{
     // A separately licensed topical image may illustrate a story but never prove the event.
     // Sensitive subjects retain original symbolic art or wait for a verified event photo.
     const sensitiveIllustrativeSubject=/homic|feminic|estupr|sequest|v[ií]tima|ferid|morto|morte|assassin|pris[aã]o|suspeit|opera[cç][aã]o|pol[ií]cia|pol[ií]tica|presidente|deputad|senador|governador|vereador|elei[cç][aã]o/i.test(title+" "+category);
-    const illustrativeStockPhoto=!registeredPhoto&&!sensitiveIllustrativeSubject&&withinBudget()&&licensingTopic(title,category).length>0
+    const illustrativeStockPhoto=!neutralCover&&!registeredPhoto&&!sensitiveIllustrativeSubject&&withinBudget()&&licensingTopic(title,category).length>0
       ? await licensedEditorialPhoto(title,category,withinBudget)
       : null;
     // Only registeredPhoto is evidence of this actual event. The illustrative
