@@ -714,15 +714,16 @@ def make_frame(photo,river,logo,claim,scene,idx,credit,path):
     if credit.startswith(("wikimedia_event_","registered_event_")):
         photo_label="FOTO DA NOTÍCIA — LICENCIADA"
     elif credit.startswith("original_editorial_labeled_v2_"):
-        photo_label="ILUSTRAÇÃO EDITORIAL — NÃO É FOTO"
+        photo_label=""  # frase de aviso removida a pedido do dono (30/10/2026)
     else:
         raise RuntimeError("Unrecognized visual origin: cannot label news media")
-    provenance_font=ImageFont.truetype(regular,25)
-    provenance_width=d.textbbox((0,0),photo_label,font=provenance_font)[2]
-    if provenance_width>925:
-        raise RuntimeError("Visual provenance label too wide for news frame")
-    d.rounded_rectangle((58,1010,95+provenance_width,1058),radius=4,fill=(3,16,36,232))
-    d.text((74,1022),photo_label,font=provenance_font,fill=WHITE)
+    if photo_label:
+        provenance_font=ImageFont.truetype(regular,25)
+        provenance_width=d.textbbox((0,0),photo_label,font=provenance_font)[2]
+        if provenance_width>925:
+            raise RuntimeError("Visual provenance label too wide for news frame")
+        d.rounded_rectangle((58,1010,95+provenance_width,1058),radius=4,fill=(3,16,36,232))
+        d.text((74,1022),photo_label,font=provenance_font,fill=WHITE)
     if claim.get("urgent") is True:
         d.rounded_rectangle((785,45,1034,117),radius=6,fill=(222,31,45,255))
         d.text((800,55),"URGENTE",font=ImageFont.truetype(heavy,43),fill=WHITE)
