@@ -250,8 +250,13 @@ class V:
             self.durs.append((d + 0.32) if d else 0.38 * len(bt["txt"].split()) + 0.6)
         self.starts = [sum(self.durs[:i]) for i in range(len(self.b))]
         self.OUT = 2.6; self.total = sum(self.durs) + self.OUT
-        lg = Image.open(os.path.join(ASSETS, "logo-oficial.webp")).convert("RGBA"); m = Image.new("L", lg.size, 0)
-        ImageDraw.Draw(m).ellipse([1, 1, lg.width - 2, lg.height - 2], fill=255); lg.putalpha(m); self.selo = lg
+        novo = os.path.join(ASSETS, "giro-logo-oficial.png")
+        if os.path.exists(novo):
+            # Logo oficial em alta qualidade, ja com fundo transparente (nao recortar em circulo: o nome vaza do circulo).
+            self.selo = Image.open(novo).convert("RGBA")
+        else:
+            lg = Image.open(os.path.join(ASSETS, "logo-oficial.webp")).convert("RGBA"); m = Image.new("L", lg.size, 0)
+            ImageDraw.Draw(m).ellipse([1, 1, lg.width - 2, lg.height - 2], fill=255); lg.putalpha(m); self.selo = lg
         self.icons = {}
         self.photo = c.get("photo"); self.photo_credit = c.get("photo_credit") or ""
     def icon(self, k, p):
@@ -305,7 +310,7 @@ class V:
         # molduras fixas
         d = ImageDraw.Draw(cv)
         d.rectangle([0, 0, W, 10], fill=(0, 0, 0, 40)); d.rectangle([0, 0, W * t / self.total, 10], fill=YEL)
-        mini = self.selo.resize((120, 120), Image.LANCZOS); cv.alpha_composite(mini, (40, 50))
+        mini = self.selo.resize((150, 150), Image.LANCZOS); cv.alpha_composite(mini, (34, 36))
         if self.c.get("teste"):
             f = font(FD, 24); d.rounded_rectangle([W - 330, 60, W - 40, 112], 12, fill=(0, 0, 0, 150)); d.text((W - 185, 86), "PRÉVIA DE TESTE", font=f, fill=WHITE, anchor="mm")
         if i >= len(self.b) - 3:

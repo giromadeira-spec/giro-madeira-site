@@ -1059,18 +1059,54 @@ def report_render_outcome(outcome):
             f.write("\n### Render "+PLATFORM+"\n\n```json\n"+json.dumps(outcome,ensure_ascii=False,indent=2)+"\n```\n")
 
 
-def render_motion(result,category,folder,credit,picture=None,photo_label=""):
+SCENE_IMG_BASE="https://dsihvbdhocbqscaypraw.supabase.co/storage/v1/object/public/news-images/auto/jpeg/video/"
+SCENE_IMG_MAX=6
+
+def chatgpt_scene_images(qid):
+    """Imagens do ChatGPT por cena (autorizado por Gilson em 27/10/2026; ate 6 por video em 30/10/2026).
+
+    O Supabase importa video-<id>-<n>.jpg do Drive para news-images/auto/jpeg/video/<id>/<n>.jpg (n=1..6).
+    Falta de imagem nunca derruba o video: a cena fica com a arte de reserva."""
+    found=[]
+    for n in range(1,SCENE_IMG_MAX+1):
+        try:
+            found.append(fetch_picture(SCENE_IMG_BASE+str(int(qid))+"/"+str(n)+".jpg"))
+        except Exception:
+            found.append(None)
+    print("Imagens do ChatGPT por cena:",[im is not None for im in found])
+    return found
+
+def attach_scene_images(beats,images):
+    """Coloca cada imagem em uma tela do video, espalhadas; a ordem das cenas e mantida."""
+    imgs=[im for im in (images or []) if im is not None]
+    if not imgs:return 0
+    idxs=[i for i,b in enumerate(beats) if i>0 and b.get("kind")!="num"]
+    if not idxs:return 0
+    n=min(len(imgs),len(idxs))
+    if n==1:pick=[idxs[len(idxs)//2]]
+    else:pick=[idxs[round(j*(len(idxs)-1)/(n-1))] for j in range(n)]
+    for k,i in enumerate(pick):
+        beats[i].update(kind="photo",bg="dark",img=imgs[k],img_credit="Giro Madeira",pidx=k,img_ai=False)
+    return n
+
+def render_motion(result,category,folder,credit,picture=None,photo_label="",scene_images=None):
     """Motion graphics + narracao gratuita. Texto vem so da pauta verificada. Devolve (video, duracao)."""
     sys.path.insert(0,str(ROOT/"scripts"))
     import giro_motion, giro_voz
     beats=giro_motion.build_beats(result["title"],result["scenes"],category,has_photo=picture is not None)
     broll=[]
-    try:
-        import giro_broll
-        broll=giro_broll.attach(beats,result["title"],result["scenes"],category)
-        if broll:print("B-roll ilustrativo:",json.dumps(broll,ensure_ascii=False))
-    except Exception as exc:
-        print("B-roll indisponivel, seguindo sem:",str(exc)[:120])
+    used_chatgpt=0
+    if picture is None:
+        used_chatgpt=attach_scene_images(beats,scene_images)
+    if used_chatgpt:
+        print("Imagens do ChatGPT usadas no video:",used_chatgpt)
+    else:
+        try:
+            import giro_broll
+            broll=giro_broll.attach(beats,result["title"],result["scenes"],category)
+            if broll:print("B-roll ilustrativo:",json.dumps(broll,ensure_ascii=False))
+        except Exception as exc:
+            print("B-roll indisponivel, seguindo sem:",str(exc)[:120])
     voices=giro_voz.narrate([b["txt"] for b in beats],folder)
     if voices:
         for b,v in zip(beats,voices):
@@ -1130,7 +1166,7 @@ def main():
                 raise RuntimeError("Visual origin verification failed")
             import giro_motion as _gm  # noqa
             label=_gm.photo_credit_label(credit) if picture is not None else ""
-            video,dur,has_voice=render_motion(result,category,folder,credit,picture,label)
+            video,dur,has_voice=render_motion(result,category,folder,credit,picture,label,scene_images=(chatgpt_scene_images(qid) if picture is None else None))
             preview_dir=ROOT/"shorts-test-preview";preview_dir.mkdir(exist_ok=True)
             subprocess.run(["ffmpeg","-hide_banner","-loglevel","error","-y","-ss","1.2","-i",str(video),"-frames:v","1",
                             str(preview_dir/("fila-"+str(qid)+".png"))],check=True,timeout=60)
