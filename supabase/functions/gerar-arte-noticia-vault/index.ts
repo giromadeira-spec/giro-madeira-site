@@ -673,9 +673,9 @@ function makeSvg(kind:"feed"|"story",title:string,summary:string,source:string,c
     '" fill="#071526">'+esc(cat)+'</text>'+
     '<path d="M'+(pad+tagW+9)+' '+(categoryY+62)+' H'+(W-pad)+
     '" stroke="#ffcc1c" stroke-width="5"/>';
-  const credit=previewLabel||(isEventPhoto?"FOTO DA NOTÍCIA":"ILUSTRAÇÃO EDITORIAL — NÃO É FOTO");
+  const credit=previewLabel||(isEventPhoto?"FOTO DA NOTÍCIA":"");
   const labelY=portrait?1050:540;
-  const illustrative='<rect x="'+pad+'" y="'+(labelY-28)+'" width="'+(isEventPhoto?360:510)+'" height="42" rx="4" fill="#041526" opacity=".91"/>'+
+  const illustrative=!credit?'':'<rect x="'+pad+'" y="'+(labelY-28)+'" width="'+(isEventPhoto?360:510)+'" height="42" rx="4" fill="#041526" opacity=".91"/>'+
     '<text x="'+(pad+10)+'" y="'+(labelY+1)+'" font-family="Inter" font-weight="800" font-size="20" fill="#fff">'+credit+'</text>';
   const sourceName=clean(source||"Giro Madeira").slice(0,37);
   const urgentTag=urgent&&!obituary?
