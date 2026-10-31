@@ -145,8 +145,26 @@ Deno.serve(async req=>{
   else {payload.image_url=media;if(channel==='feed')payload.caption=item.legenda;}
   try{
    const sent=await fetch(url+'/functions/v1/publicar-instagram',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+role},body:JSON.stringify(payload),signal:AbortSignal.timeout(130000)});
-   const result=await sent.json().catch(()=>({}));
-   if(!sent.ok||result.success!==true||!result.instagram_media_id)throw Error('provider_response_requires_reconciliation');
+   const result:any=await sent.json().catch(()=>null);
+   if(!(sent.ok&&result?.success===true&&result?.instagram_media_id)){
+    // 30/10/2026 (autorizado): falha LIMPA = o provedor respondeu que nada foi publicado (video ainda processando,
+    // gate/semaforo, container com erro). Nesse caso volta para 'aprovada' com nova tentativa depois, sem travar o canal.
+    // Qualquer outra coisa (queda de rede, resposta ilegivel, etapa 'publish', erro inesperado) continua exigindo conferencia.
+    const CLEAN=['validate','create','pre_publish_gate','container_status','container','container_timeout','publish_gate'];
+    const diag:any[]=Array.isArray(result?.diagnostics)?result.diagnostics:[];
+    const cleanFail=!!result&&typeof result==='object'&&result.success===false&&!result.publish_unconfirmed&&!result.instagram_media_id&&
+      (result.no_publish===true||(diag.length>0&&diag.every((d:any)=>CLEAN.includes(String(d?.stage||'')))));
+    if(cleanFail){
+     const after=Date.parse(String(result.retry_at||''));
+     const retryAt=new Date(Math.max(Date.now()+15*60000,Number.isFinite(after)?after:0)).toISOString();
+     const patch:any={status:'aprovada',erro:('retry_limpo:'+String(diag[0]?.stage||result.reason||'sem_publicar')).slice(0,120),scheduled_at:retryAt};
+     if(item.manual_publish_at)patch.manual_publish_at=retryAt;
+     const back=await db.from(table).update(patch).eq('id',item.id).eq('status','publicando');
+     if(back.error)throw back.error;
+     return response({success:false,channel,error:'provider_not_published_retry_scheduled',retry_at:retryAt,stage:diag[0]?.stage||null});
+    }
+    throw Error('provider_response_requires_reconciliation');
+   }
    const saved=await db.from(table).update({status:'publicada',[ids[channel]]:String(result.instagram_media_id),published_at:new Date().toISOString(),erro:null}).eq('id',item.id).eq('status','publicando');
    if(saved.error)return response({success:false,channel,error:'confirmed_provider_id_not_saved',provider_id:result.instagram_media_id},500);
    return response({success:true,channel,publication_id:item.id,provider_id:result.instagram_media_id});
