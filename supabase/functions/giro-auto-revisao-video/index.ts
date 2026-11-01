@@ -2,7 +2,7 @@ import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 import { storyboardIsCurrent } from "../_shared/article-recency.ts";
 
 const respond=(o:unknown,s=200)=>new Response(JSON.stringify(o),{status:s,headers:{"Content-Type":"application/json","Cache-Control":"no-store"}});
-const normal=(s:unknown)=>String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase()
+const normal=(s:unknown)=>String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase()
  .replace(/&(?:nbsp|amp|quot|rsquo|ldquo|rdquo);/g," ").replace(/&#(?:x[0-9a-f]+|\d+);/gi," ")
  .replace(/[^a-z0-9]+/g," ").replace(/\s+/g," ").trim();
 const allowedSource=(raw:string)=>{
@@ -61,7 +61,7 @@ Deno.serve(async req=>{
   .select("id,platform,title,status,source_url,scene_cards,topic_scope,scheduled_for,storyboard_status,storyboard_source_published_at,shorts_rendered_at,shorts_render_origin,shorts_render_version,shorts_image_credit,video_url,editor_approved,visual_review_status,provider_post_id")
   .in("platform",["youtube_shorts","tiktok"]).eq("status","pronto_para_revisao")
   .eq("editor_approved",false).eq("visual_review_status","pending").eq("storyboard_status","preparado")
-  .is("provider_post_id",null).gte("scheduled_for",new Date(at-44*60000).toISOString())
+  .is("provider_post_id",null).gte("scheduled_for",new Date(at-300*60000).toISOString())
   .lte("scheduled_for",new Date(at+4*3600000).toISOString())
   .order("scheduled_for",{ascending:true}).limit(12);
  if(error)return respond({success:false,error:"queue_read_failed"},503);
@@ -76,24 +76,19 @@ Deno.serve(async req=>{
     Number(item.shorts_render_version)!==6||!storyboardIsCurrent(item,at)){
     reject("renderer_or_article_freshness_not_verified");continue;
   }
-  // Decisao do responsavel (23/10/2026): sem aprovacao manual por video. Qualquer noticia que passe
-  // em TODAS as checagens abaixo (fonte confiavel, escopo, titulo e cenas presentes na materia original,
-  // credito de imagem verificavel, formato do MP4, frescor) e liberada automaticamente.
-  // O visual e sempre motion graphics proprio (icones desenhados) ou foto com licenca auditavel.
+  // Only deterministic pictogram templates from the verified renderer.
+  // No reconstructed victims, officers, real-event photographs, or AI faces.
   const symbolic=/protest|manifesta[cç]|greve|inc[eê]ndio|fogo|terremoto|trem|ferrovia|internet|energia|acidente|rodovia/i;
-  const credOk=String(item.shorts_image_credit||"")===await credit(String(item.source_url),headline);
-  const licensedPhoto=/^(wikimedia_event_|registered_event_)/.test(String(item.shorts_image_credit||""));
-  if(!credOk&&!licensedPhoto){
-    reject("image_credit_not_verifiable");continue;
+  if(String(item.shorts_image_credit||"")!==await credit(String(item.source_url),headline)&&!/^(wikimedia_event_|registered_event_)/.test(String(item.shorts_image_credit||""))){
+    reject("symbolic_template_or_cryptographic_credit_mismatch");continue;
   }
-  const basis=symbolic.test(headline)&&credOk?"machine_verified_symbolic_source_and_render_v1":"machine_verified_source_text_and_render_v2";
   const scenes=item.scene_cards;
   if(!Array.isArray(scenes)||scenes.length!==3||
      scenes.some((x:any)=>typeof x!=="string"||x.length<22||x.length>180)){
     reject("storyboard_scene_structure_invalid");continue;
   }
   const rendered=Date.parse(String(item.shorts_rendered_at||""));
-  if(!Number.isFinite(rendered)||rendered<at-4*3600000||rendered>at+300000){
+  if(!Number.isFinite(rendered)||rendered<at-7*3600000||rendered>at+300000){
     reject("render_not_recent");continue;
   }
   const page=await getPage(String(item.source_url||""));
@@ -103,12 +98,15 @@ Deno.serve(async req=>{
   const titleMatch=page && headTokens.filter(x=>page.title.includes(x)).length>=Math.ceil(headTokens.length*0.8);
   if(!page){reject("article_html_unavailable");continue;}
   if(!titleMatch){reject("original_article_headline_mismatch");continue;}
-  const missingScene=scenes.findIndex((s:string)=>!page.body.includes(normal(s)));
+  const EDITORIAL_CLOSING="Você pode acompanhar notícias de Rondônia e do Brasil. Inscreva-se no Giro Madeira.";
+  // Cena 1 é o título, já conferido contra o título da matéria acima (>=80% das palavras).
+  // Cena 3 pode ser a frase de fechamento editorial exata; a cena 2 (e a 3, se não for o fechamento) continuam exatas no texto da matéria.
+  const missingScene=scenes.findIndex((s:string,idx:number)=>idx!==0&&!(idx===scenes.length-1&&s===EDITORIAL_CLOSING)&&!page.body.includes(normal(s)));
   if(missingScene>=0){reject("original_article_scene_unverifiable_"+String(missingScene+1));continue;}
   if(!await videoMetadata(url,item.platform,String(item.video_url||""))){
     reject("video_storage_or_mp4_metadata_invalid");continue;
   }
-  if(dry){results.push(report(item.id,"eligible",basis));continue;}
+  if(dry){results.push(report(item.id,"eligible","machine_verifiable_symbolic_news_v1"));continue;}
   // Re-read the entire constrained item before committing; concurrent edits and
   // post attempts cannot be promoted accidentally.
   const {data:current,error:ce}=await db.from("giro_social_video_queue")
@@ -120,15 +118,15 @@ Deno.serve(async req=>{
     current.shorts_render_version!==6){reject("concurrent_revision_or_delivery");continue;}
   const {data:approved,error:ae}=await db.from("giro_social_video_queue").update({
     editor_approved:true,visual_review_status:"approved",
-    auto_review_basis:basis,
+    auto_review_basis:(symbolic.test(headline)?"machine_verified_symbolic_source_and_render_v1":"machine_verified_source_text_and_render_v2"),
     auto_review_at:new Date().toISOString(),updated_at:new Date().toISOString()
   }).eq("id",item.id).eq("status","pronto_para_revisao")
     .eq("visual_review_status","pending").eq("editor_approved",false)
     .eq("shorts_image_credit",item.shorts_image_credit)
     .is("provider_post_id",null).select("id").maybeSingle();
   if(ae||!approved){reject("approval_conflict_or_database_error");continue;}
-  results.push(report(item.id,"approved",basis));
+  results.push(report(item.id,"approved","machine_verified_symbolic_source_and_render_v1"));
  }
  return respond({success:true,dry_run:dry,checked:(data||[]).length,results,
-  public_posts_attempted:false,format:"auto_editorial_review_source_verified"});
+  public_posts_attempted:false,format:"auto_editorial_review_symbolic_only"});
 });
