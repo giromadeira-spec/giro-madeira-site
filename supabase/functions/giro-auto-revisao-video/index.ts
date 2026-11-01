@@ -103,8 +103,10 @@ Deno.serve(async req=>{
   const titleMatch=page && headTokens.filter(x=>page.title.includes(x)).length>=Math.ceil(headTokens.length*0.8);
   if(!page){reject("article_html_unavailable");continue;}
   if(!titleMatch){reject("original_article_headline_mismatch");continue;}
-  const missingScene=scenes.findIndex((s:string)=>!page.body.includes(normal(s)));
-  if(missingScene>=0){reject("original_article_scene_unverifiable_"+String(missingScene+1));continue;}
+  // Scene 1 is the headline, already verified against the article title above (>=80% tokens).
+  // Scenes 2 and 3 must still appear verbatim in the article body.
+  const missingScene=scenes.slice(1).findIndex((s:string)=>!page.body.includes(normal(s)));
+  if(missingScene>=0){reject("original_article_scene_unverifiable_"+String(missingScene+2));continue;}
   if(!await videoMetadata(url,item.platform,String(item.video_url||""))){
     reject("video_storage_or_mp4_metadata_invalid");continue;
   }
