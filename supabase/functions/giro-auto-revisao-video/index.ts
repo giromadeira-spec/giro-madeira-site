@@ -61,7 +61,7 @@ Deno.serve(async req=>{
   .select("id,platform,title,status,source_url,scene_cards,topic_scope,scheduled_for,storyboard_status,storyboard_source_published_at,shorts_rendered_at,shorts_render_origin,shorts_render_version,shorts_image_credit,video_url,editor_approved,visual_review_status,provider_post_id")
   .in("platform",["youtube_shorts","tiktok"]).eq("status","pronto_para_revisao")
   .eq("editor_approved",false).eq("visual_review_status","pending").eq("storyboard_status","preparado")
-  .is("provider_post_id",null).gte("scheduled_for",new Date(at-44*60000).toISOString())
+  .is("provider_post_id",null).gte("scheduled_for",new Date(at-300*60000).toISOString())
   .lte("scheduled_for",new Date(at+4*3600000).toISOString())
   .order("scheduled_for",{ascending:true}).limit(12);
  if(error)return respond({success:false,error:"queue_read_failed"},503);
@@ -88,7 +88,7 @@ Deno.serve(async req=>{
     reject("storyboard_scene_structure_invalid");continue;
   }
   const rendered=Date.parse(String(item.shorts_rendered_at||""));
-  if(!Number.isFinite(rendered)||rendered<at-4*3600000||rendered>at+300000){
+  if(!Number.isFinite(rendered)||rendered<at-7*3600000||rendered>at+300000){
     reject("render_not_recent");continue;
   }
   const page=await getPage(String(item.source_url||""));
