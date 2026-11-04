@@ -96,9 +96,12 @@ Deno.serve(async req=>{
   // original publication: reject creative or out-of-context text.
   const headTokens=normal(headline).split(" ").filter(x=>x.length>=4);
   const bodyHasHeadline=!!page && normal(headline).length>=28 && page.body.includes(normal(headline));
-  const titleMatch=page && (headTokens.filter(x=>page.title.includes(x)).length>=Math.ceil(headTokens.length*0.8) || bodyHasHeadline);
+  const slugText=(()=>{try{const seg=new URL(String(item.source_url||"")).pathname.split("/").filter(Boolean).pop()||"";return normal(decodeURIComponent(seg));}catch{return "";}})();
+  const slugHits=headTokens.filter(x=>slugText.includes(x)).length;
+  const slugMatch=headTokens.length>=5 && slugHits>=Math.ceil(headTokens.length*0.8);
+  const titleMatch=page && (headTokens.filter(x=>page.title.includes(x)).length>=Math.ceil(headTokens.length*0.8) || bodyHasHeadline || slugMatch);
   if(!page){reject("article_html_unavailable");continue;}
-  if(!titleMatch){const hits=headTokens.filter(x=>page.title.includes(x));results.push({...report(item.id,"held","original_article_headline_mismatch"),diag:{body_has_headline:bodyHasHeadline,page_title:page.title.slice(0,160),page_body_len:page.body.length,tokens:headTokens.length,matched:hits.length,needed:Math.ceil(headTokens.length*0.8),missing:headTokens.filter(x=>!hits.includes(x)).slice(0,12)}});continue;}
+  if(!titleMatch){const hits=headTokens.filter(x=>page.title.includes(x));results.push({...report(item.id,"held","original_article_headline_mismatch"),diag:{body_has_headline:bodyHasHeadline,slug:slugText.slice(0,120),slug_hits:slugHits,page_title:page.title.slice(0,160),page_body_len:page.body.length,tokens:headTokens.length,matched:hits.length,needed:Math.ceil(headTokens.length*0.8),missing:headTokens.filter(x=>!hits.includes(x)).slice(0,12)}});continue;}
   const EDITORIAL_CLOSING="Você pode acompanhar notícias de Rondônia e do Brasil. Inscreva-se no Giro Madeira.";
   // Cena 1 é o título, já conferido contra o título da matéria acima (>=80% das palavras).
   // Cena 3 pode ser a frase de fechamento editorial exata; a cena 2 (e a 3, se não for o fechamento) continuam exatas no texto da matéria.
