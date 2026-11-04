@@ -95,9 +95,10 @@ Deno.serve(async req=>{
   // Source title and ALL rendered scene statements must be present in the
   // original publication: reject creative or out-of-context text.
   const headTokens=normal(headline).split(" ").filter(x=>x.length>=4);
-  const titleMatch=page && headTokens.filter(x=>page.title.includes(x)).length>=Math.ceil(headTokens.length*0.8);
+  const bodyHasHeadline=!!page && normal(headline).length>=28 && page.body.includes(normal(headline));
+  const titleMatch=page && (headTokens.filter(x=>page.title.includes(x)).length>=Math.ceil(headTokens.length*0.8) || bodyHasHeadline);
   if(!page){reject("article_html_unavailable");continue;}
-  if(!titleMatch){reject("original_article_headline_mismatch");continue;}
+  if(!titleMatch){const hits=headTokens.filter(x=>page.title.includes(x));results.push({...report(item.id,"held","original_article_headline_mismatch"),diag:{body_has_headline:bodyHasHeadline,page_title:page.title.slice(0,160),page_body_len:page.body.length,tokens:headTokens.length,matched:hits.length,needed:Math.ceil(headTokens.length*0.8),missing:headTokens.filter(x=>!hits.includes(x)).slice(0,12)}});continue;}
   const EDITORIAL_CLOSING="Você pode acompanhar notícias de Rondônia e do Brasil. Inscreva-se no Giro Madeira.";
   // Cena 1 é o título, já conferido contra o título da matéria acima (>=80% das palavras).
   // Cena 3 pode ser a frase de fechamento editorial exata; a cena 2 (e a 3, se não for o fechamento) continuam exatas no texto da matéria.
