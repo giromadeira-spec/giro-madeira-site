@@ -31,7 +31,8 @@ def claim(tok,requested=0):
     if requested:params["publication_id"]=requested
     resp=requests.post(BRIDGE,params=params,
          headers={"Authorization":"Bearer "+tok},timeout=35)
-    resp.raise_for_status()
+    if resp.status_code >= 400:
+        raise RuntimeError("qa_bridge_claim_http_"+str(resp.status_code)+": "+resp.text[:1500])
     data=resp.json()
     if not data.get("success"):raise RuntimeError("claim: "+str(data))
     return data
