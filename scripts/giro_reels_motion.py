@@ -43,8 +43,17 @@ def main():
         if url.startswith(qa.ROOT + "/storage/v1/object/public/news-images/"):
             try: picture = sa.fetch_picture(url)
             except Exception as exc: print("sem imagem editorial:", str(exc)[:100])
+        # Imagens do ChatGPT por cena (reelcena-<id>-<n>.jpg -> auto/jpeg/reel/<id>/<n>.jpg), ate 6.
+        base = qa.ROOT + "/storage/v1/object/public/news-images/auto/jpeg/reel/" + str(int(ident)) + "/"
+        scene_imgs = []
+        for n in range(1, 7):
+            try: scene_imgs.append(sa.fetch_picture(base + str(n) + ".jpg"))
+            except Exception: scene_imgs.append(None)
+        got = [im is not None for im in scene_imgs]
+        print("Imagens por cena do Reel:", got)
         with tempfile.TemporaryDirectory(prefix="giro-reel-motion-") as tmp:
-            video, dur, narrated = sa.render_motion(result, "", tmp, "Giro Madeira", picture=picture)
+            video, dur, narrated = sa.render_motion(result, "", tmp, "Giro Madeira",
+                picture=None if any(got) else picture, scene_images=scene_imgs)
             if not narrated: raise RuntimeError("reel_without_narration")
             headers = qa.verify(video)
             payload = Path(video).read_bytes()
