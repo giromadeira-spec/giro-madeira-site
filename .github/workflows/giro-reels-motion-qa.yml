@@ -1,0 +1,55 @@
+name: Giro Madeira - Reels motion + voz (teste sem publicar)
+
+on:
+  workflow_dispatch:
+    inputs:
+      reel_id:
+        description: 'ID do Reel para testar (vazio = proximo elegivel)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  id-token: write
+  actions: read
+
+concurrency:
+  group: giro-reels-motion-qa
+  cancel-in-progress: false
+
+jobs:
+  reel-motion-sem-publicar:
+    if: ${{ github.repository == 'giromadeira-spec/giro-madeira-site' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Dependencias gratuitas
+        run: |
+          python -m pip install --disable-pip-version-check "Pillow>=11,<13" "requests>=2.31,<3"
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ffmpeg fonts-dejavu-core espeak-ng
+          python -m py_compile scripts/giro_reels_motion.py scripts/giro_shorts_auto.py
+      - name: Narracao Kokoro pm_alex
+        run: |
+          python -m pip install --disable-pip-version-check torch --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install --disable-pip-version-check kokoro soundfile numpy
+      - name: Montar Reel motion com voz (somente QA, sem Instagram)
+        env:
+          PYTHONUNBUFFERED: '1'
+          GIRO_TEST_REEL_ID: ${{ github.event.inputs.reel_id }}
+        run: python scripts/giro_reels_motion.py
+      - name: Guardar video para inspecao
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: giro-reel-motion-qa
+          path: reel-motion-qa/reel-motion.mp4
+          if-no-files-found: ignore
+          retention-days: 7
