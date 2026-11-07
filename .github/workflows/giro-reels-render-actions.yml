@@ -1,0 +1,49 @@
+name: Giro Madeira - Reels QA sem Railway
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/giro-reels-render-actions.yml
+  workflow_dispatch:
+  workflow_run:
+    workflows:
+      - "Giro Madeira - Shorts (sem API paga)"
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: giro-reels-render-qa
+  cancel-in-progress: false
+
+jobs:
+  renderizar-um-reel-sem-publicar:
+    if: ${{ github.repository == 'giromadeira-spec/giro-madeira-site' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Obter código e não tocar no Railway
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Dependências gratuitas FFmpeg e narração local
+        run: |
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ffmpeg espeak-ng fonts-dejavu-core
+          python -m pip install --disable-pip-version-check "requests>=2.31,<3"
+          python -m py_compile scripts/giro_reels_qa_actions.py
+          ffmpeg -version | head -1
+      - name: Gerar exatamente um Reel MP4 em QA sem aprovação nem publicação
+        env:
+          GIRO_TEST_REEL_ID: ${{ github.event_name == 'push' && '226' || '' }}
+          PYTHONUNBUFFERED: '1'
+        run: python scripts/giro_reels_qa_actions.py
