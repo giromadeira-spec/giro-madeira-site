@@ -54,7 +54,6 @@ jobs:
           python -m py_compile scripts/giro_reels_qa_actions.py
           ffmpeg -version | head -1
       - name: Instalar Kokoro TTS para teste 226
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         run: |
           python -m pip install --disable-pip-version-check torch --index-url https://download.pytorch.org/whl/cpu
           python -m pip install --disable-pip-version-check 'kokoro==0.9.4' 'soundfile>=0.12,<1' 'Pillow>=11,<13'
@@ -69,7 +68,8 @@ jobs:
           elif [ "${{ github.event_name }}" = "push" ]; then
             python scripts/giro_reels_226_kokoro.py
           else
-            python scripts/giro_reels_qa_actions.py
+            # workflow_run (apos o Short): tambem usa o Reel motion com imagens por cena e voz pm_alex
+            python scripts/giro_reels_motion.py
           fi
       - name: Guardar video de teste numa branch de QA (so disparo manual)
         if: github.event_name == 'workflow_dispatch' && hashFiles('reel-motion-qa/reel-motion.mp4') != ''
