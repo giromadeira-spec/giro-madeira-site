@@ -11,8 +11,8 @@ ROOT="https://dsihvbdhocbqscaypraw.supabase.co"
 BRIDGE=ROOT+"/functions/v1/giro-reels-github-render-bridge"
 UA="GiroMadeira-Internal-ReelsQA/1.0"
 HEADERS={"User-Agent":UA}
-def run(cmd,timeout=240):
-    p=subprocess.run(cmd,text=True,capture_output=True,timeout=timeout)
+def run(cmd,timeout=240,cwd=None):
+    p=subprocess.run(cmd,text=True,capture_output=True,timeout=timeout,cwd=cwd)
     if p.returncode:
         raise RuntimeError("command_failed "+str(cmd[0])+": "+p.stderr[-1200:])
     return p.stdout.strip()
@@ -101,7 +101,7 @@ def render(item,dirpath):
         raise RuntimeError("image_invalid_size")
     (cwd/"story.jpg").write_bytes(response.content)
     text=narration(item)
-    run(["espeak-ng","-v","pt-br","-s","161","-p","45","-w","narration.wav",text],timeout=90)
+    run(["espeak-ng","-v","pt-br","-s","161","-p","45","-w","narration.wav",text],timeout=90,cwd=cwd)
     voice=seconds(cwd/"narration.wav")
     duration=round(max(9,min(voice+1.3,70)),1)
     captions(text,voice,cwd/"subtitle.srt")
@@ -124,7 +124,7 @@ def render(item,dirpath):
        "-c:v","libx264","-preset","veryfast","-crf","27","-threads","2",
        "-pix_fmt","yuv420p","-c:a","aac","-b:a","112k",
        "-movflags","+faststart","render.mp4"]
-    run(cmd,timeout=1100)
+    run(cmd,timeout=1100,cwd=cwd)
     return cwd/"render.mp4"
 
 def main():
