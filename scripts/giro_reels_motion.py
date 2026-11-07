@@ -28,7 +28,11 @@ def build_result(item):
 def main():
     tok = qa.token()
     requested = int(os.environ.get("GIRO_TEST_REEL_ID", "0") or "0")
-    data = qa.claim(tok, requested)
+    extra = {"variant": "kokoro55"} if requested == 226 else {}   # ponte permite repetir o 226
+    params = {"action": "claim", **({"publication_id": requested} if requested else {}), **extra}
+    resp = requests.post(qa.BRIDGE, params=params, headers={"Authorization": "Bearer " + tok}, timeout=35)
+    if resp.status_code >= 400: raise RuntimeError("claim_http_%s: %s" % (resp.status_code, resp.text[:600]))
+    data = resp.json()
     if not data.get("available"):
         print("NO_ELIGIBLE_REEL " + str(data.get("reason"))); return
     ident = data["publication_id"]
@@ -46,7 +50,7 @@ def main():
             payload = Path(video).read_bytes()
             if len(payload) > 35_000_000: raise RuntimeError("video_exceeds_35MB")
             headers.update({"Authorization": "Bearer " + tok, "Content-Type": "video/mp4"})
-            sent = requests.post(qa.BRIDGE, params={"action": "upload", "publication_id": ident},
+            sent = requests.post(qa.BRIDGE, params={"action": "upload", "publication_id": ident, **extra},
                                  headers=headers, data=payload, timeout=120)
             sent.raise_for_status()
             out = sent.json()
