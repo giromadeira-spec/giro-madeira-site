@@ -6,6 +6,7 @@ on:
     paths:
       - .github/workflows/giro-reels-render-actions.yml
       - scripts/giro_reels_qa_actions.py
+      - scripts/giro_reels_226_kokoro.py
   workflow_dispatch:
   workflow_run:
     workflows:
@@ -43,8 +44,18 @@ jobs:
           python -m pip install --disable-pip-version-check "requests>=2.31,<3"
           python -m py_compile scripts/giro_reels_qa_actions.py
           ffmpeg -version | head -1
+      - name: Instalar Kokoro TTS para teste 226
+        if: github.event_name == 'push'
+        run: |
+          python -m pip install --disable-pip-version-check 'kokoro==0.9.4' 'soundfile>=0.12,<1' 'Pillow>=11,<13'
+          python -m py_compile scripts/giro_reels_226_kokoro.py
       - name: Gerar exatamente um Reel MP4 em QA sem aprovação nem publicação
         env:
           GIRO_TEST_REEL_ID: ${{ github.event_name == 'push' && '226' || '' }}
           PYTHONUNBUFFERED: '1'
-        run: python scripts/giro_reels_qa_actions.py
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            python scripts/giro_reels_226_kokoro.py
+          else
+            python scripts/giro_reels_qa_actions.py
+          fi
