@@ -1,0 +1,24 @@
+name: Giro Madeira - Reels agendador (montagem automatica, sem publicar)
+
+# Autorizado por Gilson em 07/11/2026: montar Reels sozinho (motion graphics, imagens por cena, voz pm_alex).
+# So dispara o fluxo giro-reels-render-actions.yml (que so gera video de QA). Nao publica nada.
+on:
+  schedule:
+    - cron: '20 10-23,0-3 * * *'   # de hora em hora, 07h20 a 00h20 (Porto Velho)
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  disparar:
+    if: ${{ github.repository == 'giromadeira-spec/giro-madeira-site' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Disparar a montagem do Reel (sem publicar)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api -X POST "repos/${{ github.repository }}/actions/workflows/giro-reels-render-actions.yml/dispatches" -f ref=main

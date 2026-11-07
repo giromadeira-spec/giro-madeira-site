@@ -25,16 +25,44 @@ def build_result(item):
         raise RuntimeError("editorial_narration_too_short")
     return {"title": title, "scenes": scenes, "source_name": sa.clean(item.get("source_name") or "Giro Madeira")}
 
+def scene_images(ident):
+    base = qa.ROOT + "/storage/v1/object/public/news-images/auto/jpeg/reel/" + str(int(ident)) + "/"
+    imgs = []
+    for n in range(1, 7):
+        try: imgs.append(sa.fetch_picture(base + str(n) + ".jpg"))
+        except Exception: imgs.append(None)
+    return imgs
+
+def claim_one(tok, rid, extra):
+    params = {"action": "claim", **({"publication_id": rid} if rid else {}), **extra}
+    resp = requests.post(qa.BRIDGE, params=params, headers={"Authorization": "Bearer " + tok}, timeout=35)
+    if resp.status_code >= 400: raise RuntimeError("claim_http_%s: %s" % (resp.status_code, resp.text[:600]))
+    return resp.json()
+
+def pick(tok, requested):
+    """Manual (reel_id): usa esse Reel. Automatico: o primeiro Reel pendente que ja tem >=4 imagens por cena."""
+    if requested:
+        extra = {"variant": "kokoro55"} if requested == 226 else {}
+        data = claim_one(tok, requested, extra)
+        return (data, extra, scene_images(requested)) if data.get("available") else (None, extra, None)
+    first = claim_one(tok, 0, {})
+    if not first.get("available"): return None, {}, None
+    top = int(first["publication_id"])
+    for rid in [top] + list(range(top - 1, max(top - 60, 0), -1)):
+        data = first if rid == top else claim_one(tok, rid, {})
+        if not data.get("available"): continue
+        imgs = scene_images(rid)
+        have = sum(im is not None for im in imgs)
+        print("Reel", rid, "imagens por cena:", have)
+        if have >= 4: return data, {}, imgs
+    return None, {}, None
+
 def main():
     tok = qa.token()
     requested = int(os.environ.get("GIRO_TEST_REEL_ID", "0") or "0")
-    extra = {"variant": "kokoro55"} if requested == 226 else {}   # ponte permite repetir o 226
-    params = {"action": "claim", **({"publication_id": requested} if requested else {}), **extra}
-    resp = requests.post(qa.BRIDGE, params=params, headers={"Authorization": "Bearer " + tok}, timeout=35)
-    if resp.status_code >= 400: raise RuntimeError("claim_http_%s: %s" % (resp.status_code, resp.text[:600]))
-    data = resp.json()
-    if not data.get("available"):
-        print("NO_ELIGIBLE_REEL " + str(data.get("reason"))); return
+    data, extra, scene_imgs = pick(tok, requested)
+    if not data:
+        print("NO_REEL_READY (nenhum Reel pendente com imagens por cena suficientes)"); return
     ident = data["publication_id"]
     try:
         result = build_result(data)
@@ -43,12 +71,6 @@ def main():
         if url.startswith(qa.ROOT + "/storage/v1/object/public/news-images/"):
             try: picture = sa.fetch_picture(url)
             except Exception as exc: print("sem imagem editorial:", str(exc)[:100])
-        # Imagens do ChatGPT por cena (reelcena-<id>-<n>.jpg -> auto/jpeg/reel/<id>/<n>.jpg), ate 6.
-        base = qa.ROOT + "/storage/v1/object/public/news-images/auto/jpeg/reel/" + str(int(ident)) + "/"
-        scene_imgs = []
-        for n in range(1, 7):
-            try: scene_imgs.append(sa.fetch_picture(base + str(n) + ".jpg"))
-            except Exception: scene_imgs.append(None)
         got = [im is not None for im in scene_imgs]
         print("Imagens por cena do Reel:", got)
         with tempfile.TemporaryDirectory(prefix="giro-reel-motion-") as tmp:
