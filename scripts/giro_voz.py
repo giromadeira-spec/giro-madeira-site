@@ -1,4 +1,4 @@
-"""Narração gratuita (Kokoro, Apache 2.0, voz pt-BR pm_santa) para os Shorts do Giro Madeira.
+"""Narração gratuita (Kokoro, Apache 2.0, voz pt-BR pm_alex) para os Shorts do Giro Madeira.
 
 Falha com segurança: qualquer problema devolve None e o vídeo segue só com a trilha original.
 Usa somente o texto já verificado da pauta; não inventa nada.
@@ -7,7 +7,7 @@ import re, wave
 from pathlib import Path
 
 SR = 24000          # Kokoro e a trilha de make_music() usam 24 kHz
-VOICE = "pm_santa"
+VOICE = "pm_alex"
 MAX_SCENE_SECONDS = 8.2   # cada cena do vídeo dura 9 s (fade de saída em 8,65 s)
 
 

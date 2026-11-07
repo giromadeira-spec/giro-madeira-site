@@ -845,7 +845,7 @@ def add_narration(texts,folder,music):
             return music
         mixed=Path(folder)/"sound_voz.wav"
         giro_voz.mix_into_music(music,voices,mixed)
-        print("Narração Kokoro (pm_santa) aplicada em",sum(1 for v in voices if v),"cenas.")
+        print("Narração Kokoro (pm_alex) aplicada em",sum(1 for v in voices if v),"cenas.")
         return mixed
     except Exception as exc:
         print("Narração ignorada:",type(exc).__name__,str(exc)[:120])
