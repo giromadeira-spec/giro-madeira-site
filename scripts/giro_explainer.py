@@ -172,8 +172,7 @@ def build(pessoas, lugar):
     sc.append(Scene("E você, o que acha? Ouvir a PGR primeiro é o caminho certo? Conta aqui nos comentários. Segue o Giro Madeira para a parte dois.", ["PGR", "certo"], s_q))
     return sc
 
-def render(out, pessoas, lugar, fonte, creditos):
-    sc = build(pessoas, lugar)
+def render(out, sc, fonte, creditos):
     tmp = tempfile.mkdtemp(prefix="expl-")
     voices = giro_voz.narrate([s.voz for s in sc], tmp)
     if not voices and os.environ.get("GIRO_EXPL_SEMVOZ") == "1":  # so previa local sem Kokoro
@@ -226,6 +225,89 @@ def render(out, pessoas, lugar, fonte, creditos):
     if pr.wait() != 0: raise RuntimeError("ffmpeg falhou")
     os.remove(wp); return total
 
+
+# ------------------------------------------------------------------ roteiro automatico (so a partir da pauta verificada)
+CARGO = r"(ministro|ministra|presidente|senador|senadora|deputado|deputada|governador|governadora|prefeito|prefeita|vereador|vereadora|juiz|juíza|desembargador|desembargadora|procurador-geral|procuradora-geral|secretário|secretária)"
+NOME = r"[A-ZÁÉÍÓÚÂÊÔÃÕÇ][\wáéíóúâêôãõç]+"
+PERSON_RX = re.compile(r"\b(?i:" + CARGO + r")(?:\s+(?:do|da|de)\s+[A-ZÁÉÍÓÚÂÊÔÃÕÇ]\w+)?\s+(" + NOME + r"(?:\s+(?:d[aeo]s?\s+)?" + NOME + r"){0,3})")
+TRAGEDY = re.compile(r"morr|mort|ferid|assassin|homic|crime|pres[oa]\b|prisao|prisão|policia|polícia|tiro|ataque|atentado|explos|estupr|abus|acidente|vitima|vítima|tragedia|tragédia|guerra|bomb|sequestr|trafico|tráfico|operacao|operação|massacre|suicid|desaparec|afog|incendi|queda", re.I)
+STAMPS = [(r"provis[óo]ri", "PROVISÓRIA"), (r"sigilo", "EM SIGILO"), (r"liminar", "LIMINAR"), (r"suspens", "SUSPENSO"), (r"proib", "PROIBIDO"), (r"urgente|urgência", "URGENTE"), (r"aprovad", "APROVADO"), (r"rejeit|negad", "NEGADO"), (r"adiad", "ADIADO")]
+UNKNOWN = re.compile(r"ainda n[ãa]o|sem previs[ãa]o|n[ãa]o h[áa] prazo|n[ãa]o foi divulgad|a definir", re.I)
+
+def find_people(texts, limit=2):
+    out = []; seen = set()
+    for t in texts:
+        for m in PERSON_RX.finditer(t):
+            nome = m.group(2).strip(); key = _norm(nome)
+            if key in seen or len(nome.split()) < 2 and len(nome) < 4: continue
+            seen.add(key); out.append({"nome": nome, "cargo": m.group(1).lower(), "txt": t})
+            if len(out) >= limit: return out
+    return out
+
+def fact_box(cv, y, text, a, num=None, mark=None, col=WHITE, edge=(255, 255, 255)):
+    if a <= 0: return y
+    f = font(FD, 40); lines = wrap(text.split(), f, 800 if num is not None else 840)[:5]; h = 40 + len(lines) * 54
+    L = Image.new("RGBA", (944, h + 6), (0, 0, 0, 0)); d = ImageDraw.Draw(L)
+    d.rounded_rectangle([2, 2, 942, h + 2], 20, fill=PANEL + (255,), outline=edge + (150,), width=3); tx = 34
+    if num is not None:
+        d.ellipse([20, 20, 76, 76], fill=GOLD + (255,)); d.text((48, 49), str(num), font=font(FD, 32), fill=(20, 20, 28), anchor="mm"); tx = 100
+    for i, ln in enumerate(lines): d.text((tx, 22 + i * 54), " ".join(ln), font=f, fill=col)
+    if mark == "q": d.text((900, 49), "?", font=font(FD, 50), fill=GOLD, anchor="mm")
+    dx = int((1 - ease(a)) * 140); L.putalpha(L.getchannel("A").point(lambda v: int(v * clamp(a * 1.4)))); cv.alpha_composite(L, (60 + dx, int(y))); return y + h + 28
+
+def auto_scenes(result, category, pessoas, picture):
+    title = re.sub(r"\s+", " ", str(result["title"]).split("|")[0]).strip(); facts = [re.sub(r"\s+", " ", str(x)).strip() for x in result["scenes"] if str(x).strip()]
+    kicker = (category or "Giro Madeira").title(); words = re.findall(r"[\wÀ-ú$%.,]+", title); hi_t = [max(words, key=lambda w: (bool(re.search(r"\d", w)), len(w)))] if words else []
+    sc = []
+    def hook(v, cv, t, d, tt):
+        if picture is not None:
+            im = cover_crop(picture.convert("RGB"), W, H, 0.4).convert("RGBA"); k = 1 + 0.06 * (t / d); im = im.resize((int(W * k), int(H * k)))
+            im = im.crop(((im.width - W) // 2, (im.height - H) // 2, (im.width - W) // 2 + W, (im.height - H) // 2 + H)); im.alpha_composite(Image.new("RGBA", (W, H), (2, 8, 20, 170))); cv.paste(im, (0, 0))
+        head(cv, title, hi_t, 330, kicker); stamp(cv, "ENTENDA", ease((t - 0.6) / 0.4), 540, 1000, 96, YEL, -5)
+    sc.append(Scene(spoken_title(title) + " Entenda.", hi_t, hook))
+    used = set()
+    for i, ft in enumerate(facts):
+        pe = next((p for p in pessoas if p["nome"] not in used and p["nome"].split()[-1].lower() in ft.lower()), None)
+        st = next((lab for rx, lab in STAMPS if re.search(rx, ft, re.I)), None); unk = bool(UNKNOWN.search(ft)); n = i + 1
+        hi = [w for w in re.findall(r"\w+", ft) if re.search(r"\d", w)][:2] or [max(re.findall(r"\w+", ft), key=len)]
+        def draw(v, cv, t, d, tt, pe=pe, st=st, unk=unk, ft=ft, n=n):
+            if pe is not None:
+                head(cv, "Quem é o personagem", [], 330, kicker + " · " + str(n) + "/" + str(len(facts)))
+                cv.alpha_composite(ph_card(pe, 360, 1.0, -3), (int(330 + (1 - ease(t / 0.5)) * -500), 470)); fact_box(cv, 1130, ft, ease((t - 0.8) / 0.4), mark="ok")
+            elif st:
+                head(cv, "O que se sabe", [], 330, kicker + " · " + str(n) + "/" + str(len(facts))); stamp(cv, st, ease((t - 0.5) / 0.4), 540, 760, 96, GOLD, -7); fact_box(cv, 960, ft, ease((t - 1.6) / 0.4))
+            else:
+                head(cv, "Ainda sem resposta" if unk else "O que se sabe", [], 330, kicker + " · " + str(n) + "/" + str(len(facts)))
+                fact_box(cv, 520, ft, ease((t - 0.5) / 0.4), num=None if unk else n, mark="q" if unk else None)
+        if pe is not None: used.add(pe["nome"])
+        sc.append(Scene(ft, hi, draw))
+    def q(v, cv, t, d, tt):
+        head(cv, "E você, o que acha disso?", ["acha"], 340, "e você?"); buttons(cv, ease((t - 0.5) / 0.4), ("CONCORDO", "DISCORDO"))
+        dd = ImageDraw.Draw(cv); a = ease((t - 1.2) / 0.4)
+        if a > 0:
+            dd.text((540, 1220), "COMENTA AQUI EMBAIXO", font=font(FD, 38), fill=WHITE, anchor="mm"); dd.polygon([(520, 1260), (560, 1260), (540, 1290)], fill=YEL)
+            dd.rounded_rectangle([340, 1330, 740, 1410], 14, fill=YEL); dd.text((540, 1370), "GIRO MADEIRA", font=font(FD, 40), fill=(20, 20, 28), anchor="mm")
+    sc.append(Scene("E você, o que acha disso? Conta aqui nos comentários. Segue o Giro Madeira.", ["acha"], q))
+    return sc
+
+def spoken_title(t): return t if t.endswith((".", "?", "!")) else t + "."
+
+def render_auto(result, category, folder, picture=None):
+    """Video explicativo automatico: so pauta verificada; foto de personagem so de cargo publico e fora de crime/tragedia."""
+    texts = [str(result["title"])] + [str(x) for x in result["scenes"]]
+    tragic = bool(TRAGEDY.search(" ".join(texts))) or (category or "").upper() in ("SEGURANÇA", "SEGURANCA")
+    pessoas = []; creditos = []
+    if not tragic:
+        for pe in find_people(texts):
+            ph = commons_photo(pe["nome"], [pe["nome"].split()[-1]])
+            if ph: pe["img"] = ph["img"]; creditos.append(ph["credit"].replace(" / Wikimedia Commons", ""))
+            pessoas.append(pe)
+    sc = auto_scenes(result, category, pessoas, picture)
+    cred = ("; ".join(dict.fromkeys(creditos))[:90] + " / Wikimedia Commons") if creditos else ""
+    out = Path(folder) / "giro_short.mp4"
+    dur = render(str(out), sc, str(result.get("source_name") or "Fonte"), cred)
+    return out, dur, True
+
 def exemplo(out="reel-motion-qa/reel-motion.mp4"):
     Path(out).parent.mkdir(exist_ok=True)
     fachin = {"nome": "Edson Fachin", "cargo": "presidente do STF"}
@@ -235,7 +317,7 @@ def exemplo(out="reel-motion-qa/reel-motion.mp4"):
     cred = []
     if f: cred.append(f["credit"])
     if lugar: cred.append(lugar["credit"])
-    d = render(out, [fachin], lugar, "CNN Brasil, Poder360, Agência Brasil", "; ".join(dict.fromkeys(c.replace(" / Wikimedia Commons", "") for c in cred))[:90] + " / Wikimedia Commons")
+    d = render(out, build([fachin], lugar), "CNN Brasil, Poder360, Agência Brasil", "; ".join(dict.fromkeys(c.replace(" / Wikimedia Commons", "") for c in cred))[:90] + " / Wikimedia Commons")
     print("EXPLAINER_OK dur=%.1f foto_fachin=%s lugar=%s" % (d, bool(f), bool(lugar)))
 
 if __name__ == "__main__":

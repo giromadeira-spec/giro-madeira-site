@@ -58,7 +58,14 @@ def pick(tok, requested):
     return None, {}, None
 
 def exemplo():
-    import giro_explainer; return giro_explainer.exemplo()  # modo explicativo (QA): personagens, listas, carimbos e pergunta
+    import giro_explainer, tempfile as _tf
+    r = {"title": "Com Master na Presidência do STF, Fachin quer ouvir PGR sobre investigações",
+         "scenes": ["O ministro Edson Fachin assinou os despachos na quarta-feira (4).", "A medida é provisória e ocorre em meio a um impasse na Corte.",
+                    "Ainda não há prazo para a resposta da PGR."], "source_name": "CNN Brasil"}
+    with _tf.TemporaryDirectory() as d:
+        video, dur, _ = giro_explainer.render_auto(r, "POLÍTICA", d, None)  # teste do roteiro AUTOMATICO
+        Path("reel-motion-qa").mkdir(exist_ok=True); Path("reel-motion-qa/reel-motion.mp4").write_bytes(Path(video).read_bytes()); print("AUTO_OK", dur)
+    return
     """Reel de exemplo de noticia mundial viral (so QA, sem ponte, sem publicar)."""
     # Exemplo com imagens do ChatGPT por cena ja existentes (noticia do STF, fila de video 19165) so para mostrar o layout.
     os.environ["GIRO_MAX_DUR"] = "75"; os.environ["GIRO_VOZ_FLUIDA"] = "1"

@@ -1093,6 +1093,22 @@ def attach_scene_images(beats,images):
 def render_motion(result,category,folder,credit,picture=None,photo_label="",scene_images=None):
     """Motion graphics + narracao gratuita. Texto vem so da pauta verificada. Devolve (video, duracao)."""
     sys.path.insert(0,str(ROOT/"scripts"))
+    if os.environ.get("GIRO_EXPLAINER","1")=="1":
+        # Padrao explicativo (autorizado por Gilson em 08/11/2026): personagens, listas, carimbos, pergunta final. Falhou: formato anterior.
+        try:
+            import giro_explainer
+            video,dur,voiced=giro_explainer.render_auto(result,category,folder,picture)
+            probe=subprocess.run(["ffprobe","-v","error","-show_entries","format=duration:stream=codec_type,codec_name,width,height,avg_frame_rate","-of","json",str(video)],capture_output=True,text=True,check=True)
+            meta=json.loads(probe.stdout); vs=[x for x in meta["streams"] if x["codec_type"]=="video"][0]; dur=float(meta["format"]["duration"])
+            from fractions import Fraction
+            if vs["codec_name"]!="h264" or vs["width"]!=1080 or vs["height"]!=1920 or Fraction(vs["avg_frame_rate"])!=30:raise RuntimeError("explainer format invalid")
+            if not any(x["codec_type"]=="audio" and x["codec_name"]=="aac" for x in meta["streams"]):raise RuntimeError("explainer without audio")
+            if not 8.0<=dur<=float(os.environ.get("GIRO_MAX_DUR","59")):raise RuntimeError("explainer duration out of range")
+            if not (100000<Path(video).stat().st_size<30*1024*1024):raise RuntimeError("explainer size out of bounds")
+            print("Padrao explicativo usado:",round(dur,1),"s")
+            return video,dur,True
+        except Exception as exc:
+            print("Padrao explicativo indisponivel, usando formato anterior:",type(exc).__name__,str(exc)[:160])
     import giro_motion, giro_voz
     beats=giro_motion.build_beats(result["title"],result["scenes"],category,has_photo=picture is not None)
     broll=[]
