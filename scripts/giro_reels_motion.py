@@ -59,12 +59,15 @@ def pick(tok, requested):
 
 def exemplo():
     """Reel de exemplo de noticia mundial viral (so QA, sem ponte, sem publicar)."""
-    result = {"title": "Japão alerta para novos tremores após terremoto de magnitude 5,7",
-              "scenes": ["Um terremoto de magnitude 5,7 atingiu o Japão.", "O tremor deixou feridos.",
-                         "As autoridades japonesas alertam para novos tremores."],
-              "source_name": "G1 e UOL Notícias"}
+    # Exemplo com imagens do ChatGPT por cena ja existentes (noticia do STF, fila de video 19165) so para mostrar o layout.
+    result = {"title": "Com Master na Presidência do STF, Fachin quer ouvir PGR sobre investigações",
+              "scenes": ["Os despachos foram assinados na quarta-feira (4).",
+                         "As frentes são as suspeitas de fraude em operações entre o Master e o BRB (Banco de Brasília).",
+                         "A medida é provisória e ocorre em meio a um impasse na Corte."],
+              "source_name": "CNN Brasil"}
+    imgs = sa.chatgpt_scene_images(19165)
     with tempfile.TemporaryDirectory(prefix="giro-reel-exemplo-") as tmp:
-        video, dur, narrated = sa.render_motion(result, "MUNDO", tmp, "Giro Madeira", picture=None)
+        video, dur, narrated = sa.render_motion(result, "POLÍTICA", tmp, "Giro Madeira", picture=None, scene_images=imgs)
         if not narrated: raise RuntimeError("reel_without_narration")
         Path("reel-motion-qa").mkdir(exist_ok=True)
         Path("reel-motion-qa/reel-motion.mp4").write_bytes(Path(video).read_bytes())
