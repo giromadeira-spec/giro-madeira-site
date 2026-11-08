@@ -215,7 +215,8 @@ def render(out, sc, fonte, creditos):
             ws = s.voz.split(); ch = [" ".join(ws[k:k + 6]) for k in range(0, len(ws), 6)]
             caption(cv, ch[min(len(ch) - 1, int(lt / (s.dur - 0.25) * len(ch)))], s.hi)
             dd = ImageDraw.Draw(cv); dd.rectangle([0, 0, W, 10], fill=(0, 0, 0, 40)); dd.rectangle([0, 0, W * t / total, 10], fill=YEL)
-            cv.alpha_composite(selo, (34, 36)); dd.text((W - 40, 70), "PRÉVIA DE TESTE", font=font(FD, 24), fill=(190, 198, 215), anchor="rm")
+            cv.alpha_composite(selo, (34, 36))
+            if os.environ.get("GIRO_EXPL_PREVIA") == "1": dd.text((W - 40, 70), "PRÉVIA DE TESTE", font=font(FD, 24), fill=(190, 198, 215), anchor="rm")
             dd.text((W // 2, H - 150), "Fontes: " + fonte, font=font(FM, 26), fill=(190, 198, 215), anchor="mm")
             if creditos: dd.text((W // 2, H - 110), "Fotos: " + creditos, font=font(FM, 22), fill=(150, 158, 175), anchor="mm")
             if lt < 0.08: cv = Image.blend(cv, Image.new("RGBA", cv.size, (255, 255, 255, 255)), 0.3 * (1 - lt / 0.08))
@@ -272,7 +273,7 @@ def auto_scenes(result, category, pessoas, picture):
         hi = [w for w in re.findall(r"\w+", ft) if re.search(r"\d", w)][:2] or [max(re.findall(r"\w+", ft), key=len)]
         def draw(v, cv, t, d, tt, pe=pe, st=st, unk=unk, ft=ft, n=n):
             if pe is not None:
-                head(cv, "Quem é o personagem", [], 330, kicker + " · " + str(n) + "/" + str(len(facts)))
+                head(cv, "Em foco", [], 330, kicker + " · " + str(n) + "/" + str(len(facts)))
                 cv.alpha_composite(ph_card(pe, 360, 1.0, -3), (int(330 + (1 - ease(t / 0.5)) * -500), 470)); fact_box(cv, 1130, ft, ease((t - 0.8) / 0.4), mark="ok")
             elif st:
                 head(cv, "O que se sabe", [], 330, kicker + " · " + str(n) + "/" + str(len(facts))); stamp(cv, st, ease((t - 0.5) / 0.4), 540, 760, 96, GOLD, -7); fact_box(cv, 960, ft, ease((t - 1.6) / 0.4))

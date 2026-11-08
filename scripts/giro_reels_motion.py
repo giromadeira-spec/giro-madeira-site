@@ -58,6 +58,7 @@ def pick(tok, requested):
     return None, {}, None
 
 def exemplo():
+    os.environ["GIRO_EXPL_PREVIA"] = "1"
     import giro_explainer, tempfile as _tf
     r = {"title": "Com Master na Presidência do STF, Fachin quer ouvir PGR sobre investigações",
          "scenes": ["O ministro Edson Fachin assinou os despachos na quarta-feira (4).", "A medida é provisória e ocorre em meio a um impasse na Corte.",
