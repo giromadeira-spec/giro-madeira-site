@@ -58,6 +58,7 @@ def pick(tok, requested):
     return None, {}, None
 
 def exemplo():
+    import giro_explainer; return giro_explainer.exemplo()  # modo explicativo (QA): personagens, listas, carimbos e pergunta
     """Reel de exemplo de noticia mundial viral (so QA, sem ponte, sem publicar)."""
     # Exemplo com imagens do ChatGPT por cena ja existentes (noticia do STF, fila de video 19165) so para mostrar o layout.
     os.environ["GIRO_MAX_DUR"] = "75"; os.environ["GIRO_VOZ_FLUIDA"] = "1"
