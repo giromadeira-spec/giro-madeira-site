@@ -57,7 +57,22 @@ def pick(tok, requested):
         if have >= 4: return data, {}, imgs
     return None, {}, None
 
+def exemplo():
+    """Reel de exemplo de noticia mundial viral (so QA, sem ponte, sem publicar)."""
+    result = {"title": "Japão alerta para novos tremores após terremoto de magnitude 5,7",
+              "scenes": ["Um terremoto de magnitude 5,7 atingiu o Japão.", "O tremor deixou feridos.",
+                         "As autoridades japonesas alertam para novos tremores."],
+              "source_name": "G1 e UOL Notícias"}
+    with tempfile.TemporaryDirectory(prefix="giro-reel-exemplo-") as tmp:
+        video, dur, narrated = sa.render_motion(result, "MUNDO", tmp, "Giro Madeira", picture=None)
+        if not narrated: raise RuntimeError("reel_without_narration")
+        Path("reel-motion-qa").mkdir(exist_ok=True)
+        Path("reel-motion-qa/reel-motion.mp4").write_bytes(Path(video).read_bytes())
+        print("EXEMPLO_OK dur=" + str(round(dur, 1)) + " narrated=" + str(narrated))
+
 def main():
+    if os.environ.get("GIRO_REEL_EXEMPLO") == "1":
+        return exemplo()
     tok = qa.token()
     requested = int(os.environ.get("GIRO_TEST_REEL_ID", "0") or "0")
     data, extra, scene_imgs = pick(tok, requested)

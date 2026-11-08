@@ -64,7 +64,7 @@ jobs:
           PYTHONUNBUFFERED: '1'
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            GIRO_TEST_REEL_ID="${{ github.event.inputs.reel_id }}" python scripts/giro_reels_motion.py
+            GIRO_REEL_EXEMPLO="${{ github.event.inputs.modo == 'exemplo' && '1' || '0' }}" GIRO_TEST_REEL_ID="${{ github.event.inputs.reel_id }}" python scripts/giro_reels_motion.py
           elif [ "${{ github.event_name }}" = "push" ]; then
             python scripts/giro_reels_226_kokoro.py
           else
