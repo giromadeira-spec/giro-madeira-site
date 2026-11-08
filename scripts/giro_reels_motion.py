@@ -60,10 +60,24 @@ def pick(tok, requested):
 def exemplo():
     """Reel de exemplo de noticia mundial viral (so QA, sem ponte, sem publicar)."""
     # Exemplo com imagens do ChatGPT por cena ja existentes (noticia do STF, fila de video 19165) so para mostrar o layout.
-    result = {"title": "Com Master na Presidência do STF, Fachin quer ouvir PGR sobre investigações",
-              "scenes": ["Os despachos foram assinados na quarta-feira (4).",
-                         "As frentes são as suspeitas de fraude em operações entre o Master e o BRB (Banco de Brasília).",
-                         "A medida é provisória e ocorre em meio a um impasse na Corte."],
+    os.environ["GIRO_MAX_DUR"] = "68"
+    result = {"title": "Fachin quer ouvir a PGR sobre as investigações do caso Master. Entenda.",
+              "scenes": ["Os despachos foram assinados na quarta-feira, dia 4.",
+                         "Eles tratam de investigações ligadas ao Banco Master.",
+                         "As frentes são as suspeitas de fraude em operações entre o Master e o BRB, o Banco de Brasília.",
+                         "A medida é provisória.",
+                         "E acontece em meio a um impasse dentro da Corte.",
+                         "O que isso significa na prática?",
+                         "Fachin ainda não decidiu nada de forma definitiva. Primeiro ele quer ouvir a Procuradoria-Geral da República.",
+                         "Só depois do parecer da PGR o caso pode seguir para o próximo passo.",
+                         "Agora, o que ainda não se sabe.",
+                         "Não está claro quanto tempo a PGR vai levar para responder.",
+                         "Também não está claro como o impasse na Corte vai ser resolvido.",
+                         "Uma pergunta que muita gente faz: será que o parecer da PGR pode mudar o rumo das investigações?",
+                         "É uma possibilidade, mas ainda é só uma hipótese. Nada foi confirmado.",
+                         "E você, o que acha? A decisão do Fachin de ouvir a PGR primeiro é o caminho certo?",
+                         "Conta aqui nos comentários.",
+                         "Segue o Giro Madeira para acompanhar os próximos passos."],
               "source_name": "CNN Brasil"}
     imgs = sa.chatgpt_scene_images(19165)
     with tempfile.TemporaryDirectory(prefix="giro-reel-exemplo-") as tmp:

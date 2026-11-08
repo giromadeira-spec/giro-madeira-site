@@ -1124,7 +1124,7 @@ def render_motion(result,category,folder,credit,picture=None,photo_label="",scen
     if vs["codec_name"]!="h264" or vs["width"]!=1080 or vs["height"]!=1920 or Fraction(vs["avg_frame_rate"])!=30:
         raise RuntimeError("Motion video format invalid")
     if not any(x["codec_type"]=="audio" and x["codec_name"]=="aac" for x in streams):raise RuntimeError("Motion video without AAC audio")
-    if not 8.0<=dur<=59.0:raise RuntimeError("Motion video duration outside Shorts range")
+    if not 8.0<=dur<=float(os.environ.get("GIRO_MAX_DUR","59")):raise RuntimeError("Motion video duration outside Shorts range")
     return video,dur,bool(voices)
 
 def main():
