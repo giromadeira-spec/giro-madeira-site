@@ -235,7 +235,7 @@ def exemplo(out="reel-motion-qa/reel-motion.mp4"):
     cred = []
     if f: cred.append(f["credit"])
     if lugar: cred.append(lugar["credit"])
-    d = render(out, [fachin], lugar, "CNN Brasil, Poder360, Agência Brasil", " · ".join(dict.fromkeys(cred))[:140])
+    d = render(out, [fachin], lugar, "CNN Brasil, Poder360, Agência Brasil", "; ".join(dict.fromkeys(c.replace(" / Wikimedia Commons", "") for c in cred))[:90] + " / Wikimedia Commons")
     print("EXPLAINER_OK dur=%.1f foto_fachin=%s lugar=%s" % (d, bool(f), bool(lugar)))
 
 if __name__ == "__main__":
