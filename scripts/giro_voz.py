@@ -3,6 +3,7 @@
 Falha com segurança: qualquer problema devolve None e o vídeo segue só com a trilha original.
 Usa somente o texto já verificado da pauta; não inventa nada.
 """
+import os
 import re, wave
 from pathlib import Path
 
@@ -47,7 +48,7 @@ def narrate(texts, folder, voice=VOICE):
             if not line:
                 out.append(None); continue
             audio = None
-            for speed in (1.0, 1.12, 1.25):
+            for speed in ((1.08, 1.15, 1.25) if os.environ.get("GIRO_VOZ_FLUIDA") == "1" else (1.0, 1.12, 1.25)):
                 parts = [np.asarray(a, dtype="float32") for _, _, a in pipe(line, voice=voice, speed=speed) if a is not None]
                 if not parts:
                     raise RuntimeError("Kokoro sem áudio")
@@ -57,6 +58,10 @@ def narrate(texts, folder, voice=VOICE):
             if len(audio) / SR > MAX_SCENE_SECONDS:
                 print("Narração da cena %d longa demais (%.1fs); vídeo seguirá sem voz." % (i, len(audio) / SR))
                 return None
+            if os.environ.get("GIRO_VOZ_FLUIDA") == "1":  # opt-in: corta silencio das pontas para a fala emendar sem pausas
+                nz = np.where(np.abs(audio) > 0.012)[0]
+                if len(nz):
+                    audio = audio[max(0, nz[0] - int(0.03 * SR)): nz[-1] + int(0.05 * SR)]
             path = Path(folder) / ("voz%d.wav" % i)
             _write_wav(path, audio)
             out.append(path)

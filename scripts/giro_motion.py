@@ -247,7 +247,7 @@ class V:
             p = os.path.join(base, bt["voz"]) if bt.get("voz") else None
             d = probe_dur(p) if p and os.path.exists(p) else None
             self.voz.append(p if d else None)
-            self.durs.append((d + 0.32) if d else 0.38 * len(bt["txt"].split()) + 0.6)
+            self.durs.append((d + (0.06 if os.environ.get("GIRO_VOZ_FLUIDA") == "1" else 0.32)) if d else 0.38 * len(bt["txt"].split()) + 0.6)
         self.starts = [sum(self.durs[:i]) for i in range(len(self.b))]
         self.OUT = 2.6; self.total = sum(self.durs) + self.OUT
         novo = os.path.join(ASSETS, "giro-logo-oficial.png")
